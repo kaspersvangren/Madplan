@@ -16,6 +16,7 @@
     fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
     label { display: block; margin: 0.25rem 0; }
     table {
+      table-layout: auto;
       width: 100%;
       border-collapse: collapse;
       background: white;
@@ -23,11 +24,10 @@
     th, td {
       padding: 0.5rem;
       border: 1px solid #ddd;
-      text-align: left;
+      text-align: center;
+      white-space: nowrap;
     }
-    th {
-      background: #eee;
-    }
+    th { background: #eee; }
     thead th {
       position: sticky;
       top: 0;
