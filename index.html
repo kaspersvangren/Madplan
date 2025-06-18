@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <title>Min Madplan</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; background-color: #f9f9f9; }
+    h1 { text-align: center; }
+    .filters, .kontrol { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+    fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
+    label { display: inline-block; margin: 0.25rem 0.5rem; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { padding: 0.75rem; border: 1px solid #ddd; text-align: left; }
+    th { background: #f0f0f0; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Madoversigt fra Google Sheet</h1>
+  <div class="kontrol">
+    <button onclick="hentData()">🔄 Hent madplan</button>
+  </div>
+
+  <div class="filters">
+    <fieldset>
+      <legend>Praktisk</legend>
+      <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
+      <label><input type="checkbox" id="filter-to-dage" /> Kan spises 2 dage</label>
+      <label><input type="checkbox" id="filter-nem" /> Nem ret</label>
+    </fieldset>
+    <fieldset>
+      <legend>Kødtype & Vegetar</legend>
+      <label><input type="checkbox" id="filter-okse" /> Oksekød</label>
+      <label><input type="checkbox" id="filter-gris" /> Svinekød</label>
+      <label><input type="checkbox" id="filter-kylling" /> Kylling</label>
+      <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
+    </fieldset>
+  </div>
+
+  <table id="ret-tabel">
+    <thead>
+      <tr>
+        <th>Navn</th>
+        <th>Vegetar</th>
+        <th>Oksekød</th>
+        <th>Kylling</th>
+        <th>Svinekød</th>
+        <th>2 dage</th>
+        <th>Nem ret</th>
+        <th>Agnes kan lide</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const filters = {
+      agnes: document.getElementById("filter-agnes"),
+      toDage: document.getElementById("filter-to-dage"),
+      nem: document.getElementById("filter-nem"),
+      vegetar: document.getElementById("filter-vegetar"),
+      okse: document.getElementById("filter-okse"),
+      kylling: document.getElementById("filter-kylling"),
+      gris: document.getElementById("filter-gris")
+    };
+    const tbody = document.querySelector("#ret-tabel tbody");
+    let alleRetter = [];
+
+    function hentData() {
+      fetch("https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan")
+        .then(response => response.text())
+        .then(csv => {
+          const parsed = Papa.parse(csv, { header: true });
+          alleRetter = parsed.data.map((r) => ({
+            navn: r["Navn"],
+            vegetar: r["Vegetar"] === "X",
+            okse: r["Oksekød"] === "X",
+            kylling: r["Kyllingekød"] === "X",
+            gris: r["Grisekød"] === "X",
+            toDage: r["2 dage"] === "X",
+            nem: r["Nem ret"] === "X",
+            agnes: r["Agnes"] === "X"
+          }));
+          visFiltreredeRetter();
+        });
+    }
+
+    Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
+
+    function visFiltreredeRetter() {
+      const filtreret = alleRetter.filter((r) => {
+        if (filters.agnes.checked && !r.agnes) return false;
+        if (filters.toDage.checked && !r.toDage) return false;
+        if (filters.nem.checked && !r.nem) return false;
+        if (filters.vegetar.checked && !r.vegetar) return false;
+        if (filters.okse.checked && !r.okse) return false;
+        if (filters.kylling.checked && !r.kylling) return false;
+        if (filters.gris.checked && !r.gris) return false;
+        return true;
+      });
+
+      tbody.innerHTML = "";
+      filtreret.forEach((r) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>\${r.navn}</td>
+          <td>\${r.vegetar ? "✔" : ""}</td>
+          <td>\${r.okse ? "✔" : ""}</td>
+          <td>\${r.kylling ? "✔" : ""}</td>
+          <td>\${r.gris ? "✔" : ""}</td>
+          <td>\${r.toDage ? "✔" : ""}</td>
+          <td>\${r.nem ? "✔" : ""}</td>
+          <td>\${r.agnes ? "✔" : ""}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
