@@ -7,14 +7,38 @@
   <style>
     body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
     h1 { text-align: center; }
-    table { width: 100%; border-collapse: collapse; background: white; }
-    th, td { padding: 0.5rem; border: 1px solid #ddd; }
-    th { background: #eee; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
+    label { display: block; margin: 0.25rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background: #eee;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #eee;
+      z-index: 1;
+    }
   </style>
 </head>
 <body>
   <h1>Madplan</h1>
-  
+
   <div class="filters">
     <fieldset>
       <legend>Praktisk</legend>
@@ -30,8 +54,8 @@
       <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
     </fieldset>
   </div>
+
   <table id="madplan">
-    
     <thead>
       <tr>
         <th>Navn</th>
@@ -51,50 +75,25 @@
     const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
     const tableBody = document.querySelector("#madplan tbody");
 
+    const filters = {
+      "Agnes": document.getElementById("filter-agnes"),
+      "2 dage": document.getElementById("filter-to-dage"),
+      "Nem ret": document.getElementById("filter-nem"),
+      "Oksekød": document.getElementById("filter-oksekød"),
+      "Grisekød": document.getElementById("filter-grisekød"),
+      "Kyllingekød": document.getElementById("filter-kyllingekød"),
+      "Vegetar": document.getElementById("filter-vegetar")
+    };
+
+    let allRows = [];
+
     fetch(url)
       .then(r => r.text())
       .then(csv => {
         const result = Papa.parse(csv, { header: true });
-        const rows = result.data;
-
-        
-        const filters = {
-          "Agnes": document.getElementById("filter-agnes"),
-          "2 dage": document.getElementById("filter-to-dage"),
-          "Nem ret": document.getElementById("filter-nem"),
-          "Oksekød": document.getElementById("filter-oksekød"),
-          "Grisekød": document.getElementById("filter-grisekød"),
-          "Kyllingekød": document.getElementById("filter-kyllingekød"),
-          "Vegetar": document.getElementById("filter-vegetar")
-        };
-
-        Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
+        allRows = result.data;
         visFiltreredeRetter();
-
-        function visFiltreredeRetter() {
-          tableBody.innerHTML = "";
-          rows.forEach(row => {
-            for (const key in filters) {
-              if (filters[key].checked && row[key] !== "X") return;
-            }
-    
-          const tr = document.createElement("tr");
-
-          const navn = document.createElement("td");
-          navn.textContent = row["Navn"] || "";
-          tr.appendChild(navn);
-
-          const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
-          cols.forEach(col => {
-            const td = document.createElement("td");
-            td.textContent = row[col] === "X" ? "✔" : "";
-            tr.appendChild(td);
-          });
-
-                      tableBody.appendChild(tr);
-          });
-        }
-        });
+        Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
       })
       .catch(err => {
         const row = document.createElement("tr");
@@ -105,6 +104,29 @@
         row.appendChild(cell);
         tableBody.appendChild(row);
       });
+
+    function visFiltreredeRetter() {
+      tableBody.innerHTML = "";
+      allRows.forEach(row => {
+        for (const key in filters) {
+          if (filters[key].checked && row[key] !== "X") return;
+        }
+        const tr = document.createElement("tr");
+
+        const navn = document.createElement("td");
+        navn.textContent = row["Navn"] || "";
+        tr.appendChild(navn);
+
+        const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
+        cols.forEach(col => {
+          const td = document.createElement("td");
+          td.textContent = row[col] === "X" ? "✔" : "";
+          tr.appendChild(td);
+        });
+
+        tableBody.appendChild(tr);
+      });
+    }
   </script>
 </body>
 </html>
