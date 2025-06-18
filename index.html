@@ -7,20 +7,18 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 2rem; background-color: #f9f9f9; }
     h1 { text-align: center; }
-    .filters, .kontrol { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+    .filters { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
     fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
     label { display: inline-block; margin: 0.25rem 0.5rem; }
     table { width: 100%; border-collapse: collapse; background: white; }
     th, td { padding: 0.75rem; border: 1px solid #ddd; text-align: left; }
     th { background: #f0f0f0; }
-    button { padding: 0.5rem 1rem; font-size: 1rem; }
+    .error { color: red; text-align: center; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>Madoversigt fra Google Sheet</h1>
-  <div class="kontrol">
-    <button onclick="hentData()">🔄 Hent madplan</button>
-  </div>
+  <div id="error" class="error"></div>
 
   <div class="filters">
     <fieldset>
@@ -65,26 +63,33 @@
       gris: document.getElementById("filter-gris")
     };
     const tbody = document.querySelector("#ret-tabel tbody");
+    const errorBox = document.getElementById("error");
     let alleRetter = [];
 
-    function hentData() {
-      fetch("https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan")
-        .then(response => response.text())
-        .then(csv => {
-          const parsed = Papa.parse(csv, { header: true });
-          alleRetter = parsed.data.map((r) => ({
-            navn: r["Navn"],
-            vegetar: r["Vegetar"] === "X",
-            okse: r["Oksekød"] === "X",
-            kylling: r["Kyllingekød"] === "X",
-            gris: r["Grisekød"] === "X",
-            toDage: r["2 dage"] === "X",
-            nem: r["Nem ret"] === "X",
-            agnes: r["Agnes"] === "X"
-          }));
-          visFiltreredeRetter();
-        });
-    }
+    const csvUrl = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
+
+    fetch(csvUrl)
+      .then(response => {
+        if (!response.ok) throw new Error("Kunne ikke hente data fra Google Sheet.");
+        return response.text();
+      })
+      .then(csv => {
+        const parsed = Papa.parse(csv, { header: true });
+        alleRetter = parsed.data.map((r) => ({
+          navn: r["Navn"],
+          vegetar: r["Vegetar"] === "X",
+          okse: r["Oksekød"] === "X",
+          kylling: r["Kyllingekød"] === "X",
+          gris: r["Grisekød"] === "X",
+          toDage: r["2 dage"] === "X",
+          nem: r["Nem ret"] === "X",
+          agnes: r["Agnes"] === "X"
+        }));
+        visFiltreredeRetter();
+      })
+      .catch(err => {
+        errorBox.textContent = "FEJL: " + err.message;
+      });
 
     Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
 
