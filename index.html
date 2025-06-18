@@ -109,14 +109,14 @@
       filtreret.forEach((r) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>\${r.navn}</td>
-          <td>\${r.vegetar ? "✔" : ""}</td>
-          <td>\${r.okse ? "✔" : ""}</td>
-          <td>\${r.kylling ? "✔" : ""}</td>
-          <td>\${r.gris ? "✔" : ""}</td>
-          <td>\${r.toDage ? "✔" : ""}</td>
-          <td>\${r.nem ? "✔" : ""}</td>
-          <td>\${r.agnes ? "✔" : ""}</td>
+          <td>${r.navn}</td>
+          <td>${r.vegetar ? "✔" : ""}</td>
+          <td>${r.okse ? "✔" : ""}</td>
+          <td>${r.kylling ? "✔" : ""}</td>
+          <td>${r.gris ? "✔" : ""}</td>
+          <td>${r.toDage ? "✔" : ""}</td>
+          <td>${r.nem ? "✔" : ""}</td>
+          <td>${r.agnes ? "✔" : ""}</td>
         `;
         tbody.appendChild(row);
       });
