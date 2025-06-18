@@ -5,10 +5,6 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    .container {
-      max-width: 900px;
-      margin: auto;
-    }
     body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
     h1 { text-align: center; }
     .filters {
@@ -33,14 +29,6 @@
 td:not(:first-child), th:not(:first-child) {
   width: 1%;
   text-align: center;
-}
-td:first-child, th:first-child {
-  max-width: 350px;
-  text-align: left;
-  white-space: nowrap;
-}
-  width: 1%;
-  text-align: center;
   text-align: center;
 }
 td:first-child, th:first-child {
@@ -58,7 +46,18 @@ td:first-child, th:first-child {
       background: #eee;
       z-index: 1;
     }
-  </style>
+  
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+    .navn-cell {
+      max-width: 350px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    </style>
 </head>
 <body>
   <div class="container">
@@ -139,7 +138,10 @@ td:first-child, th:first-child {
         const tr = document.createElement("tr");
 
         const navn = document.createElement("td");
-        navn.textContent = row["Navn"] || "";
+        const navnDiv = document.createElement("div");
+        navnDiv.className = "navn-cell";
+        navnDiv.textContent = row["Navn"] || "";
+        navn.appendChild(navnDiv);
         tr.appendChild(navn);
 
         const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
