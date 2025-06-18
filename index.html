@@ -2,87 +2,104 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-  <meta charset="UTF-8">
-  <title>Madplan - Fuldt System</title>
+  <meta charset="UTF-8" />
+  <title>Madplan – Integreret Drag'n'Drop</title>
   <style>
     body {
       font-family: sans-serif;
-      display: flex;
-      gap: 2rem;
-      padding: 2rem;
+      margin: 0;
       background: #f9f9f9;
     }
-    .retter, .ugeplan {
-      flex: 1;
-    }
-    .ret {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 0.5rem 1rem;
-      margin: 0.5rem 0;
-      cursor: grab;
+    header {
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 10;
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      gap: 2rem;
     }
-    .ret label {
-      font-size: 0.8rem;
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
     .ugeplan {
-      border: 2px solid #bbb;
-      border-radius: 10px;
-      padding: 1rem;
-      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      background: #fdfdfd;
+      min-width: 300px;
+    }
+    .ugeplan h3 {
+      margin-top: 0;
     }
     .dag {
+      padding: 0.4rem;
+      margin: 0.2rem 0;
       border: 1px dashed #aaa;
-      padding: 0.75rem;
-      margin: 0.5rem 0;
-      min-height: 2.5rem;
       border-radius: 5px;
+      min-height: 2rem;
       position: relative;
     }
     .dag.dragover {
       background: #e0ffe0;
     }
-    .ret-navn {
-      display: inline-block;
-    }
     .remove {
       position: absolute;
-      right: 0.5rem;
-      top: 0.5rem;
-      background: red;
-      color: white;
-      border: none;
+      right: 6px;
+      top: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid #666;
+      color: #666;
+      background: transparent;
+      font-size: 12px;
+      line-height: 14px;
+      padding: 0;
       cursor: pointer;
-      font-size: 0.8rem;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+    }
+    th {
+      background: #f0f0f0;
+      position: sticky;
+      top: 6rem;
+      z-index: 5;
+    }
+    td:first-child {
+      cursor: grab;
+      background: #fff;
     }
   </style>
 </head>
 <body>
-  <div class="retter">
-    <h2>Retter</h2>
-    <div class="ret" draggable="true" data-navn="Pizza">
-      <span class="ret-navn">Pizza</span>
-      <label><input type="checkbox" class="to-dage"> 2 dage</label>
-    </div>
-    <div class="ret" draggable="true" data-navn="Burger">
-      <span class="ret-navn">Burger</span>
-      <label><input type="checkbox" class="to-dage"> 2 dage</label>
-    </div>
-    <div class="ret" draggable="true" data-navn="Rugbrød">
-      <span class="ret-navn">Rugbrød</span>
-      <label><input type="checkbox" class="to-dage"> 2 dage</label>
-    </div>
-    <div class="ret" draggable="true" data-navn="Boller i karry">
-      <span class="ret-navn">Boller i karry</span>
-      <label><input type="checkbox" class="to-dage"> 2 dage</label>
-    </div>
+
+<header>
+  <div class="filters">
+    <label><input type="checkbox" id="filter-agnes"> Agnes</label>
+    <label><input type="checkbox" id="filter-nem"> Nem</label>
+    <label><input type="checkbox" id="filter-todage"> 2 dage</label>
+    <label><input type="checkbox" id="filter-vegetar"> Vegetar</label>
+    <label><input type="checkbox" id="filter-okse"> Oksekød</label>
+    <label><input type="checkbox" id="filter-kylling"> Kylling</label>
+    <label><input type="checkbox" id="filter-gris"> Svinekød</label>
   </div>
 
   <div class="ugeplan">
-    <h2>Ugens mad</h2>
+    <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
     <div class="dag" data-dag="lørdag">Lørdag:</div>
     <div class="dag" data-dag="søndag">Søndag:</div>
@@ -91,49 +108,68 @@
     <div class="dag" data-dag="onsdag">Onsdag:</div>
     <div class="dag" data-dag="torsdag">Torsdag:</div>
   </div>
+</header>
 
-  <script>
-    const dage = ["fredag", "lørdag", "søndag", "mandag", "tirsdag", "onsdag", "torsdag"];
-    let draggedRet = null;
-    let draggedToDage = false;
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th>Navn</th>
+        <th>Vegetar</th>
+        <th>Oksekød</th>
+        <th>Kylling</th>
+        <th>Svinekød</th>
+        <th>2 dage</th>
+        <th>Nem</th>
+        <th>Agnes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr draggable="true" data-navn="Pizza">
+        <td>Pizza</td><td>✔</td><td></td><td>✔</td><td></td><td></td><td>✔</td><td>✔</td>
+      </tr>
+      <tr draggable="true" data-navn="Rugbrød">
+        <td>Rugbrød</td><td>✔</td><td></td><td></td><td></td><td></td><td>✔</td><td></td>
+      </tr>
+      <tr draggable="true" data-navn="Boller i karry">
+        <td>Boller i karry</td><td></td><td>✔</td><td></td><td></td><td>✔</td><td>✔</td><td>✔</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
 
-    document.querySelectorAll(".ret").forEach(ret => {
-      ret.addEventListener("dragstart", e => {
-        draggedRet = ret.getAttribute("data-navn");
-        draggedToDage = ret.querySelector(".to-dage").checked;
-      });
+<script>
+  const dage = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
+  let draggedNavn = "";
+
+  document.querySelectorAll("tr[draggable]").forEach(row => {
+    row.addEventListener("dragstart", () => {
+      draggedNavn = row.getAttribute("data-navn");
     });
+  });
 
-    document.querySelectorAll(".dag").forEach(dag => {
-      dag.addEventListener("dragover", e => {
-        e.preventDefault();
-        dag.classList.add("dragover");
-      });
-      dag.addEventListener("dragleave", () => {
-        dag.classList.remove("dragover");
-      });
-      dag.addEventListener("drop", () => {
-        dag.classList.remove("dragover");
-        const dagNavn = dag.getAttribute("data-dag");
-
-        const indsætRet = (dagnavn) => {
-          const target = document.querySelector(`.dag[data-dag='${dagnavn}']`);
-          if (!target) return;
-          target.innerHTML = `${dagnavn.charAt(0).toUpperCase() + dagnavn.slice(1)}: ${draggedRet}
-            <button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">✖️</button>`;
-        };
-
-        indsætRet(dagNavn);
-
-        if (draggedToDage) {
-          const index = dage.indexOf(dagNavn);
-          if (index !== -1 && index < dage.length - 1) {
-            const næsteDag = dage[index + 1];
-            indsætRet(næsteDag);
-          }
-        }
-      });
+  document.querySelectorAll(".dag").forEach(dag => {
+    dag.addEventListener("dragover", e => {
+      e.preventDefault();
+      dag.classList.add("dragover");
     });
-  </script>
+    dag.addEventListener("dragleave", () => {
+      dag.classList.remove("dragover");
+    });
+    dag.addEventListener("drop", () => {
+      dag.classList.remove("dragover");
+      const dagNavn = dag.getAttribute("data-dag");
+      dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
+        `: ${draggedNavn}<button class="remove" onclick="fjernRet(this)">×</button>`;
+    });
+  });
+
+  function fjernRet(knap) {
+    const dag = knap.parentElement;
+    const dagNavn = dag.getAttribute("data-dag");
+    dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+  }
+</script>
+
 </body>
 </html>
