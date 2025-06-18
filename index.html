@@ -1,57 +1,122 @@
-
 <!DOCTYPE html>
 <html lang="da">
 <head>
   <meta charset="UTF-8" />
-  <title>Madplan – Integreret Drag'n'Drop</title>
+  <title>Madplan</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
+    document.querySelectorAll("#madplan tbody").forEach(tbody => {
+      tbody.addEventListener("dragstart", e => {
+        const row = e.target.closest("tr");
+        if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
+      });
+    });
+
+    document.querySelectorAll(".dag").forEach(dag => {
+      dag.addEventListener("dragover", e => {
+        e.preventDefault();
+        dag.classList.add("dragover");
+      });
+      dag.addEventListener("dragleave", () => {
+        dag.classList.remove("dragover");
+      });
+      dag.addEventListener("drop", e => {
+        dag.classList.remove("dragover");
+        const navn = e.dataTransfer.getData("text/plain");
+        const dagNavn = dag.getAttribute("data-dag");
+        dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
+          `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
+      });
+    });
+    
+</script>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      background: #f9f9f9;
+    body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
+    h1 { text-align: center; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
     }
-    header {
+    fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
+    label { display: block; margin: 0.25rem 0; }
+    table {
+      table-layout: auto;
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    th, td {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  white-space: nowrap;
+}
+td:not(:first-child), th:not(:first-child) {
+  width: 1%;
+  text-align: center;
+  text-align: center;
+}
+td:first-child, th:first-child {
+  text-align: left;
+}
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th { background: #eee; }
+    thead th {
       position: sticky;
       top: 0;
-      background: white;
-      z-index: 10;
+      background: #eee;
+      z-index: 1;
+    }
+  
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+    .navn-cell {
+      max-width: 350px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .plan-container {
+      position: sticky;
+      top: 0;
+      background: #fff;
       padding: 1rem;
-      border-bottom: 1px solid #ddd;
+      z-index: 100;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 2rem;
-    }
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
+      font-size: 1rem;
     }
     .ugeplan {
+      min-width: 280px;
+      background: #fff;
       border: 1px solid #ccc;
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 0.5rem 1rem;
-      background: #fdfdfd;
-      min-width: 300px;
     }
-    .ugeplan h3 {
-      margin-top: 0;
-    }
-    .dag {
-      padding: 0.4rem;
-      margin: 0.2rem 0;
-      border: 1px dashed #aaa;
-      border-radius: 5px;
+    .ugeplan .dag {
+      border: 1px dashed #999;
+      border-radius: 4px;
+      padding: 0.5rem;
+      margin: 0.3rem 0;
       min-height: 2rem;
       position: relative;
     }
-    .dag.dragover {
-      background: #e0ffe0;
+    .ugeplan .dag.dragover {
+      background-color: #e0ffe0;
     }
-    .remove {
+    .ugeplan button.remove {
       position: absolute;
       right: 6px;
-      top: 4px;
+      top: 6px;
       width: 18px;
       height: 18px;
       border-radius: 50%;
@@ -63,41 +128,27 @@
       padding: 0;
       cursor: pointer;
     }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 1rem;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 0.5rem;
-    }
-    th {
-      background: #f0f0f0;
-      position: sticky;
-      top: 6rem;
-      z-index: 5;
-    }
-    td:first-child {
-      cursor: grab;
-      background: #fff;
-    }
-  </style>
+    </style>
 </head>
 <body>
+  <div class="container">
+  <h1>Madplan</h1>
 
-<header>
-  <div class="filters">
-    <label><input type="checkbox" id="filter-agnes"> Agnes</label>
-    <label><input type="checkbox" id="filter-nem"> Nem</label>
-    <label><input type="checkbox" id="filter-todage"> 2 dage</label>
-    <label><input type="checkbox" id="filter-vegetar"> Vegetar</label>
-    <label><input type="checkbox" id="filter-okse"> Oksekød</label>
-    <label><input type="checkbox" id="filter-kylling"> Kylling</label>
-    <label><input type="checkbox" id="filter-gris"> Svinekød</label>
+  <div class="plan-container"><div class="filters">
+    <fieldset>
+      <legend>Praktisk</legend>
+      <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
+      <label><input type="checkbox" id="filter-to-dage" /> Kan spises 2 dage</label>
+      <label><input type="checkbox" id="filter-nem" /> Nem ret</label>
+    </fieldset>
+    <fieldset>
+      <legend>Kødtype & Vegetar</legend>
+      <label><input type="checkbox" id="filter-oksekød" /> Oksekød</label>
+      <label><input type="checkbox" id="filter-grisekød" /> Svinekød</label>
+      <label><input type="checkbox" id="filter-kyllingekød" /> Kylling</label>
+      <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
+    </fieldset>
   </div>
-
   <div class="ugeplan">
     <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
@@ -108,10 +159,8 @@
     <div class="dag" data-dag="onsdag">Onsdag:</div>
     <div class="dag" data-dag="torsdag">Torsdag:</div>
   </div>
-</header>
 
-<main>
-  <table>
+  <table id="madplan">
     <thead>
       <tr>
         <th>Navn</th>
@@ -120,56 +169,98 @@
         <th>Kylling</th>
         <th>Svinekød</th>
         <th>2 dage</th>
-        <th>Nem</th>
+        <th>Nem ret</th>
         <th>Agnes</th>
       </tr>
     </thead>
-    <tbody>
-      <tr draggable="true" data-navn="Pizza">
-        <td>Pizza</td><td>✔</td><td></td><td>✔</td><td></td><td></td><td>✔</td><td>✔</td>
-      </tr>
-      <tr draggable="true" data-navn="Rugbrød">
-        <td>Rugbrød</td><td>✔</td><td></td><td></td><td></td><td></td><td>✔</td><td></td>
-      </tr>
-      <tr draggable="true" data-navn="Boller i karry">
-        <td>Boller i karry</td><td></td><td>✔</td><td></td><td></td><td>✔</td><td>✔</td><td>✔</td>
-      </tr>
-    </tbody>
+    <tbody></tbody>
   </table>
-</main>
 
-<script>
-  const dage = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
-  let draggedNavn = "";
+  <script>
+    const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
+    const tableBody = document.querySelector("#madplan tbody");
 
-  document.querySelectorAll("tr[draggable]").forEach(row => {
-    row.addEventListener("dragstart", () => {
-      draggedNavn = row.getAttribute("data-navn");
-    });
-  });
+    const filters = {
+      "Agnes": document.getElementById("filter-agnes"),
+      "2 dage": document.getElementById("filter-to-dage"),
+      "Nem ret": document.getElementById("filter-nem"),
+      "Oksekød": document.getElementById("filter-oksekød"),
+      "Grisekød": document.getElementById("filter-grisekød"),
+      "Kyllingekød": document.getElementById("filter-kyllingekød"),
+      "Vegetar": document.getElementById("filter-vegetar")
+    };
 
-  document.querySelectorAll(".dag").forEach(dag => {
-    dag.addEventListener("dragover", e => {
-      e.preventDefault();
-      dag.classList.add("dragover");
-    });
-    dag.addEventListener("dragleave", () => {
-      dag.classList.remove("dragover");
-    });
-    dag.addEventListener("drop", () => {
-      dag.classList.remove("dragover");
-      const dagNavn = dag.getAttribute("data-dag");
-      dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
-        `: ${draggedNavn}<button class="remove" onclick="fjernRet(this)">×</button>`;
-    });
-  });
+    let allRows = [];
 
-  function fjernRet(knap) {
-    const dag = knap.parentElement;
-    const dagNavn = dag.getAttribute("data-dag");
-    dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
-  }
+    fetch(url)
+      .then(r => r.text())
+      .then(csv => {
+        const result = Papa.parse(csv, { header: true });
+        allRows = result.data;
+        visFiltreredeRetter();
+        Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
+      })
+      .catch(err => {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 8;
+        cell.style.color = "red";
+        cell.textContent = "FEJL: Kunne ikke hente data – " + err.message;
+        row.appendChild(cell);
+        tableBody.appendChild(row);
+      });
+
+    function visFiltreredeRetter() {
+      tableBody.innerHTML = "";
+      allRows.forEach(row => {
+        for (const key in filters) {
+          if (filters[key].checked && row[key] !== "X") return;
+        }
+        const tr = document.createElement("tr");
+
+        const navn = document.createElement("td");
+        const navnDiv = document.createElement("div");
+        navnDiv.className = "navn-cell";
+        navnDiv.textContent = row["Navn"] || "";
+        navn.appendChild(navnDiv);
+        tr.appendChild(navn);
+
+        const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
+        cols.forEach(col => {
+          const td = document.createElement("td");
+          td.textContent = row[col] === "X" ? "✔" : "";
+          tr.appendChild(td);
+        });
+
+        tableBody.appendChild(tr);
+      });
+    }
+  
+    document.querySelectorAll("#madplan tbody").forEach(tbody => {
+      tbody.addEventListener("dragstart", e => {
+        const row = e.target.closest("tr");
+        if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
+      });
+    });
+
+    document.querySelectorAll(".dag").forEach(dag => {
+      dag.addEventListener("dragover", e => {
+        e.preventDefault();
+        dag.classList.add("dragover");
+      });
+      dag.addEventListener("dragleave", () => {
+        dag.classList.remove("dragover");
+      });
+      dag.addEventListener("drop", e => {
+        dag.classList.remove("dragover");
+        const navn = e.dataTransfer.getData("text/plain");
+        const dagNavn = dag.getAttribute("data-dag");
+        dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
+          `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
+      });
+    });
+    
 </script>
-
+  </div>
 </body>
 </html>
