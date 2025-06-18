@@ -5,6 +5,10 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
     body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
     h1 { text-align: center; }
     .filters {
@@ -29,6 +33,14 @@
 td:not(:first-child), th:not(:first-child) {
   width: 1%;
   text-align: center;
+}
+td:first-child, th:first-child {
+  max-width: 350px;
+  text-align: left;
+  white-space: nowrap;
+}
+  width: 1%;
+  text-align: center;
   text-align: center;
 }
 td:first-child, th:first-child {
@@ -49,6 +61,7 @@ td:first-child, th:first-child {
   </style>
 </head>
 <body>
+  <div class="container">
   <h1>Madplan</h1>
 
   <div class="filters">
@@ -140,5 +153,6 @@ td:first-child, th:first-child {
       });
     }
   </script>
+  </div>
 </body>
 </html>
