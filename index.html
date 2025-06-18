@@ -1,25 +1,20 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-  <meta charset="UTF-8">
-  <title>Min Madplan</title>
+  <meta charset="UTF-8" />
+  <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 2rem; background-color: #f9f9f9; }
+    body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
     h1 { text-align: center; }
-    .filters { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
-    fieldset { border:1px solid #ccc; padding:1rem; border-radius:6px; }
-    label { display: inline-block; margin: 0.25rem 0.5rem; }
     table { width: 100%; border-collapse: collapse; background: white; }
-    th, td { padding: 0.75rem; border: 1px solid #ddd; text-align: left; }
-    th { background: #f0f0f0; }
-    .error { color: red; text-align: center; font-weight: bold; }
+    th, td { padding: 0.5rem; border: 1px solid #ddd; }
+    th { background: #eee; }
   </style>
 </head>
 <body>
-  <h1>Madoversigt fra Google Sheet</h1>
-  <div id="error" class="error"></div>
-
+  <h1>Madplan</h1>
+  
   <div class="filters">
     <fieldset>
       <legend>Praktisk</legend>
@@ -29,14 +24,14 @@
     </fieldset>
     <fieldset>
       <legend>Kødtype & Vegetar</legend>
-      <label><input type="checkbox" id="filter-okse" /> Oksekød</label>
-      <label><input type="checkbox" id="filter-gris" /> Svinekød</label>
-      <label><input type="checkbox" id="filter-kylling" /> Kylling</label>
+      <label><input type="checkbox" id="filter-oksekød" /> Oksekød</label>
+      <label><input type="checkbox" id="filter-grisekød" /> Svinekød</label>
+      <label><input type="checkbox" id="filter-kyllingekød" /> Kylling</label>
       <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
     </fieldset>
   </div>
-
-  <table id="ret-tabel">
+  <table id="madplan">
+    
     <thead>
       <tr>
         <th>Navn</th>
@@ -46,81 +41,70 @@
         <th>Svinekød</th>
         <th>2 dage</th>
         <th>Nem ret</th>
-        <th>Agnes kan lide</th>
+        <th>Agnes</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <script>
-    const filters = {
-      agnes: document.getElementById("filter-agnes"),
-      toDage: document.getElementById("filter-to-dage"),
-      nem: document.getElementById("filter-nem"),
-      vegetar: document.getElementById("filter-vegetar"),
-      okse: document.getElementById("filter-okse"),
-      kylling: document.getElementById("filter-kylling"),
-      gris: document.getElementById("filter-gris")
-    };
-    const tbody = document.querySelector("#ret-tabel tbody");
-    const errorBox = document.getElementById("error");
-    let alleRetter = [];
+    const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
+    const tableBody = document.querySelector("#madplan tbody");
 
-    const csvUrl = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
-
-    fetch(csvUrl)
-      .then(response => {
-        if (!response.ok) throw new Error("Kunne ikke hente data fra Google Sheet.");
-        return response.text();
-      })
+    fetch(url)
+      .then(r => r.text())
       .then(csv => {
-        const parsed = Papa.parse(csv, { header: true });
-        alleRetter = parsed.data.map((r) => ({
-          navn: r["Navn"],
-          vegetar: r["Vegetar"] === "X",
-          okse: r["Oksekød"] === "X",
-          kylling: r["Kyllingekød"] === "X",
-          gris: r["Grisekød"] === "X",
-          toDage: r["2 dage"] === "X",
-          nem: r["Nem ret"] === "X",
-          agnes: r["Agnes"] === "X"
-        }));
+        const result = Papa.parse(csv, { header: true });
+        const rows = result.data;
+
+        
+        const filters = {
+          "Agnes": document.getElementById("filter-agnes"),
+          "2 dage": document.getElementById("filter-to-dage"),
+          "Nem ret": document.getElementById("filter-nem"),
+          "Oksekød": document.getElementById("filter-oksekød"),
+          "Grisekød": document.getElementById("filter-grisekød"),
+          "Kyllingekød": document.getElementById("filter-kyllingekød"),
+          "Vegetar": document.getElementById("filter-vegetar")
+        };
+
+        Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
         visFiltreredeRetter();
+
+        function visFiltreredeRetter() {
+          tableBody.innerHTML = "";
+          rows.forEach(row => {
+            for (const key in filters) {
+              if (filters[key].checked && row[key] !== "X") return;
+            }
+    
+          const tr = document.createElement("tr");
+
+          const navn = document.createElement("td");
+          navn.textContent = row["Navn"] || "";
+          tr.appendChild(navn);
+
+          const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
+          cols.forEach(col => {
+            const td = document.createElement("td");
+            td.textContent = row[col] === "X" ? "✔" : "";
+            tr.appendChild(td);
+          });
+
+                      tableBody.appendChild(tr);
+          });
+        }
+        });
       })
       .catch(err => {
-        errorBox.textContent = "FEJL: " + err.message;
-      });
-
-    Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
-
-    function visFiltreredeRetter() {
-      const filtreret = alleRetter.filter((r) => {
-        if (filters.agnes.checked && !r.agnes) return false;
-        if (filters.toDage.checked && !r.toDage) return false;
-        if (filters.nem.checked && !r.nem) return false;
-        if (filters.vegetar.checked && !r.vegetar) return false;
-        if (filters.okse.checked && !r.okse) return false;
-        if (filters.kylling.checked && !r.kylling) return false;
-        if (filters.gris.checked && !r.gris) return false;
-        return true;
-      });
-
-      tbody.innerHTML = "";
-      filtreret.forEach((r) => {
         const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${r.navn}</td>
-          <td>${r.vegetar ? "✔" : ""}</td>
-          <td>${r.okse ? "✔" : ""}</td>
-          <td>${r.kylling ? "✔" : ""}</td>
-          <td>${r.gris ? "✔" : ""}</td>
-          <td>${r.toDage ? "✔" : ""}</td>
-          <td>${r.nem ? "✔" : ""}</td>
-          <td>${r.agnes ? "✔" : ""}</td>
-        `;
-        tbody.appendChild(row);
+        const cell = document.createElement("td");
+        cell.colSpan = 8;
+        cell.style.color = "red";
+        cell.textContent = "FEJL: Kunne ikke hente data – " + err.message;
+        row.appendChild(cell);
+        tableBody.appendChild(row);
       });
-    }
   </script>
 </body>
 </html>
