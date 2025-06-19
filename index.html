@@ -140,7 +140,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.17</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.18</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -235,7 +235,7 @@
         });
 
         tr.addEventListener("dragstart", e => {
-          e.dataTransfer.setData("text/plain", row["Navn"] || "");
+          e.dataTransfer.setData("application/x-ret-navn", row["Navn"] || "");
         });
 
         tableBody.appendChild(tr);
@@ -269,7 +269,8 @@
           e.preventDefault();
           dag.classList.remove("dragover");
 
-          const navn = e.dataTransfer.getData("text/plain");
+          if (!e.dataTransfer.types.includes("application/x-ret-navn")) return;
+          const navn = e.dataTransfer.getData("application/x-ret-navn");
           dag.setAttribute("data-ret", navn);
 
           const wrapper = document.createElement("div");
@@ -297,7 +298,7 @@
           dag.setAttribute("draggable", "true");
 
           dag.addEventListener("dragstart", ev => {
-            ev.dataTransfer.setData("text/plain", dag.getAttribute("data-ret"));
+            ev.dataTransfer.setData("application/x-ret-navn", dag.getAttribute("data-ret"));
           });
         });
       });
