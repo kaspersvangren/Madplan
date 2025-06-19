@@ -56,16 +56,11 @@
     }
 
     
-    .ugeplan .dag {
+    .ugeplan .dag .dag-indhold {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      overflow: hidden;
-    }
-
-    .ugeplan .dag .dag-label {
-      font-weight: bold;
     }
 
     .ugeplan .dag .ret-navn {
@@ -147,7 +142,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.15</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.16</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -268,32 +263,11 @@ tableBody.appendChild(tr);
           dag.classList.remove("dragover");
         });
         dag.addEventListener("drop", e => {
-          e.preventDefault();
           dag.classList.remove("dragover");
           const navn = e.dataTransfer.getData("text/plain");
           const dagNavn = dag.getAttribute("data-dag");
-
-          const label = document.createElement("span");
-          label.className = "dag-label";
-          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
-
-          const ret = document.createElement("span");
-          ret.className = "ret-navn";
-          ret.textContent = navn;
-
-          const btn = document.createElement("button");
-          btn.className = "remove";
-          btn.innerHTML = "×";
-          btn.onclick = function () {
-            dag.innerHTML = "";
-            dag.appendChild(label);
-          };
-
-          dag.innerHTML = "";
-          dag.appendChild(label);
-          dag.appendChild(ret);
-          dag.appendChild(btn);
-        });
+          dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) +
+            `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
         });
       });
     });
