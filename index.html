@@ -133,7 +133,7 @@ td:first-child, th:first-child {
 </head>
 <body>
   <div class="container">
-  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.7</small></h1>
+  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.8</small></h1>
 
   
 
@@ -166,6 +166,34 @@ td:first-child, th:first-child {
   <div class="ugeplan" style="position: sticky; top: 6rem; align-self: flex-start;">
     <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
+
+<div id="filter-container" style="
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: center;
+  background: #f8f8f8;
+  padding: 1rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+">
+  <fieldset style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <legend>Praktisk</legend>
+    <label><input type="checkbox" id="filter-agnes"> Agnes kan lide</label>
+    <label><input type="checkbox" id="filter-todage"> Kan spises 2 dage</label>
+    <label><input type="checkbox" id="filter-nem"> Nem ret</label>
+  </fieldset>
+  <fieldset style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <legend>Kødtype & Vegetar</legend>
+    <label><input type="checkbox" id="filter-okse"> Oksekød</label>
+    <label><input type="checkbox" id="filter-gris"> Svinekød</label>
+    <label><input type="checkbox" id="filter-kylling"> Kylling</label>
+    <label><input type="checkbox" id="filter-vegetar"> Vegetar</label>
+  </fieldset>
+</div>
+
     <div class="dag" data-dag="lørdag">Lørdag:</div>
     <div class="dag" data-dag="søndag">Søndag:</div>
     <div class="dag" data-dag="mandag">Mandag:</div>
@@ -174,7 +202,7 @@ td:first-child, th:first-child {
     <div class="dag" data-dag="torsdag">Torsdag:</div>
   </div>
 
-  <table id="madplan" style="margin-top: 10rem;" style="margin-top: 7rem;">
+  <table id="madplan" style="margin-top: 2rem;" style="margin-top: 7rem;">
     <thead>
       <tr>
         <th>Navn</th>
