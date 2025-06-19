@@ -9,6 +9,7 @@
         const dagNavn = dag.getAttribute("data-dag");
 
         const resetDag = () => {
+          dag.removeAttribute("data-ret");
           dag.innerHTML = "";
           const label = document.createElement("span");
           label.className = "dag-label";
@@ -184,7 +185,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.22</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.21</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -334,6 +335,7 @@
         const dagNavn = dag.getAttribute("data-dag");
 
         const resetDag = () => {
+          dag.removeAttribute("data-ret");
           dag.innerHTML = "";
           const label = document.createElement("span");
           label.className = "dag-label";
