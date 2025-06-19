@@ -57,26 +57,13 @@
 
     
     .ugeplan .dag {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .ugeplan .dag .dag-label {
-      font-weight: bold;
-    }
-    .ugeplan .dag .ret-navn {
-      flex-grow: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      display: block;
     }
 
-    
-    .ugeplan .dag {
+    .ugeplan .dag .dag-indhold {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 0.5rem;
     }
 
@@ -89,7 +76,6 @@
 
     .ugeplan .dag .remove {
       flex-shrink: 0;
-      margin-left: 0.5rem;
     }
 
     .ugeplan .dag.dragover {
@@ -160,7 +146,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.14</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.11</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -263,11 +249,7 @@
           tr.appendChild(td);
         });
 
-        
-    tr.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/plain", row["Navn"] || "");
-    });
-tableBody.appendChild(tr);
+        tableBody.appendChild(tr);
       });
     }
 
