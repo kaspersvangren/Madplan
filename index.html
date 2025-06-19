@@ -3,7 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <title>Madplan</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".dag").forEach(dag => {
+        const dagNavn = dag.getAttribute("data-dag");
+
+        const resetDag = () => {
+          dag.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+          dag.appendChild(label);
+        };
+
+        resetDag();
+
+        dag.addEventListener("dragover", e => {
+          e.preventDefault();
+          dag.classList.add("dragover");
+        });
+
+        dag.addEventListener("dragleave", () => {
+          dag.classList.remove("dragover");
+        });
+
+        dag.addEventListener("drop", e => {
+          e.preventDefault();
+          dag.classList.remove("dragover");
+
+          if (!e.dataTransfer.types.includes("application/x-ret-navn")) return;
+          const navn = e.dataTransfer.getData("application/x-ret-navn");
+          dag.setAttribute("data-ret", navn);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "dag-indhold";
+
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+
+          const navnSpan = document.createElement("span");
+          navnSpan.className = "ret-navn";
+          navnSpan.textContent = navn;
+
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "remove";
+          removeBtn.textContent = "×";
+          removeBtn.onclick = resetDag;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(navnSpan);
+          wrapper.appendChild(removeBtn);
+
+          dag.innerHTML = "";
+          dag.appendChild(wrapper);
+          dag.setAttribute("draggable", "true");
+
+          dag.addEventListener("dragstart", ev => {
+            ev.dataTransfer.setData("application/x-ret-navn", dag.getAttribute("data-ret"));
+          });
+        });
+      });
+    });
+    </script>
   <style>
     body {
       font-family: sans-serif;
@@ -266,6 +328,68 @@
 
       document.getElementById("indkoebsliste-result").textContent = output;
     });
-  </script>
+  
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".dag").forEach(dag => {
+        const dagNavn = dag.getAttribute("data-dag");
+
+        const resetDag = () => {
+          dag.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+          dag.appendChild(label);
+        };
+
+        resetDag();
+
+        dag.addEventListener("dragover", e => {
+          e.preventDefault();
+          dag.classList.add("dragover");
+        });
+
+        dag.addEventListener("dragleave", () => {
+          dag.classList.remove("dragover");
+        });
+
+        dag.addEventListener("drop", e => {
+          e.preventDefault();
+          dag.classList.remove("dragover");
+
+          if (!e.dataTransfer.types.includes("application/x-ret-navn")) return;
+          const navn = e.dataTransfer.getData("application/x-ret-navn");
+          dag.setAttribute("data-ret", navn);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "dag-indhold";
+
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+
+          const navnSpan = document.createElement("span");
+          navnSpan.className = "ret-navn";
+          navnSpan.textContent = navn;
+
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "remove";
+          removeBtn.textContent = "×";
+          removeBtn.onclick = resetDag;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(navnSpan);
+          wrapper.appendChild(removeBtn);
+
+          dag.innerHTML = "";
+          dag.appendChild(wrapper);
+          dag.setAttribute("draggable", "true");
+
+          dag.addEventListener("dragstart", ev => {
+            ev.dataTransfer.setData("application/x-ret-navn", dag.getAttribute("data-ret"));
+          });
+        });
+      });
+    });
+    </script>
 </body>
 </html>
