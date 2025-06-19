@@ -53,9 +53,9 @@
       margin: 0.3rem 0;
       min-height: 2rem;
       position: relative;
+      overflow: hidden;
     }
 
-    
     .ugeplan .dag .dag-indhold {
       display: flex;
       align-items: center;
@@ -79,9 +79,7 @@
     }
 
     .ugeplan button.remove {
-      position: absolute;
-      right: 6px;
-      top: 6px;
+      position: static;
       width: 18px;
       height: 18px;
       border-radius: 50%;
@@ -142,18 +140,18 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.16</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.17</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
           <h3>Ugens mad</h3>
-          <div class="dag" data-dag="fredag">Fredag:</div>
-          <div class="dag" data-dag="lørdag">Lørdag:</div>
-          <div class="dag" data-dag="søndag">Søndag:</div>
-          <div class="dag" data-dag="mandag">Mandag:</div>
-          <div class="dag" data-dag="tirsdag">Tirsdag:</div>
-          <div class="dag" data-dag="onsdag">Onsdag:</div>
-          <div class="dag" data-dag="torsdag">Torsdag:</div>
+          <div class="dag" data-dag="fredag"></div>
+          <div class="dag" data-dag="lørdag"></div>
+          <div class="dag" data-dag="søndag"></div>
+          <div class="dag" data-dag="mandag"></div>
+          <div class="dag" data-dag="tirsdag"></div>
+          <div class="dag" data-dag="onsdag"></div>
+          <div class="dag" data-dag="torsdag"></div>
         </div>
         <div class="filters">
           <fieldset>
@@ -211,15 +209,6 @@
         allRows = result.data;
         visFiltreredeRetter();
         Object.values(filters).forEach(f => f.addEventListener("change", visFiltreredeRetter));
-      })
-      .catch(err => {
-        const row = document.createElement("tr");
-        const cell = document.createElement("td");
-        cell.colSpan = 8;
-        cell.style.color = "red";
-        cell.textContent = "FEJL: Kunne ikke hente data – " + err.message;
-        row.appendChild(cell);
-        tableBody.appendChild(row);
       });
 
     function visFiltreredeRetter() {
@@ -245,29 +234,71 @@
           tr.appendChild(td);
         });
 
-        
-    tr.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/plain", row["Navn"] || "");
-    });
-tableBody.appendChild(tr);
+        tr.addEventListener("dragstart", e => {
+          e.dataTransfer.setData("text/plain", row["Navn"] || "");
+        });
+
+        tableBody.appendChild(tr);
       });
     }
 
     document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".dag").forEach(dag => {
+        const dagNavn = dag.getAttribute("data-dag");
+
+        const resetDag = () => {
+          dag.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+          dag.appendChild(label);
+        };
+
+        resetDag();
+
         dag.addEventListener("dragover", e => {
           e.preventDefault();
           dag.classList.add("dragover");
         });
+
         dag.addEventListener("dragleave", () => {
           dag.classList.remove("dragover");
         });
+
         dag.addEventListener("drop", e => {
+          e.preventDefault();
           dag.classList.remove("dragover");
+
           const navn = e.dataTransfer.getData("text/plain");
-          const dagNavn = dag.getAttribute("data-dag");
-          dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) +
-            `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
+          dag.setAttribute("data-ret", navn);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "dag-indhold";
+
+          const label = document.createElement("span");
+          label.className = "dag-label";
+          label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
+
+          const navnSpan = document.createElement("span");
+          navnSpan.className = "ret-navn";
+          navnSpan.textContent = navn;
+
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "remove";
+          removeBtn.textContent = "×";
+          removeBtn.onclick = resetDag;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(navnSpan);
+          wrapper.appendChild(removeBtn);
+
+          dag.innerHTML = "";
+          dag.appendChild(wrapper);
+          dag.setAttribute("draggable", "true");
+
+          dag.addEventListener("dragstart", ev => {
+            ev.dataTransfer.setData("text/plain", dag.getAttribute("data-ret"));
+          });
         });
       });
     });
