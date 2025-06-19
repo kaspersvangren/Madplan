@@ -1,78 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="da">
 <head>
   <meta charset="UTF-8" />
   <title>Madplan</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
-    document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
-      document.getElementById("indkoebsliste-result").textContent = "";
-
-      const dagNavne = {
-        mandag: "Mandag",
-        tirsdag: "Tirsdag",
-        onsdag: "Onsdag",
-        torsdag: "Torsdag",
-        fredag: "Fredag",
-        lørdag: "Lørdag",
-        søndag: "Søndag"
-      };
-
-      const dage = document.querySelectorAll(".ugeplan .dag");
-      const valgteRetter = [];
-
-      dage.forEach(dag => {
-        const navn = dag.getAttribute("data-ret");
-        const dagKey = dag.getAttribute("data-dag");
-        if (navn && dagKey) {
-          const dagNavn = dagNavne[dagKey] || dagKey;
-          valgteRetter.push({ navn, dag: dagNavn });
-        }
-      });
-
-      const brugteRetter = allRows.filter(row =>
-        valgteRetter.find(v => v.navn === row["Navn"])
-      );
-
-      const overvejList = valgteRetter.map(v => {
-        const match = brugteRetter.find(row => row["Navn"] === v.navn);
-        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
-        return v.dag + ": " + v.navn + overvej;
-      });
-
-      const indkoebSet = new Set();
-      const tjekSet = new Set();
-
-      brugteRetter.forEach(row => {
-        (row["Køb"] || "").split(",").map(s => s.trim()).filter(Boolean).forEach(s => indkoebSet.add(s));
-        (row["Tjek"] || "").split(",").map(s => s.trim()).filter(Boolean).forEach(s => tjekSet.add(s));
-      });
-
-      tjekSet.forEach(item => indkoebSet.delete(item));
-
-      const capitalizeFirst = arr => {
-        const sorted = Array.from(arr).sort();
-        if (sorted.length > 0) {
-          sorted[0] = sorted[0].charAt(0).toUpperCase() + sorted[0].slice(1);
-        }
-        return sorted.join(", ");
-      };
-
-      const output = [
-        "1. Ugens madretter:
-" + overvejList.map(l => "- " + l).join("
-"),
-        "2. Indkøbsliste:
-" + capitalizeFirst(indkoebSet),
-        "3. Tjek om vi har:
-" + capitalizeFirst(tjekSet)
-      ].join("
-
-");
-
-      document.getElementById("indkoebsliste-result").textContent = output;
-    });
-
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -80,23 +12,19 @@
       margin: 0;
       padding: 0;
     }
-
     h1 {
       text-align: center;
     }
-
     .container {
       max-width: 1200px;
       margin: auto;
       padding: 1rem;
     }
-
     .layout {
       display: flex;
       gap: 2rem;
       align-items: flex-start;
     }
-
     .sidebar {
       display: flex;
       flex-direction: column;
@@ -106,7 +34,6 @@
       align-self: flex-start;
       z-index: 10;
     }
-
     .ugeplan {
       min-width: 280px;
       background: #fff;
@@ -114,7 +41,6 @@
       border-radius: 6px;
       padding: 0.5rem 1rem;
     }
-
     .ugeplan .dag {
       border: 1px dashed #999;
       border-radius: 4px;
@@ -124,29 +50,24 @@
       position: relative;
       overflow: hidden;
     }
-
     .ugeplan .dag .dag-indhold {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
     }
-
     .ugeplan .dag .ret-navn {
       flex-grow: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
     .ugeplan .dag .remove {
       flex-shrink: 0;
     }
-
     .ugeplan .dag.dragover {
       background-color: #e0ffe0;
     }
-
     .ugeplan button.remove {
       position: static;
       width: 18px;
@@ -160,24 +81,20 @@
       padding: 0;
       cursor: pointer;
     }
-
     .filters {
       display: flex;
       flex-direction: column;
       gap: 1rem;
     }
-
     fieldset {
       border: 1px solid #ccc;
       padding: 1rem;
       border-radius: 6px;
     }
-
     label {
       display: block;
       margin: 0.25rem 0;
     }
-
     table {
       table-layout: auto;
       width: 100%;
@@ -185,20 +102,17 @@
       background: white;
       margin-top: 2rem;
     }
-
     th, td {
       padding: 0.5rem;
       border: 1px solid #ddd;
       white-space: nowrap;
     }
-
     th {
       background: #eee;
       position: sticky;
       top: 0;
       z-index: 1;
     }
-
     .navn-cell {
       max-width: 350px;
       white-space: nowrap;
@@ -209,7 +123,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.26</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.20</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -227,7 +141,6 @@
   <button id="generate-indkoebsliste" style="padding: 0.5rem 1rem; font-weight: bold;">Indkøbsliste</button>
   <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 6px;"></div>
 </div>
-
           <fieldset>
             <legend>Praktisk</legend>
             <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
@@ -263,7 +176,6 @@
   <script>
     const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
     const tableBody = document.querySelector("#madplan tbody");
-
     const filters = {
       "Agnes": document.getElementById("filter-agnes"),
       "2 dage": document.getElementById("filter-to-dage"),
@@ -273,7 +185,6 @@
       "Kyllingekød": document.getElementById("filter-kyllingekød"),
       "Vegetar": document.getElementById("filter-vegetar")
     };
-
     let allRows = [];
 
     fetch(url)
@@ -293,25 +204,21 @@
         }
         const tr = document.createElement("tr");
         tr.setAttribute("draggable", "true");
-
         const navn = document.createElement("td");
         const navnDiv = document.createElement("div");
         navnDiv.className = "navn-cell";
         navnDiv.textContent = row["Navn"] || "";
         navn.appendChild(navnDiv);
         tr.appendChild(navn);
-
         const cols = ["Vegetar", "Oksekød", "Kyllingekød", "Grisekød", "2 dage", "Nem ret", "Agnes"];
         cols.forEach(col => {
           const td = document.createElement("td");
           td.textContent = row[col] === "X" ? "✔" : "";
           tr.appendChild(td);
         });
-
         tr.addEventListener("dragstart", e => {
           e.dataTransfer.setData("application/x-ret-navn", row["Navn"] || "");
         });
-
         tableBody.appendChild(tr);
       });
     }
@@ -319,7 +226,6 @@
     document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".dag").forEach(dag => {
         const dagNavn = dag.getAttribute("data-dag");
-
         const resetDag = () => {
           dag.innerHTML = "";
           const label = document.createElement("span");
@@ -327,125 +233,85 @@
           label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
           dag.appendChild(label);
         };
-
         resetDag();
-
         dag.addEventListener("dragover", e => {
           e.preventDefault();
           dag.classList.add("dragover");
         });
-
         dag.addEventListener("dragleave", () => {
           dag.classList.remove("dragover");
         });
-
         dag.addEventListener("drop", e => {
           e.preventDefault();
           dag.classList.remove("dragover");
-
           if (!e.dataTransfer.types.includes("application/x-ret-navn")) return;
           const navn = e.dataTransfer.getData("application/x-ret-navn");
           dag.setAttribute("data-ret", navn);
-
           const wrapper = document.createElement("div");
           wrapper.className = "dag-indhold";
-
           const label = document.createElement("span");
           label.className = "dag-label";
           label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
-
           const navnSpan = document.createElement("span");
           navnSpan.className = "ret-navn";
           navnSpan.textContent = navn;
-
           const removeBtn = document.createElement("button");
           removeBtn.className = "remove";
           removeBtn.textContent = "×";
           removeBtn.onclick = resetDag;
-
           wrapper.appendChild(label);
           wrapper.appendChild(navnSpan);
           wrapper.appendChild(removeBtn);
-
           dag.innerHTML = "";
           dag.appendChild(wrapper);
           dag.setAttribute("draggable", "true");
-
           dag.addEventListener("dragstart", ev => {
             ev.dataTransfer.setData("application/x-ret-navn", dag.getAttribute("data-ret"));
           });
         });
       });
     });
-  
+
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
       document.getElementById("indkoebsliste-result").textContent = "";
-
-      const dagNavne = {
-        mandag: "Mandag",
-        tirsdag: "Tirsdag",
-        onsdag: "Onsdag",
-        torsdag: "Torsdag",
-        fredag: "Fredag",
-        lørdag: "Lørdag",
-        søndag: "Søndag"
-      };
-
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
-
       dage.forEach(dag => {
         const navn = dag.getAttribute("data-ret");
-        const dagKey = dag.getAttribute("data-dag");
-        if (navn && dagKey) {
-          const dagNavn = dagNavne[dagKey] || dagKey;
-          valgteRetter.push({ navn, dag: dagNavn });
-        }
+        if (navn) valgteRetter.push(navn);
       });
-
-      const brugteRetter = allRows.filter(row =>
-        valgteRetter.find(v => v.navn === row["Navn"])
-      );
-
-      const overvejList = valgteRetter.map(v => {
-        const match = brugteRetter.find(row => row["Navn"] === v.navn);
-        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
-        return v.dag + ": " + v.navn + overvej;
+      const brugteRetter = allRows.filter(row => valgteRetter.includes(row["Navn"]));
+      const overvejList = brugteRetter.map(row => {
+        const overvej = row["Overvej"] === "X" ? " - HUSK tilbehør" : "";
+        return row["Navn"] + overvej;
       });
-
       const indkoebSet = new Set();
       const tjekSet = new Set();
-
       brugteRetter.forEach(row => {
-        (row["Køb"] || "").split(",").map(s => s.trim()).filter(Boolean).forEach(s => indkoebSet.add(s));
-        (row["Tjek"] || "").split(",").map(s => s.trim()).filter(Boolean).forEach(s => tjekSet.add(s));
+        const indkoeb = row["Køb"] || "";
+        const tjek = row["Tjek"] || "";
+        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
+        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
       });
-
       tjekSet.forEach(item => indkoebSet.delete(item));
-
-      const capitalizeFirst = arr => {
-        const sorted = Array.from(arr).sort();
-        if (sorted.length > 0) {
-          sorted[0] = sorted[0].charAt(0).toUpperCase() + sorted[0].slice(1);
-        }
-        return sorted.join(", ");
-      };
-
+      const indkoebListe = Array.from(indkoebSet).sort();
+      const tjekListe = Array.from(tjekSet).sort();
+      if (indkoebListe.length > 0) {
+        indkoebListe[0] = indkoebListe[0].charAt(0).toUpperCase() + indkoebListe[0].slice(1);
+      }
+      if (tjekListe.length > 0) {
+        tjekListe[0] = tjekListe[0].charAt(0).toUpperCase() + tjekListe[0].slice(1);
+      }
       const output = [
         "1. Ugens madretter:
-" + overvejList.map(l => "- " + l).join("
-"),
+" + overvejList.map(v => "- " + v).join("\n"),
         "2. Indkøbsliste:
-" + capitalizeFirst(indkoebSet),
+" + indkoebListe.join(", "),
         "3. Tjek om vi har:
-" + capitalizeFirst(tjekSet)
-      ].join("
-
-");
-
+" + tjekListe.join(", ")
+      ].join("\n\n");
       document.getElementById("indkoebsliste-result").textContent = output;
     });
-
-</script>
+  </script>
 </body>
 </html>
