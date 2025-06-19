@@ -5,6 +5,7 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
     document.querySelectorAll("#madplan tbody").forEach(tbody => {
+  tbody.querySelectorAll("tr").forEach(tr => tr.setAttribute("draggable", "true"));
       tbody.addEventListener("dragstart", e => {
         const row = e.target.closest("tr");
         if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
@@ -134,7 +135,9 @@ td:first-child, th:first-child {
   <div class="container">
   <h1>Madplan</h1>
 
-  <div class="plan-container"><div class="filters">
+  
+<div class="sticky-top">
+  <div class="filters">
     <fieldset>
       <legend>Praktisk</legend>
       <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
@@ -149,6 +152,8 @@ td:first-child, th:first-child {
       <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
     </fieldset>
   </div>
+</div>
+<div style="display: flex; gap: 2rem;">
   <div class="ugeplan">
     <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
@@ -217,6 +222,7 @@ td:first-child, th:first-child {
           if (filters[key].checked && row[key] !== "X") return;
         }
         const tr = document.createElement("tr");
+        tr.setAttribute("draggable", "true");
 
         const navn = document.createElement("td");
         const navnDiv = document.createElement("div");
@@ -237,6 +243,7 @@ td:first-child, th:first-child {
     }
   
     document.querySelectorAll("#madplan tbody").forEach(tbody => {
+  tbody.querySelectorAll("tr").forEach(tr => tr.setAttribute("draggable", "true"));
       tbody.addEventListener("dragstart", e => {
         const row = e.target.closest("tr");
         if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
