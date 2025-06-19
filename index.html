@@ -5,17 +5,10 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
-      document.getElementById("indkoebsliste-result").textContent = "";
+      document.getElementById("indkoebsliste-result").textContent = ""; // Clear previous result
+
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
-
-      dage.forEach(dag => {
-        const navn = dag.getAttribute("data-ret");
-        const dagNavn = dag.getAttribute("data-dag");
-        if (navn) valgteRetter.push({ navn, dag: dagNavn });
-      });
-
-      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
 
       const dagNavne = {
         mandag: "Mandag",
@@ -27,68 +20,49 @@
         søndag: "Søndag"
       };
 
-      const overvejList = valgteRetter.map(dagInfo => {
-        const match = brugteRetter.find(row => row["Navn"] === dagInfo.navn);
-        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
-        return dagNavne[dagInfo.dag] + ": " + dagInfo.navn + overvej;
-      });
-
-      const indkoebSet = new Set();
-      const tjekSet = new Set();
-
-      brugteRetter.forEach(row => {
-        const indkoeb = row["Køb"] || "";
-        const tjek = row["Tjek"] || "";
-
-        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
-        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
-      });
-
-      tjekSet.forEach(item => indkoebSet.delete(item));
-
-      const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
-
-      const output = [
-        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
-        "2. Indkøbsliste:\n" + (() => { const items = Array.from(indkoebSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })(),
-        "3. Tjek om vi har:\n" + (() => { const items = Array.from(tjekSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })()
-      ].join("\n\n");
-
-      document.getElementById("indkoebsliste-result").textContent = output;
-    });
-      const dage = document.querySelectorAll(".ugeplan .dag");
-      const valgteRetter = [];
-
       dage.forEach(dag => {
         const navn = dag.getAttribute("data-ret");
-        if (navn) valgteRetter.push(navn);
+        const dagKey = dag.getAttribute("data-dag");
+        if (navn && dagKey) valgteRetter.push({ navn, dag: dagNavne[dagKey] || dagKey });
       });
 
-      const brugteRetter = allRows.filter(row => valgteRetter.includes(row["Navn"]));
+      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
 
-      const overvejList = brugteRetter.map(row => {
-        const overvej = row["Overvej"] === "X" ? " - **overvej tilbehør**" : "";
-        return row["Navn"] + overvej;
+      const overvejList = valgteRetter.map(item => {
+        const match = brugteRetter.find(row => row["Navn"] === item.navn);
+        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
+        return item.dag + ": " + item.navn + overvej;
       });
 
       const indkoebSet = new Set();
       const tjekSet = new Set();
 
       brugteRetter.forEach(row => {
-        const indkoeb = row["Køb"] || "";
-        const tjek = row["Tjek"] || "";
-
-        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
-        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
+        (row["Køb"] || "").split(",").map(x => x.trim()).filter(Boolean).forEach(x => indkoebSet.add(x));
+        (row["Tjek"] || "").split(",").map(x => x.trim()).filter(Boolean).forEach(x => tjekSet.add(x));
       });
 
       tjekSet.forEach(item => indkoebSet.delete(item));
 
+      const capitalizeFirst = arr => {
+        const sorted = Array.from(arr).sort();
+        if (sorted.length > 0) {
+          sorted[0] = sorted[0].charAt(0).toUpperCase() + sorted[0].slice(1);
+        }
+        return sorted.join(", ");
+      };
+
       const output = [
-        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
-        "2. Indkøbsliste:\n" + Array.from(indkoebSet).sort().join(", "),
-        "3. Tjek om vi har:\n" + Array.from(tjekSet).sort().join(", ")
-      ].join("\n\n");
+        "1. Ugens madretter:
+" + overvejList.map(v => "- " + v).join("
+"),
+        "2. Indkøbsliste:
+" + capitalizeFirst(indkoebSet),
+        "3. Tjek om vi har:
+" + capitalizeFirst(tjekSet)
+      ].join("
+
+");
 
       document.getElementById("indkoebsliste-result").textContent = output;
     });
@@ -230,7 +204,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.22</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.23</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -400,17 +374,10 @@
     });
   
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
-      document.getElementById("indkoebsliste-result").textContent = "";
+      document.getElementById("indkoebsliste-result").textContent = ""; // Clear previous result
+
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
-
-      dage.forEach(dag => {
-        const navn = dag.getAttribute("data-ret");
-        const dagNavn = dag.getAttribute("data-dag");
-        if (navn) valgteRetter.push({ navn, dag: dagNavn });
-      });
-
-      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
 
       const dagNavne = {
         mandag: "Mandag",
@@ -422,68 +389,49 @@
         søndag: "Søndag"
       };
 
-      const overvejList = valgteRetter.map(dagInfo => {
-        const match = brugteRetter.find(row => row["Navn"] === dagInfo.navn);
-        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
-        return dagNavne[dagInfo.dag] + ": " + dagInfo.navn + overvej;
-      });
-
-      const indkoebSet = new Set();
-      const tjekSet = new Set();
-
-      brugteRetter.forEach(row => {
-        const indkoeb = row["Køb"] || "";
-        const tjek = row["Tjek"] || "";
-
-        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
-        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
-      });
-
-      tjekSet.forEach(item => indkoebSet.delete(item));
-
-      const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
-
-      const output = [
-        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
-        "2. Indkøbsliste:\n" + (() => { const items = Array.from(indkoebSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })(),
-        "3. Tjek om vi har:\n" + (() => { const items = Array.from(tjekSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })()
-      ].join("\n\n");
-
-      document.getElementById("indkoebsliste-result").textContent = output;
-    });
-      const dage = document.querySelectorAll(".ugeplan .dag");
-      const valgteRetter = [];
-
       dage.forEach(dag => {
         const navn = dag.getAttribute("data-ret");
-        if (navn) valgteRetter.push(navn);
+        const dagKey = dag.getAttribute("data-dag");
+        if (navn && dagKey) valgteRetter.push({ navn, dag: dagNavne[dagKey] || dagKey });
       });
 
-      const brugteRetter = allRows.filter(row => valgteRetter.includes(row["Navn"]));
+      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
 
-      const overvejList = brugteRetter.map(row => {
-        const overvej = row["Overvej"] === "X" ? " - **overvej tilbehør**" : "";
-        return row["Navn"] + overvej;
+      const overvejList = valgteRetter.map(item => {
+        const match = brugteRetter.find(row => row["Navn"] === item.navn);
+        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
+        return item.dag + ": " + item.navn + overvej;
       });
 
       const indkoebSet = new Set();
       const tjekSet = new Set();
 
       brugteRetter.forEach(row => {
-        const indkoeb = row["Køb"] || "";
-        const tjek = row["Tjek"] || "";
-
-        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
-        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
+        (row["Køb"] || "").split(",").map(x => x.trim()).filter(Boolean).forEach(x => indkoebSet.add(x));
+        (row["Tjek"] || "").split(",").map(x => x.trim()).filter(Boolean).forEach(x => tjekSet.add(x));
       });
 
       tjekSet.forEach(item => indkoebSet.delete(item));
 
+      const capitalizeFirst = arr => {
+        const sorted = Array.from(arr).sort();
+        if (sorted.length > 0) {
+          sorted[0] = sorted[0].charAt(0).toUpperCase() + sorted[0].slice(1);
+        }
+        return sorted.join(", ");
+      };
+
       const output = [
-        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
-        "2. Indkøbsliste:\n" + Array.from(indkoebSet).sort().join(", "),
-        "3. Tjek om vi har:\n" + Array.from(tjekSet).sort().join(", ")
-      ].join("\n\n");
+        "1. Ugens madretter:
+" + overvejList.map(v => "- " + v).join("
+"),
+        "2. Indkøbsliste:
+" + capitalizeFirst(indkoebSet),
+        "3. Tjek om vi har:
+" + capitalizeFirst(tjekSet)
+      ].join("
+
+");
 
       document.getElementById("indkoebsliste-result").textContent = output;
     });
