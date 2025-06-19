@@ -133,10 +133,9 @@ td:first-child, th:first-child {
 </head>
 <body>
   <div class="container">
-  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.4</small></h1>
+  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.5</small></h1>
 
   
-
 
 
 <div class="sticky-top" style="
@@ -144,27 +143,27 @@ td:first-child, th:first-child {
   top: 0;
   z-index: 999;
   background: white;
-  padding: 0.5rem 1rem;
+  padding: 1rem;
   border-bottom: 1px solid #ccc;
 ">
-  <div class="filters" style="
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    font-size: 1rem;
-  ">
-    <label><input type="checkbox" id="filter-agnes"> Agnes kan lide</label>
-    <label><input type="checkbox" id="filter-todage"> Kan spises 2 dage</label>
-    <label><input type="checkbox" id="filter-nem"> Nem ret</label>
-    <label><input type="checkbox" id="filter-okse"> Oksekød</label>
-    <label><input type="checkbox" id="filter-gris"> Svinekød</label>
-    <label><input type="checkbox" id="filter-kylling"> Kylling</label>
-    <label><input type="checkbox" id="filter-vegetar"> Vegetar</label>
+  <div class="filters" style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
+    <fieldset style="display: inline-flex; flex-wrap: wrap; gap: 1rem;">
+      <legend>Praktisk</legend>
+      <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
+      <label><input type="checkbox" id="filter-to-dage" /> Kan spises 2 dage</label>
+      <label><input type="checkbox" id="filter-nem" /> Nem ret</label>
+    </fieldset>
+    <fieldset style="display: inline-flex; flex-wrap: wrap; gap: 1rem;">
+      <legend>Kødtype & Vegetar</legend>
+      <label><input type="checkbox" id="filter-oksekød" /> Oksekød</label>
+      <label><input type="checkbox" id="filter-grisekød" /> Svinekød</label>
+      <label><input type="checkbox" id="filter-kyllingekød" /> Kylling</label>
+      <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
+    </fieldset>
   </div>
 </div>
 <div style="display: flex; gap: 2rem;">
-  <div class="ugeplan" style="position: sticky; top: 5rem; align-self: flex-start;">
- style="position: sticky; top: 6rem; align-self: flex-start;">
+  <div class="ugeplan" style="position: sticky; top: 6rem; align-self: flex-start;">
     <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
     <div class="dag" data-dag="lørdag">Lørdag:</div>
