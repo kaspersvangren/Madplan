@@ -184,7 +184,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.20</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.21</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -285,17 +285,8 @@
     }
 
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
-      // Nulstil indkoebsliste-result
-      document.getElementById("indkoebsliste-result").textContent = "";
-
-      // Genhent valgte retter dynamisk fra DOM (ingen cache)
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
-
-      dage.forEach(dag => {
-        const navn = dag.getAttribute("data-ret");
-        if (navn) valgteRetter.push(navn);
-      });
 
       dage.forEach(dag => {
         const navn = dag.getAttribute("data-ret");
