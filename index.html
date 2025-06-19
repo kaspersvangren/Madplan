@@ -3,33 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Madplan</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
-    document.querySelectorAll("#madplan tbody").forEach(tbody => {
-  tbody.querySelectorAll("tr").forEach(tr => tr.setAttribute("draggable", "true"));
-      tbody.addEventListener("dragstart", e => {
-        const row = e.target.closest("tr");
-        if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
-      });
-    });
-
-    document.querySelectorAll(".dag").forEach(dag => {
-      dag.addEventListener("dragover", e => {
-        e.preventDefault();
-        dag.classList.add("dragover");
-      });
-      dag.addEventListener("dragleave", () => {
-        dag.classList.remove("dragover");
-      });
-      dag.addEventListener("drop", e => {
-        dag.classList.remove("dragover");
-        const navn = e.dataTransfer.getData("text/plain");
-        const dagNavn = dag.getAttribute("data-dag");
-        dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
-          `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
-      });
-    });
-    
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
     h1 { text-align: center; }
@@ -83,60 +57,12 @@ td:first-child, th:first-child {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    
-    .plan-container {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      padding: 1rem;
-      z-index: 100;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 2rem;
-      font-size: 1rem;
-    }
-    .ugeplan {
-      min-width: 280px;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 0.5rem 1rem;
-    }
-    .ugeplan .dag {
-      border: 1px dashed #999;
-      border-radius: 4px;
-      padding: 0.5rem;
-      margin: 0.3rem 0;
-      min-height: 2rem;
-      position: relative;
-    }
-    .ugeplan .dag.dragover {
-      background-color: #e0ffe0;
-    }
-    .ugeplan button.remove {
-      position: absolute;
-      right: 6px;
-      top: 6px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 1px solid #666;
-      color: #666;
-      background: transparent;
-      font-size: 12px;
-      line-height: 14px;
-      padding: 0;
-      cursor: pointer;
-    }
     </style>
 </head>
 <body>
   <div class="container">
   <h1>Madplan</h1>
 
-  
-<div class="sticky-top">
   <div class="filters">
     <fieldset>
       <legend>Praktisk</legend>
@@ -151,18 +77,6 @@ td:first-child, th:first-child {
       <label><input type="checkbox" id="filter-kyllingekød" /> Kylling</label>
       <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
     </fieldset>
-  </div>
-</div>
-<div style="display: flex; gap: 2rem;">
-  <div class="ugeplan">
-    <h3>Ugens mad</h3>
-    <div class="dag" data-dag="fredag">Fredag:</div>
-    <div class="dag" data-dag="lørdag">Lørdag:</div>
-    <div class="dag" data-dag="søndag">Søndag:</div>
-    <div class="dag" data-dag="mandag">Mandag:</div>
-    <div class="dag" data-dag="tirsdag">Tirsdag:</div>
-    <div class="dag" data-dag="onsdag">Onsdag:</div>
-    <div class="dag" data-dag="torsdag">Torsdag:</div>
   </div>
 
   <table id="madplan">
@@ -222,7 +136,6 @@ td:first-child, th:first-child {
           if (filters[key].checked && row[key] !== "X") return;
         }
         const tr = document.createElement("tr");
-        tr.setAttribute("draggable", "true");
 
         const navn = document.createElement("td");
         const navnDiv = document.createElement("div");
@@ -241,33 +154,7 @@ td:first-child, th:first-child {
         tableBody.appendChild(tr);
       });
     }
-  
-    document.querySelectorAll("#madplan tbody").forEach(tbody => {
-  tbody.querySelectorAll("tr").forEach(tr => tr.setAttribute("draggable", "true"));
-      tbody.addEventListener("dragstart", e => {
-        const row = e.target.closest("tr");
-        if (row) e.dataTransfer.setData("text/plain", row.querySelector(".navn-cell").textContent);
-      });
-    });
-
-    document.querySelectorAll(".dag").forEach(dag => {
-      dag.addEventListener("dragover", e => {
-        e.preventDefault();
-        dag.classList.add("dragover");
-      });
-      dag.addEventListener("dragleave", () => {
-        dag.classList.remove("dragover");
-      });
-      dag.addEventListener("drop", e => {
-        dag.classList.remove("dragover");
-        const navn = e.dataTransfer.getData("text/plain");
-        const dagNavn = dag.getAttribute("data-dag");
-        dag.innerHTML = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + 
-          `: ${navn}<button class="remove" onclick="this.parentElement.innerHTML = this.parentElement.getAttribute('data-dag').charAt(0).toUpperCase() + this.parentElement.getAttribute('data-dag').slice(1) + ':'">×</button>`;
-      });
-    });
-    
-</script>
+  </script>
   </div>
 </body>
 </html>
