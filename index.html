@@ -133,34 +133,37 @@ td:first-child, th:first-child {
 </head>
 <body>
   <div class="container">
-  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.5</small></h1>
+  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.6</small></h1>
 
   
+
 
 
 <div class="sticky-top" style="
   position: sticky;
   top: 0;
-  z-index: 999;
   background: white;
+  z-index: 900;
   padding: 1rem;
   border-bottom: 1px solid #ccc;
 ">
-  <div class="filters" style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
-    <fieldset style="display: inline-flex; flex-wrap: wrap; gap: 1rem;">
+  <div class="filter-row" style="display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+    <fieldset style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
       <legend>Praktisk</legend>
-      <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
-      <label><input type="checkbox" id="filter-to-dage" /> Kan spises 2 dage</label>
-      <label><input type="checkbox" id="filter-nem" /> Nem ret</label>
+      <label><input type="checkbox" id="filter-agnes"> Agnes kan lide</label>
+      <label><input type="checkbox" id="filter-todage"> Kan spises 2 dage</label>
+      <label><input type="checkbox" id="filter-nem"> Nem ret</label>
     </fieldset>
-    <fieldset style="display: inline-flex; flex-wrap: wrap; gap: 1rem;">
+    <fieldset style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
       <legend>Kødtype & Vegetar</legend>
-      <label><input type="checkbox" id="filter-oksekød" /> Oksekød</label>
-      <label><input type="checkbox" id="filter-grisekød" /> Svinekød</label>
-      <label><input type="checkbox" id="filter-kyllingekød" /> Kylling</label>
-      <label><input type="checkbox" id="filter-vegetar" /> Vegetar</label>
+      <label><input type="checkbox" id="filter-okse"> Oksekød</label>
+      <label><input type="checkbox" id="filter-gris"> Svinekød</label>
+      <label><input type="checkbox" id="filter-kylling"> Kylling</label>
+      <label><input type="checkbox" id="filter-vegetar"> Vegetar</label>
     </fieldset>
   </div>
+</div>
+
 </div>
 <div style="display: flex; gap: 2rem;">
   <div class="ugeplan" style="position: sticky; top: 6rem; align-self: flex-start;">
@@ -174,7 +177,7 @@ td:first-child, th:first-child {
     <div class="dag" data-dag="torsdag">Torsdag:</div>
   </div>
 
-  <table id="madplan" style="margin-top: 7rem;">
+  <table id="madplan" style="margin-top: 10rem;" style="margin-top: 7rem;">
     <thead>
       <tr>
         <th>Navn</th>
