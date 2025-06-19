@@ -133,11 +133,19 @@ td:first-child, th:first-child {
 </head>
 <body>
   <div class="container">
-  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.1</small></h1>
+  <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.2</small></h1>
 
   
-<div class="sticky-top" style="background: white; padding: 0.5rem 1rem; top: 0; position: sticky; z-index: 200;">
-  <div class="filters" style="display: flex; flex-wrap: wrap; gap: 1rem;">
+
+<div class="sticky-top" style="
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 999;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #ccc;
+">
+  <div class="filters" style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
     <fieldset>
       <legend>Praktisk</legend>
       <label><input type="checkbox" id="filter-agnes" /> Agnes kan lide</label>
@@ -154,7 +162,7 @@ td:first-child, th:first-child {
   </div>
 </div>
 <div style="display: flex; gap: 2rem;">
-  <div class="ugeplan" style="position: sticky; top: 6rem;">
+  <div class="ugeplan" style="position: sticky; top: 6rem; align-self: flex-start;">
     <h3>Ugens mad</h3>
     <div class="dag" data-dag="fredag">Fredag:</div>
     <div class="dag" data-dag="lørdag">Lørdag:</div>
