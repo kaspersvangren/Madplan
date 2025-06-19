@@ -5,6 +5,57 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
+      document.getElementById("indkoebsliste-result").textContent = "";
+      const dage = document.querySelectorAll(".ugeplan .dag");
+      const valgteRetter = [];
+
+      dage.forEach(dag => {
+        const navn = dag.getAttribute("data-ret");
+        const dagNavn = dag.getAttribute("data-dag");
+        if (navn) valgteRetter.push({ navn, dag: dagNavn });
+      });
+
+      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
+
+      const dagNavne = {
+        mandag: "Mandag",
+        tirsdag: "Tirsdag",
+        onsdag: "Onsdag",
+        torsdag: "Torsdag",
+        fredag: "Fredag",
+        lørdag: "Lørdag",
+        søndag: "Søndag"
+      };
+
+      const overvejList = valgteRetter.map(dagInfo => {
+        const match = brugteRetter.find(row => row["Navn"] === dagInfo.navn);
+        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
+        return dagNavne[dagInfo.dag] + ": " + dagInfo.navn + overvej;
+      });
+
+      const indkoebSet = new Set();
+      const tjekSet = new Set();
+
+      brugteRetter.forEach(row => {
+        const indkoeb = row["Køb"] || "";
+        const tjek = row["Tjek"] || "";
+
+        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
+        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
+      });
+
+      tjekSet.forEach(item => indkoebSet.delete(item));
+
+      const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+      const output = [
+        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
+        "2. Indkøbsliste:\n" + (() => { const items = Array.from(indkoebSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })(),
+        "3. Tjek om vi har:\n" + (() => { const items = Array.from(tjekSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })()
+      ].join("\n\n");
+
+      document.getElementById("indkoebsliste-result").textContent = output;
+    });
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
 
@@ -179,7 +230,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.19</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.22</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -349,6 +400,57 @@
     });
   
     document.getElementById("generate-indkoebsliste").addEventListener("click", () => {
+      document.getElementById("indkoebsliste-result").textContent = "";
+      const dage = document.querySelectorAll(".ugeplan .dag");
+      const valgteRetter = [];
+
+      dage.forEach(dag => {
+        const navn = dag.getAttribute("data-ret");
+        const dagNavn = dag.getAttribute("data-dag");
+        if (navn) valgteRetter.push({ navn, dag: dagNavn });
+      });
+
+      const brugteRetter = allRows.filter(row => valgteRetter.some(d => d.navn === row["Navn"]));
+
+      const dagNavne = {
+        mandag: "Mandag",
+        tirsdag: "Tirsdag",
+        onsdag: "Onsdag",
+        torsdag: "Torsdag",
+        fredag: "Fredag",
+        lørdag: "Lørdag",
+        søndag: "Søndag"
+      };
+
+      const overvejList = valgteRetter.map(dagInfo => {
+        const match = brugteRetter.find(row => row["Navn"] === dagInfo.navn);
+        const overvej = match && match["Overvej"] === "X" ? " - HUSK tilbehør" : "";
+        return dagNavne[dagInfo.dag] + ": " + dagInfo.navn + overvej;
+      });
+
+      const indkoebSet = new Set();
+      const tjekSet = new Set();
+
+      brugteRetter.forEach(row => {
+        const indkoeb = row["Køb"] || "";
+        const tjek = row["Tjek"] || "";
+
+        indkoeb.split(",").map(v => v.trim()).filter(v => v).forEach(v => indkoebSet.add(v));
+        tjek.split(",").map(v => v.trim()).filter(v => v).forEach(v => tjekSet.add(v));
+      });
+
+      tjekSet.forEach(item => indkoebSet.delete(item));
+
+      const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+      const output = [
+        "1. Ugens madretter:\n" + overvejList.map(v => "- " + v).join("\n"),
+        "2. Indkøbsliste:\n" + (() => { const items = Array.from(indkoebSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })(),
+        "3. Tjek om vi har:\n" + (() => { const items = Array.from(tjekSet).sort(); if (items.length) items[0] = capitalize(items[0]); return items.join(", "); })()
+      ].join("\n\n");
+
+      document.getElementById("indkoebsliste-result").textContent = output;
+    });
       const dage = document.querySelectorAll(".ugeplan .dag");
       const valgteRetter = [];
 
