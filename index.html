@@ -55,6 +55,23 @@
       position: relative;
     }
 
+    
+    .ugeplan .dag {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .ugeplan .dag .dag-label {
+      font-weight: bold;
+    }
+    .ugeplan .dag .ret-navn {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .ugeplan .dag.dragover {
       background-color: #e0ffe0;
     }
@@ -123,7 +140,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.10</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.13</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
