@@ -5,14 +5,28 @@
   <title>Madplan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
+    :root{
+      --c-border:#cfcfd2;
+      --c-muted:#6b7280;
+      --c-include:#0a7;
+      --c-exclude:#c33;
+      --bg-include:#e7f8f0;
+      --bg-exclude:#fdeaea;
+      --bg-ignore:#f2f3f5;
+      --bg-panel:#ffffff;
+      --bg-page:#f9f9f9;
+    }
     body {
-      font-family: sans-serif;
-      background: #f9f9f9;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      background: var(--bg-page);
       margin: 0;
       padding: 0;
+      color:#111827;
     }
     h1 {
       text-align: center;
+      font-weight: 700;
+      letter-spacing: .2px;
     }
     .container {
       max-width: 1200px;
@@ -32,22 +46,25 @@
       top: 1rem;
       align-self: flex-start;
       z-index: 10;
+      min-width: 340px;
     }
     .ugeplan {
-      min-width: 280px;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 0.5rem 1rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
     }
+    .ugeplan h3{ margin:0.25rem 0 0.5rem; }
     .ugeplan .dag {
-      border: 1px dashed #999;
-      border-radius: 4px;
-      padding: 0.5rem;
-      margin: 0.3rem 0;
-      min-height: 2rem;
+      border: 1px dashed #b5b5b8;
+      border-radius: 10px;
+      padding: 0.5rem 0.6rem;
+      margin: 0.45rem 0;
+      min-height: 2.2rem;
       position: relative;
       overflow: hidden;
+      background:#fff;
     }
     .ugeplan .dag .dag-indhold {
       display: flex;
@@ -60,23 +77,25 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-weight:600;
     }
     .ugeplan .dag .remove {
       flex-shrink: 0;
     }
     .ugeplan .dag.dragover {
-      background-color: #e0ffe0;
+      background-color: #eefdf3;
+      border-color:#68d391;
     }
     .ugeplan button.remove {
       position: static;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 1px solid #666;
-      color: #666;
-      background: transparent;
-      font-size: 12px;
-      line-height: 14px;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid #9ca3af;
+      color: #374151;
+      background: #f9fafb;
+      font-size: 14px;
+      line-height: 18px;
       padding: 0;
       cursor: pointer;
     }
@@ -86,53 +105,134 @@
       gap: 1rem;
     }
     fieldset {
-      border: 1px solid #ccc;
+      border: 1px solid var(--c-border);
       padding: 1rem;
-      border-radius: 6px;
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
     }
-    label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0.25rem 0;
+    fieldset legend {
+      padding:0 .3rem;
+      font-weight:600;
+      color:#111827;
     }
-    label.mode-ignore { color: #666; }
-    label.mode-include { color: #0a7; }
-    label.mode-exclude { color: #c33; }
-    label.filter-off { color: #aaa; }
-    .filter-select {
-      font-size: 0.9rem;
-      padding: 0.2rem 0.4rem;
+    /* Radio grid tri-state */
+    .tri-grid {
+      display:grid;
+      grid-template-columns: 1fr repeat(3, 56px);
+      gap:.25rem .6rem;
+      align-items:center;
     }
+    .tri-grid .head { 
+      font-size:.9rem; 
+      text-align:center; 
+      color:#374151; 
+      font-weight:700;
+    }
+    .tri-grid .head.ex { color: var(--c-exclude); }
+    .tri-grid .head.in { color: var(--c-include); }
+    .tri-grid .head.ig { color: var(--c-muted); }
+    .tri-grid .row-label { 
+      font-size:.95rem; 
+      color:#111827; 
+      font-weight:600;
+      padding:.25rem 0;
+    }
+    .tri-grid .cell { display:flex; justify-content:center; }
+    .radio {
+      --size: 18px;
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width: var(--size);
+      height: var(--size);
+    }
+    .radio input { 
+      appearance:none; 
+      -webkit-appearance:none;
+      width: var(--size);
+      height: var(--size);
+      border-radius:999px;
+      border:2px solid #9ca3af;
+      background:#fff;
+      outline:none;
+      cursor:pointer;
+      display:inline-block;
+      position:relative;
+    }
+    .radio input:checked {
+      border-color:#111827;
+    }
+    .radio input:checked::after{
+      content:"";
+      position:absolute;
+      top:50%; left:50%;
+      width:8px; height:8px;
+      transform:translate(-50%,-50%);
+      background:#111827; border-radius:999px;
+    }
+    /* Switch for vegetar-only */
+    .switch {
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .switch input { display:none; }
+    .switch .slider {
+      position:relative; width:46px; height:26px; background:#e5e7eb; border-radius:999px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
+      transition: background .2s ease;
+    }
+    .switch .slider::after{
+      content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff;
+      box-shadow:0 1px 2px rgba(0,0,0,.15); transition:left .2s ease;
+    }
+    .switch input:checked + .slider { background:#86efac; }
+    .switch input:checked + .slider::after{ left:23px; }
+    .switch .switch-label{ font-weight:600; color:#111827; }
+    .switch.filter-off .switch-label{ color:#6b7280; }
+
     table {
       table-layout: auto;
       width: 100%;
       border-collapse: collapse;
       background: white;
       margin-top: 2rem;
+      border:1px solid var(--c-border);
+      border-radius:12px;
+      overflow:hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
     }
     th, td {
-      padding: 0.5rem;
-      border: 1px solid #ddd;
+      padding: 0.6rem .7rem;
+      border: 1px solid #e5e7eb;
       white-space: nowrap;
+      font-size:.95rem;
     }
     th {
-      background: #eee;
+      background: #f3f4f6;
       position: sticky;
       top: 0;
       z-index: 1;
+      font-weight:700;
     }
     .navn-cell {
       max-width: 350px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-weight:600;
     }
+    .btn {
+      appearance:none; border:1px solid var(--c-border); background:#111827; color:#fff; border-radius:10px;
+      padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06);
+    }
+    .btn:hover{ filter:brightness(1.05); }
+    #indkoebsliste-result{ font-size: .95rem; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.25</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.27</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -147,47 +247,48 @@
         </div>
         <div class="filters">
           <div class="indkoebsliste-container" style="margin-top: 1rem;">
-            <button id="generate-indkoebsliste" style="padding: 0.5rem 1rem; font-weight: bold;">Indkøbsliste</button>
-            <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 6px;"></div>
+            <button id="generate-indkoebsliste" class="btn">Indkøbsliste</button>
+            <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 12px;"></div>
           </div>
+
           <fieldset>
             <legend>Praktisk (vælg pr. felt)</legend>
-            <label id="label-agnes" class="mode-ignore">
-              <span>Agnes kan lide</span>
-              <select id="filter-agnes-mode" class="filter-select">
-                <option value="ignore" selected>Ignorer</option>
-                <option value="include">Skal have</option>
-                <option value="exclude">Skal ikke have</option>
-              </select>
-            </label>
-            <label id="label-to-dage" class="mode-ignore">
-              <span>Kan spises 2 dage</span>
-              <select id="filter-to-dage-mode" class="filter-select">
-                <option value="ignore" selected>Ignorer</option>
-                <option value="include">Skal have</option>
-                <option value="exclude">Skal ikke have</option>
-              </select>
-            </label>
-            <label id="label-nem" class="mode-ignore">
-              <span>Nem ret</span>
-              <select id="filter-nem-mode" class="filter-select">
-                <option value="ignore" selected>Ignorer</option>
-                <option value="include">Skal have</option>
-                <option value="exclude">Skal ikke have</option>
-              </select>
-            </label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Ignorer = ingen krav, Skal have = skal være X, Skal ikke have = må ikke være X.</small>
+            <div class="tri-grid" role="group" aria-label="Tri-state praktisk">
+              <div></div>
+              <div class="head ex">✕</div>
+              <div class="head in">✔</div>
+              <div class="head ig">–</div>
+
+              <div class="row-label" id="rowlabel-agnes">Agnes kan lide</div>
+              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-include" value="include"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-ignore"  value="ignore" checked></span></div>
+
+              <div class="row-label" id="rowlabel-to-dage">Kan spises 2 dage</div>
+              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-include" value="include"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-ignore"  value="ignore" checked></span></div>
+
+              <div class="row-label" id="rowlabel-nem">Nem ret</div>
+              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-exclude" value="exclude"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-include" value="include"></span></div>
+              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-ignore"  value="ignore" checked></span></div>
+            </div>
+            <small style="color:var(--c-muted);display:block;margin-top:0.35rem;">✕ = skal ikke have · ✔ = skal have · – = ignorer.</small>
           </fieldset>
+
           <fieldset>
             <legend>Vegetar</legend>
-            <label id="label-vegetar" class="filter-off">
+            <label id="label-vegetar" class="switch filter-off">
               <input type="checkbox" id="filter-vegetar-only">
-              <span>Vis kun vegetar</span>
+              <span class="slider"></span>
+              <span class="switch-label">Vis kun vegetar</span>
             </label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Når slået til, vises kun vegetarretter. Ellers vises alle.</small>
+            <small style="color:var(--c-muted);display:block;margin-top:0.25rem;">Når slået til, vises kun vegetarretter. Ellers vises alle.</small>
           </fieldset>
         </div>
       </div>
+
       <table id="madplan">
         <thead>
           <tr id="thead-row">
@@ -238,9 +339,9 @@
 
     // Tri-state practical filters
     const practicalFilters = [
-      { id: "filter-agnes-mode", labelId: "label-agnes", cols: COLS.agnes },
-      { id: "filter-to-dage-mode", labelId: "label-to-dage", cols: COLS.toDage },
-      { id: "filter-nem-mode", labelId: "label-nem", cols: COLS.nem },
+      { group: "agnes", labelId: "rowlabel-agnes", cols: COLS.agnes },
+      { group: "to-dage", labelId: "rowlabel-to-dage", cols: COLS.toDage },
+      { group: "nem", labelId: "rowlabel-nem", cols: COLS.nem },
     ];
     const vegOnlyId = "filter-vegetar-only";
 
@@ -275,7 +376,7 @@
           e.preventDefault();
           dag.classList.remove("dragover");
 
-        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
+          if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
           const navn = e.dataTransfer.getData("application/x-ret-navn");
           dag.setAttribute("data-ret", navn);
 
@@ -310,15 +411,18 @@
       });
     }
 
+    function getMode(group){
+      const checked = document.querySelector('input[name="' + group + '-mode"]:checked');
+      return checked ? checked.value : "ignore";
+    }
+
     function updateFilterLabelStyles() {
       practicalFilters.forEach(f => {
-        const sel = document.getElementById(f.id);
         const label = document.getElementById(f.labelId);
-        if (!sel || !label) return;
-        label.classList.remove("mode-ignore","mode-include","mode-exclude");
-        if (sel.value === "include") label.classList.add("mode-include");
-        else if (sel.value === "exclude") label.classList.add("mode-exclude");
-        else label.classList.add("mode-ignore");
+        if (!label) return;
+        // Color row-label text by mode (subtle)
+        const mode = getMode(f.group);
+        label.style.color = (mode === "include") ? "#0a7" : (mode === "exclude" ? "#c33" : "#111827");
       });
       const vegEl = document.getElementById(vegOnlyId);
       const vegLabel = document.getElementById("label-vegetar");
@@ -331,9 +435,7 @@
     function passesPractical(row) {
       // include = kræver X, exclude = må ikke være X, ignore = ingen krav
       for (const f of practicalFilters) {
-        const sel = document.getElementById(f.id);
-        if (!sel) continue;
-        const mode = sel.value;
+        const mode = getMode(f.group);
         if (mode === "include" && !hasX(row, f.cols)) return false;
         if (mode === "exclude" && hasX(row, f.cols)) return false;
       }
@@ -446,8 +548,8 @@
         visFiltreredeRetter();
 
         // Event listeners
-        practicalFilters.forEach(f => {
-          document.getElementById(f.id)?.addEventListener("change", visFiltreredeRetter);
+        document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => {
+          r.addEventListener("change", visFiltreredeRetter);
         });
         document.getElementById(vegOnlyId)?.addEventListener("change", visFiltreredeRetter);
       });
