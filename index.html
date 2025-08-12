@@ -96,7 +96,6 @@
       gap: 0.5rem;
       margin: 0.25rem 0;
     }
-    /* Grå tekst for fravalgte filtre */
     label.filter-off {
       color: #aaa;
     }
@@ -128,7 +127,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.22</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.23</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -147,19 +146,19 @@
             <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 6px;"></div>
           </div>
           <fieldset>
-            <legend>Praktisk</legend>
-            <label><input type="checkbox" id="filter-agnes" checked><span>Agnes kan lide</span></label>
-            <label><input type="checkbox" id="filter-to-dage" checked><span>Kan spises 2 dage</span></label>
-            <label><input type="checkbox" id="filter-nem" checked><span>Nem ret</span></label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Tip: Fjern flueben for at skjule retter med dette mærke.</small>
+            <legend>Praktisk (AND-logik)</legend>
+            <label><input type="checkbox" id="filter-agnes"><span>Agnes kan lide</span></label>
+            <label><input type="checkbox" id="filter-to-dage"><span>Kan spises 2 dage</span></label>
+            <label><input type="checkbox" id="filter-nem"><span>Nem ret</span></label>
+            <small style="color:#666;display:block;margin-top:0.25rem;">Vælg de egenskaber, retten SKAL have (vælger du flere, kræves alle).</small>
           </fieldset>
           <fieldset>
-            <legend>Kødtype & Vegetar</legend>
+            <legend>Kødtype & Vegetar (OR-logik)</legend>
             <label><input type="checkbox" id="filter-okse" checked><span>Oksekød</span></label>
             <label><input type="checkbox" id="filter-gris" checked><span>Svinekød</span></label>
             <label><input type="checkbox" id="filter-kylling" checked><span>Kylling</span></label>
             <label><input type="checkbox" id="filter-vegetar" checked><span>Vegetar</span></label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Tip: Behold kun de kødtyper du vil se.</small>
+            <small style="color:#666;display:block;margin-top:0.25rem;">Vælg de typer, der er tilladt (vælger du flere, vises en af dem er nok).</small>
           </fieldset>
         </div>
       </div>
@@ -184,7 +183,7 @@
   <script>
     const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
 
-    // Hjælpere til kolonnenavne (tolerer variationer)
+    // Kolonnenavne (tolerante)
     const COLS = {
       navn: ["Navn"],
       vegetar: ["Vegetar"],
@@ -210,21 +209,18 @@
     }
 
     const tableBody = document.querySelector("#madplan tbody");
-    const headerRow = document.getElementById("thead-row");
 
-    // Filtre: map checkbox -> hvilke kolonner der tæller som dette filter
-    const filterDefs = [
+    const practicalFilters = [
       { id: "filter-agnes", cols: COLS.agnes },
       { id: "filter-to-dage", cols: COLS.toDage },
       { id: "filter-nem", cols: COLS.nem },
+    ];
+    const meatFilters = [
       { id: "filter-okse", cols: COLS.okse },
       { id: "filter-gris", cols: COLS.gris },
       { id: "filter-kylling", cols: COLS.kylling },
       { id: "filter-vegetar", cols: COLS.vegetar },
     ];
-    const filterEls = filterDefs.map(fd => ({ el: document.getElementById(fd.id), cols: fd.cols }));
-    const dagOrder = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
-    let allRows = [];
 
     function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
@@ -293,37 +289,39 @@
     }
 
     function updateFilterLabelStyles() {
-      filterDefs.forEach(fd => {
-        const label = document.querySelector("label[for='" + fd.id + "']") || document.getElementById(fd.id)?.closest("label");
-        const cb = document.getElementById(fd.id);
-        if (label && cb) {
-          if (cb.checked) label.classList.remove("filter-off");
+      [...practicalFilters, ...meatFilters].forEach(fd => {
+        const el = document.getElementById(fd.id);
+        const label = el?.closest("label");
+        if (el && label) {
+          if (el.checked) label.classList.remove("filter-off");
           else label.classList.add("filter-off");
         }
       });
     }
 
+    function passesPractical(row) {
+      // AND: alle markerede egenskaber skal være X
+      for (const f of practicalFilters) {
+        const el = document.getElementById(f.id);
+        if (el && el.checked) {
+          if (!hasX(row, f.cols)) return false;
+        }
+      }
+      return true;
+    }
+
+    function passesMeat(row) {
+      // OR: mindst én markeret kødtype/vegetar skal være X
+      const checked = meatFilters.filter(f => document.getElementById(f.id)?.checked);
+      if (checked.length === 0) return true; // ingen valg = ingen begrænsning
+      return checked.some(f => hasX(row, f.cols));
+    }
+
     function visFiltreredeRetter() {
       tableBody.innerHTML = "";
-
-      // Opbyg dynamisk hvilke kolonner der faktisk eksisterer i data til visning i tabellen
-      const displayCols = [
-        { key: "Vegetar", cols: COLS.vegetar },
-        { key: "Oksekød", cols: COLS.okse },
-        { key: "Kylling", cols: COLS.kylling },
-        { key: "Svinekød", cols: COLS.gris },
-        { key: "2 dage", cols: COLS.toDage },
-        { key: "Nem ret", cols: COLS.nem },
-        { key: "Agnes", cols: COLS.agnes },
-      ];
-      // Opdater header for at matche labels (vis altid faste kolonner, men det er ok)
-      // (Hvis du hellere vil skjule kolonner der slet ikke findes i sheetet, kan vi tilføje logik her.)
-
       allRows.forEach(row => {
-        // Flueben-i-alt: Hvis et filter er slået FRA, skjul retter hvor den tilsvarende kolonne har X
-        for (const {el, cols} of filterEls) {
-          if (el && !el.checked && hasX(row, cols)) return;
-        }
+        if (!passesPractical(row)) return;
+        if (!passesMeat(row)) return;
 
         const tr = document.createElement("tr");
         tr.setAttribute("draggable", "true");
@@ -335,6 +333,15 @@
         navn.appendChild(navnDiv);
         tr.appendChild(navn);
 
+        const displayCols = [
+          { key: "Vegetar", cols: COLS.vegetar },
+          { key: "Oksekød", cols: COLS.okse },
+          { key: "Kylling", cols: COLS.kylling },
+          { key: "Svinekød", cols: COLS.gris },
+          { key: "2 dage", cols: COLS.toDage },
+          { key: "Nem ret", cols: COLS.nem },
+          { key: "Agnes", cols: COLS.agnes },
+        ];
         displayCols.forEach(dc => {
           const td = document.createElement("td");
           td.textContent = hasX(row, dc.cols) ? "✔" : "";
@@ -347,7 +354,6 @@
 
         tableBody.appendChild(tr);
       });
-
       updateFilterLabelStyles();
     }
 
@@ -401,17 +407,18 @@
       document.getElementById("indkoebsliste-result").textContent = output;
     }
 
-    // Hent data, sortér alfabetisk, vis
+    let allRows = [];
     fetch(url)
       .then(r => r.text())
       .then(csv => {
         const result = Papa.parse(csv, { header: true });
         allRows = (result.data || []).filter(row => ((getCol(row, COLS.navn) || "").trim().length > 0));
-        // Alfabetisk sortering på Navn (dansk locale)
         allRows.sort((a, b) => (getCol(a, COLS.navn) || "").localeCompare(getCol(b, COLS.navn) || "", "da", {sensitivity: "base"}));
         visFiltreredeRetter();
-        // Lyt til filter-ændringer
-        filterEls.forEach(({el}) => {
+
+        // Event listeners
+        [...practicalFilters, ...meatFilters].forEach(f => {
+          const el = document.getElementById(f.id);
           if (el) el.addEventListener("change", visFiltreredeRetter);
         });
       });
