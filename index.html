@@ -96,8 +96,13 @@
       gap: 0.5rem;
       margin: 0.25rem 0;
     }
-    label.filter-off {
-      color: #aaa;
+    label.mode-ignore { color: #666; }
+    label.mode-include { color: #0a7; }
+    label.mode-exclude { color: #c33; }
+    label.filter-off { color: #aaa; }
+    .filter-select {
+      font-size: 0.9rem;
+      padding: 0.2rem 0.4rem;
     }
     table {
       table-layout: auto;
@@ -127,7 +132,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.24</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.25</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -146,16 +151,40 @@
             <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 6px;"></div>
           </div>
           <fieldset>
-            <legend>Praktisk (AND-logik)</legend>
-            <label><input type="checkbox" id="filter-agnes"><span>Agnes kan lide</span></label>
-            <label><input type="checkbox" id="filter-to-dage"><span>Kan spises 2 dage</span></label>
-            <label><input type="checkbox" id="filter-nem"><span>Nem ret</span></label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Vælg de egenskaber, retten SKAL have (vælger du flere, kræves alle).</small>
+            <legend>Praktisk (vælg pr. felt)</legend>
+            <label id="label-agnes" class="mode-ignore">
+              <span>Agnes kan lide</span>
+              <select id="filter-agnes-mode" class="filter-select">
+                <option value="ignore" selected>Ignorer</option>
+                <option value="include">Skal have</option>
+                <option value="exclude">Skal ikke have</option>
+              </select>
+            </label>
+            <label id="label-to-dage" class="mode-ignore">
+              <span>Kan spises 2 dage</span>
+              <select id="filter-to-dage-mode" class="filter-select">
+                <option value="ignore" selected>Ignorer</option>
+                <option value="include">Skal have</option>
+                <option value="exclude">Skal ikke have</option>
+              </select>
+            </label>
+            <label id="label-nem" class="mode-ignore">
+              <span>Nem ret</span>
+              <select id="filter-nem-mode" class="filter-select">
+                <option value="ignore" selected>Ignorer</option>
+                <option value="include">Skal have</option>
+                <option value="exclude">Skal ikke have</option>
+              </select>
+            </label>
+            <small style="color:#666;display:block;margin-top:0.25rem;">Ignorer = ingen krav, Skal have = skal være X, Skal ikke have = må ikke være X.</small>
           </fieldset>
           <fieldset>
             <legend>Vegetar</legend>
-            <label><input type="checkbox" id="filter-vegetar-only"><span>Vis kun vegetar</span></label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Når slået til, vises kun vegetarretter. Når slået fra, vises alle retter.</small>
+            <label id="label-vegetar" class="filter-off">
+              <input type="checkbox" id="filter-vegetar-only">
+              <span>Vis kun vegetar</span>
+            </label>
+            <small style="color:#666;display:block;margin-top:0.25rem;">Når slået til, vises kun vegetarretter. Ellers vises alle.</small>
           </fieldset>
         </div>
       </div>
@@ -207,10 +236,11 @@
 
     const tableBody = document.querySelector("#madplan tbody");
 
+    // Tri-state practical filters
     const practicalFilters = [
-      { id: "filter-agnes", cols: COLS.agnes },
-      { id: "filter-to-dage", cols: COLS.toDage },
-      { id: "filter-nem", cols: COLS.nem },
+      { id: "filter-agnes-mode", labelId: "label-agnes", cols: COLS.agnes },
+      { id: "filter-to-dage-mode", labelId: "label-to-dage", cols: COLS.toDage },
+      { id: "filter-nem-mode", labelId: "label-nem", cols: COLS.nem },
     ];
     const vegOnlyId = "filter-vegetar-only";
 
@@ -245,7 +275,7 @@
           e.preventDefault();
           dag.classList.remove("dragover");
 
-          if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
+        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
           const navn = e.dataTransfer.getData("application/x-ret-navn");
           dag.setAttribute("data-ret", navn);
 
@@ -281,17 +311,17 @@
     }
 
     function updateFilterLabelStyles() {
-      // Grå labels for alle fravalgte i Praktisk + vegetar-only hvis fra
       practicalFilters.forEach(f => {
-        const el = document.getElementById(f.id);
-        const label = el?.closest("label");
-        if (el && label) {
-          if (el.checked) label.classList.remove("filter-off");
-          else label.classList.add("filter-off");
-        }
+        const sel = document.getElementById(f.id);
+        const label = document.getElementById(f.labelId);
+        if (!sel || !label) return;
+        label.classList.remove("mode-ignore","mode-include","mode-exclude");
+        if (sel.value === "include") label.classList.add("mode-include");
+        else if (sel.value === "exclude") label.classList.add("mode-exclude");
+        else label.classList.add("mode-ignore");
       });
       const vegEl = document.getElementById(vegOnlyId);
-      const vegLabel = vegEl?.closest("label");
+      const vegLabel = document.getElementById("label-vegetar");
       if (vegEl && vegLabel) {
         if (vegEl.checked) vegLabel.classList.remove("filter-off");
         else vegLabel.classList.add("filter-off");
@@ -299,19 +329,20 @@
     }
 
     function passesPractical(row) {
-      // AND: alle markerede egenskaber skal være X
+      // include = kræver X, exclude = må ikke være X, ignore = ingen krav
       for (const f of practicalFilters) {
-        const el = document.getElementById(f.id);
-        if (el && el.checked) {
-          if (!hasX(row, f.cols)) return false;
-        }
+        const sel = document.getElementById(f.id);
+        if (!sel) continue;
+        const mode = sel.value;
+        if (mode === "include" && !hasX(row, f.cols)) return false;
+        if (mode === "exclude" && hasX(row, f.cols)) return false;
       }
       return true;
     }
 
     function passesVegetarian(row) {
       const vegOnly = document.getElementById(vegOnlyId)?.checked;
-      if (!vegOnly) return true; // ikke begrænset
+      if (!vegOnly) return true;
       return hasX(row, COLS.vegetar);
     }
 
@@ -416,8 +447,7 @@
 
         // Event listeners
         practicalFilters.forEach(f => {
-          const el = document.getElementById(f.id);
-          if (el) el.addEventListener("change", visFiltreredeRetter);
+          document.getElementById(f.id)?.addEventListener("change", visFiltreredeRetter);
         });
         document.getElementById(vegOnlyId)?.addEventListener("change", visFiltreredeRetter);
       });
