@@ -127,7 +127,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.23</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.24</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -153,12 +153,9 @@
             <small style="color:#666;display:block;margin-top:0.25rem;">Vælg de egenskaber, retten SKAL have (vælger du flere, kræves alle).</small>
           </fieldset>
           <fieldset>
-            <legend>Kødtype & Vegetar (OR-logik)</legend>
-            <label><input type="checkbox" id="filter-okse" checked><span>Oksekød</span></label>
-            <label><input type="checkbox" id="filter-gris" checked><span>Svinekød</span></label>
-            <label><input type="checkbox" id="filter-kylling" checked><span>Kylling</span></label>
-            <label><input type="checkbox" id="filter-vegetar" checked><span>Vegetar</span></label>
-            <small style="color:#666;display:block;margin-top:0.25rem;">Vælg de typer, der er tilladt (vælger du flere, vises en af dem er nok).</small>
+            <legend>Vegetar</legend>
+            <label><input type="checkbox" id="filter-vegetar-only"><span>Vis kun vegetar</span></label>
+            <small style="color:#666;display:block;margin-top:0.25rem;">Når slået til, vises kun vegetarretter. Når slået fra, vises alle retter.</small>
           </fieldset>
         </div>
       </div>
@@ -215,12 +212,7 @@
       { id: "filter-to-dage", cols: COLS.toDage },
       { id: "filter-nem", cols: COLS.nem },
     ];
-    const meatFilters = [
-      { id: "filter-okse", cols: COLS.okse },
-      { id: "filter-gris", cols: COLS.gris },
-      { id: "filter-kylling", cols: COLS.kylling },
-      { id: "filter-vegetar", cols: COLS.vegetar },
-    ];
+    const vegOnlyId = "filter-vegetar-only";
 
     function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
@@ -289,14 +281,21 @@
     }
 
     function updateFilterLabelStyles() {
-      [...practicalFilters, ...meatFilters].forEach(fd => {
-        const el = document.getElementById(fd.id);
+      // Grå labels for alle fravalgte i Praktisk + vegetar-only hvis fra
+      practicalFilters.forEach(f => {
+        const el = document.getElementById(f.id);
         const label = el?.closest("label");
         if (el && label) {
           if (el.checked) label.classList.remove("filter-off");
           else label.classList.add("filter-off");
         }
       });
+      const vegEl = document.getElementById(vegOnlyId);
+      const vegLabel = vegEl?.closest("label");
+      if (vegEl && vegLabel) {
+        if (vegEl.checked) vegLabel.classList.remove("filter-off");
+        else vegLabel.classList.add("filter-off");
+      }
     }
 
     function passesPractical(row) {
@@ -310,18 +309,17 @@
       return true;
     }
 
-    function passesMeat(row) {
-      // OR: mindst én markeret kødtype/vegetar skal være X
-      const checked = meatFilters.filter(f => document.getElementById(f.id)?.checked);
-      if (checked.length === 0) return true; // ingen valg = ingen begrænsning
-      return checked.some(f => hasX(row, f.cols));
+    function passesVegetarian(row) {
+      const vegOnly = document.getElementById(vegOnlyId)?.checked;
+      if (!vegOnly) return true; // ikke begrænset
+      return hasX(row, COLS.vegetar);
     }
 
     function visFiltreredeRetter() {
       tableBody.innerHTML = "";
       allRows.forEach(row => {
         if (!passesPractical(row)) return;
-        if (!passesMeat(row)) return;
+        if (!passesVegetarian(row)) return;
 
         const tr = document.createElement("tr");
         tr.setAttribute("draggable", "true");
@@ -417,10 +415,11 @@
         visFiltreredeRetter();
 
         // Event listeners
-        [...practicalFilters, ...meatFilters].forEach(f => {
+        practicalFilters.forEach(f => {
           const el = document.getElementById(f.id);
           if (el) el.addEventListener("change", visFiltreredeRetter);
         });
+        document.getElementById(vegOnlyId)?.addEventListener("change", visFiltreredeRetter);
       });
 
     document.addEventListener("DOMContentLoaded", () => {
