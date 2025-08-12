@@ -6,18 +6,20 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root{
-      --c-border:#cfcfd2;
-      --c-muted:#6b7280;
-      --c-include:#0a7;
-      --c-exclude:#c33;
-      --bg-include:#e7f8f0;
-      --bg-exclude:#fdeaea;
-      --bg-ignore:#f2f3f5;
-      --bg-panel:#ffffff;
-      --bg-page:#f9f9f9;
-      --focus:#2563eb;
-      --ink:#111827;
+      /* Warm, calm palette */
+      --bg-page:#faf6f2;
+      --bg-panel:#fffaf5;
+      --ink:#3a2d25;
+      --c-border:#e6dfd7;
+      --c-muted:#8b6f61;
+      --focus:#d97706;
+      --c-include:#2e7d5b;
+      --c-exclude:#b84a4a;
+      --bg-include:#ecf7f1;
+      --bg-exclude:#fdeeed;
+      --bg-ignore:#f3f0eb;
     }
+    * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
       background: var(--bg-page);
@@ -59,7 +61,7 @@
     }
     .ugeplan h3{ margin:0.25rem 0 0.5rem; }
     .ugeplan .dag {
-      border: 1px dashed #b5b5b8;
+      border: 1px dashed #d8cfc6;
       border-radius: 10px;
       padding: 0.5rem 0.6rem;
       margin: 0.45rem 0;
@@ -85,17 +87,17 @@
       flex-shrink: 0;
     }
     .ugeplan .dag.dragover {
-      background-color: #eefdf3;
-      border-color:#68d391;
+      background-color: #f1fbf6;
+      border-color:#7ed9ac;
     }
     .ugeplan button.remove {
       position: static;
       width: 22px;
       height: 22px;
       border-radius: 999px;
-      border: 1px solid #9ca3af;
-      color: #374151;
-      background: #f9fafb;
+      border: 1px solid #c9bdb2;
+      color: #6e5a4d;
+      background: #fffaf5;
       font-size: 14px;
       line-height: 18px;
       padding: 0;
@@ -116,7 +118,7 @@
     fieldset legend {
       padding:0 .3rem;
       font-weight:600;
-      color:#111827;
+      color:var(--ink);
     }
 
     /* Radio grid tri-state */
@@ -129,7 +131,7 @@
     .tri-grid .head { 
       font-size:.9rem; 
       text-align:center; 
-      color:#374151; 
+      color:#5b463a; 
       font-weight:700;
       user-select:none;
     }
@@ -138,7 +140,7 @@
     .tri-grid .head.ig { color: var(--c-muted); }
     .tri-grid .row-label { 
       font-size:.95rem; 
-      color:#111827; 
+      color:var(--ink); 
       font-weight:600;
       padding:.25rem 0;
     }
@@ -158,12 +160,11 @@
       aspect-ratio: 1 / 1;
       display:inline-block;
       border-radius: 999px;
-      border: 2px solid #9ca3af;
+      border: 2px solid #c9bdb2;
       background: #ffffff;
-      box-sizing: border-box;
       position: relative;
       cursor: pointer;
-      forced-color-adjust: none; /* keep our look even in Windows forced colors */
+      forced-color-adjust: none;
     }
     .radio-input:focus-visible + .radio-ui {
       outline: 2px solid var(--focus);
@@ -183,7 +184,6 @@
       background: var(--ink);
       border-radius: 999px;
     }
-    /* High-contrast fallback */
     @media (forced-colors: active) {
       .radio-ui { border-color: ButtonText; background: Canvas; }
       .radio-input:checked + .radio-ui { border-color: ButtonText; background: Canvas; }
@@ -196,7 +196,7 @@
     }
     .switch input { display:none; }
     .switch .slider {
-      position:relative; width:46px; height:26px; background:#e5e7eb; border-radius:999px;
+      position:relative; width:46px; height:26px; background:#eadfd6; border-radius:999px;
       box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
       transition: background .2s ease;
       forced-color-adjust: none;
@@ -205,34 +205,39 @@
       content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff;
       box-shadow:0 1px 2px rgba(0,0,0,.15); transition:left .2s ease;
     }
-    .switch input:checked + .slider { background:#86efac; }
+    .switch input:checked + .slider { background:#bfe6cd; }
     .switch input:checked + .slider::after{ left:23px; }
-    .switch .switch-label{ font-weight:600; color:#111827; }
-    .switch.filter-off .switch-label{ color:#6b7280; }
+    .switch .switch-label{ font-weight:600; color:var(--ink); }
 
-    table {
-      table-layout: auto;
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      margin-top: 2rem;
+    /* Table wrapper for sticky header */
+    .table-wrap{
       border:1px solid var(--c-border);
       border-radius:12px;
-      overflow:hidden;
+      background:#fff;
       box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      overflow: visible; /* do not clip sticky */
+    }
+    table {
+      width: 100%;
+      border-collapse: separate; /* improve sticky behavior */
+      border-spacing: 0;
+      background: white;
     }
     th, td {
       padding: 0.6rem .7rem;
-      border: 1px solid #e5e7eb;
+      border-bottom: 1px solid #efe7df;
       white-space: nowrap;
       font-size:.95rem;
+      color: var(--ink);
     }
-    th {
-      background: #f3f4f6;
+    thead th {
       position: sticky;
       top: 0;
-      z-index: 1;
+      z-index: 5;
+      background: #fffaf5; /* warm header bg */
       font-weight:700;
+      border-bottom: 1px solid #e6dfd7;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.03);
     }
     .navn-cell {
       max-width: 350px;
@@ -242,7 +247,7 @@
       font-weight:600;
     }
     .btn {
-      appearance:none; border:1px solid var(--c-border); background:#111827; color:#fff; border-radius:10px;
+      appearance:none; border:1px solid var(--c-border); background:#4a372a; color:#fff; border-radius:10px;
       padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06);
     }
     .btn:hover{ filter:brightness(1.05); }
@@ -251,7 +256,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.29</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 1.30</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -267,7 +272,7 @@
         <div class="filters">
           <div class="indkoebsliste-container" style="margin-top: 1rem;">
             <button id="generate-indkoebsliste" class="btn">Indkøbsliste</button>
-            <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1rem; border-radius: 12px;"></div>
+            <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid var(--c-border); padding: 1rem; border-radius: 12px;"></div>
           </div>
 
           <fieldset>
@@ -324,7 +329,7 @@
 
           <fieldset>
             <legend>Vegetar</legend>
-            <label id="label-vegetar" class="switch filter-off">
+            <label id="label-vegetar" class="switch">
               <input type="checkbox" id="filter-vegetar-only">
               <span class="slider"></span>
               <span class="switch-label">Vis kun vegetar</span>
@@ -333,18 +338,20 @@
         </div>
       </div>
 
-      <table id="madplan">
-        <thead>
-          <tr id="thead-row">
-            <th>Navn</th>
-            <th>Vegetar</th>
-            <th>2 dage</th>
-            <th>Nem ret</th>
-            <th>Agnes</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-wrap">
+        <table id="madplan">
+          <thead>
+            <tr id="thead-row">
+              <th>Navn</th>
+              <th>Vegetar</th>
+              <th>2 dage</th>
+              <th>Nem ret</th>
+              <th>Agnes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -462,13 +469,12 @@
         const label = document.getElementById(f.labelId);
         if (!label) return;
         const mode = getMode(f.group);
-        label.style.color = (mode === "include") ? "#0a7" : (mode === "exclude" ? "#c33" : "#111827");
+        label.style.color = (mode === "include") ? "#2e7d5b" : (mode === "exclude" ? "#b84a4a" : "var(--ink)");
       });
       const vegEl = document.getElementById(vegOnlyId);
       const vegLabel = document.getElementById("label-vegetar");
       if (vegEl && vegLabel) {
-        if (vegEl.checked) vegLabel.classList.remove("filter-off");
-        else vegLabel.classList.add("filter-off");
+        vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
       }
     }
 
@@ -580,11 +586,9 @@
       .then(csv => {
         const result = Papa.parse(csv, { header: true });
         allRows = (result.data || []).filter(row => ((getCol(row, COLS.navn) || "").trim().length > 0));
-        // Alfabetisk sortering på Navn (dansk locale)
         allRows.sort((a, b) => (getCol(a, COLS.navn) || "").localeCompare(getCol(b, COLS.navn) || "", "da", {sensitivity: "base"}));
         visFiltreredeRetter();
 
-        // Lyt til ændringer på tri-state radios + vegetar switch
         document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => {
           r.addEventListener("change", visFiltreredeRetter);
         });
