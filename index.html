@@ -15,13 +15,15 @@
       --bg-ignore:#f2f3f5;
       --bg-panel:#ffffff;
       --bg-page:#f9f9f9;
+      --focus:#2563eb;
+      --ink:#111827;
     }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
       background: var(--bg-page);
       margin: 0;
       padding: 0;
-      color:#111827;
+      color: var(--ink);
     }
     h1 {
       text-align: center;
@@ -46,7 +48,7 @@
       top: 1rem;
       align-self: flex-start;
       z-index: 10;
-      min-width: 340px;
+      min-width: 360px;
     }
     .ugeplan {
       background: var(--bg-panel);
@@ -116,6 +118,7 @@
       font-weight:600;
       color:#111827;
     }
+
     /* Radio grid tri-state */
     .tri-grid {
       display:grid;
@@ -128,6 +131,7 @@
       text-align:center; 
       color:#374151; 
       font-weight:700;
+      user-select:none;
     }
     .tri-grid .head.ex { color: var(--c-exclude); }
     .tri-grid .head.in { color: var(--c-include); }
@@ -139,39 +143,53 @@
       padding:.25rem 0;
     }
     .tri-grid .cell { display:flex; justify-content:center; }
-    .radio {
+
+    /* Custom round radio (accessible) */
+    .radio-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .radio-ui {
       --size: 18px;
-      position:relative;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
       width: var(--size);
       height: var(--size);
-    }
-    .radio input { 
-      appearance:none; 
-      -webkit-appearance:none;
-      width: var(--size);
-      height: var(--size);
-      border-radius:999px;
-      border:2px solid #9ca3af;
-      background:#fff;
-      outline:none;
-      cursor:pointer;
+      aspect-ratio: 1 / 1;
       display:inline-block;
-      position:relative;
+      border-radius: 999px;
+      border: 2px solid #9ca3af;
+      background: #ffffff;
+      box-sizing: border-box;
+      position: relative;
+      cursor: pointer;
+      forced-color-adjust: none; /* keep our look even in Windows forced colors */
     }
-    .radio input:checked {
-      border-color:#111827;
+    .radio-input:focus-visible + .radio-ui {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
     }
-    .radio input:checked::after{
-      content:"";
-      position:absolute;
-      top:50%; left:50%;
-      width:8px; height:8px;
-      transform:translate(-50%,-50%);
-      background:#111827; border-radius:999px;
+    .radio-input:checked + .radio-ui {
+      border-color: var(--ink);
     }
+    .radio-input:checked + .radio-ui::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      transform: translate(-50%, -50%);
+      background: var(--ink);
+      border-radius: 999px;
+    }
+    /* High-contrast fallback */
+    @media (forced-colors: active) {
+      .radio-ui { border-color: ButtonText; background: Canvas; }
+      .radio-input:checked + .radio-ui { border-color: ButtonText; background: Canvas; }
+      .radio-input:checked + .radio-ui::after { background: ButtonText; }
+    }
+
     /* Switch for vegetar-only */
     .switch {
       display:flex; align-items:center; gap:.6rem;
@@ -181,6 +199,7 @@
       position:relative; width:46px; height:26px; background:#e5e7eb; border-radius:999px;
       box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
       transition: background .2s ease;
+      forced-color-adjust: none;
     }
     .switch .slider::after{
       content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff;
@@ -232,7 +251,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.27</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #666;">version 1.28</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -260,19 +279,46 @@
               <div class="head ig">–</div>
 
               <div class="row-label" id="rowlabel-agnes">Agnes kan lide</div>
-              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-include" value="include"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="agnes-mode" id="agnes-ignore"  value="ignore" checked></span></div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="agnes-mode" id="agnes-exclude" value="exclude">
+                <label class="radio-ui" for="agnes-exclude" aria-label="Agnes: skal ikke have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="agnes-mode" id="agnes-include" value="include">
+                <label class="radio-ui" for="agnes-include" aria-label="Agnes: skal have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="agnes-mode" id="agnes-ignore" value="ignore" checked>
+                <label class="radio-ui" for="agnes-ignore" aria-label="Agnes: ignorér"></label>
+              </div>
 
               <div class="row-label" id="rowlabel-to-dage">Kan spises 2 dage</div>
-              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-include" value="include"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="to-dage-mode" id="to-dage-ignore"  value="ignore" checked></span></div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude">
+                <label class="radio-ui" for="to-dage-exclude" aria-label="2 dage: skal ikke have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-include" value="include">
+                <label class="radio-ui" for="to-dage-include" aria-label="2 dage: skal have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-ignore" value="ignore" checked>
+                <label class="radio-ui" for="to-dage-ignore" aria-label="2 dage: ignorér"></label>
+              </div>
 
               <div class="row-label" id="rowlabel-nem">Nem ret</div>
-              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-exclude" value="exclude"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-include" value="include"></span></div>
-              <div class="cell"><span class="radio"><input type="radio" name="nem-mode" id="nem-ignore"  value="ignore" checked></span></div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="nem-mode" id="nem-exclude" value="exclude">
+                <label class="radio-ui" for="nem-exclude" aria-label="Nem: skal ikke have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="nem-mode" id="nem-include" value="include">
+                <label class="radio-ui" for="nem-include" aria-label="Nem: skal have"></label>
+              </div>
+              <div class="cell">
+                <input class="radio-input" type="radio" name="nem-mode" id="nem-ignore" value="ignore" checked>
+                <label class="radio-ui" for="nem-ignore" aria-label="Nem: ignorér"></label>
+              </div>
             </div>
             <small style="color:var(--c-muted);display:block;margin-top:0.35rem;">✕ = skal ikke have · ✔ = skal have · – = ignorer.</small>
           </fieldset>
@@ -294,9 +340,6 @@
           <tr id="thead-row">
             <th>Navn</th>
             <th>Vegetar</th>
-            <th>Oksekød</th>
-            <th>Kylling</th>
-            <th>Svinekød</th>
             <th>2 dage</th>
             <th>Nem ret</th>
             <th>Agnes</th>
@@ -420,7 +463,6 @@
       practicalFilters.forEach(f => {
         const label = document.getElementById(f.labelId);
         if (!label) return;
-        // Color row-label text by mode (subtle)
         const mode = getMode(f.group);
         label.style.color = (mode === "include") ? "#0a7" : (mode === "exclude" ? "#c33" : "#111827");
       });
@@ -433,7 +475,6 @@
     }
 
     function passesPractical(row) {
-      // include = kræver X, exclude = må ikke være X, ignore = ingen krav
       for (const f of practicalFilters) {
         const mode = getMode(f.group);
         if (mode === "include" && !hasX(row, f.cols)) return false;
@@ -466,9 +507,6 @@
 
         const displayCols = [
           { key: "Vegetar", cols: COLS.vegetar },
-          { key: "Oksekød", cols: COLS.okse },
-          { key: "Kylling", cols: COLS.kylling },
-          { key: "Svinekød", cols: COLS.gris },
           { key: "2 dage", cols: COLS.toDage },
           { key: "Nem ret", cols: COLS.nem },
           { key: "Agnes", cols: COLS.agnes },
@@ -544,10 +582,11 @@
       .then(csv => {
         const result = Papa.parse(csv, { header: true });
         allRows = (result.data || []).filter(row => ((getCol(row, COLS.navn) || "").trim().length > 0));
+        // Alfabetisk sortering på Navn (dansk locale)
         allRows.sort((a, b) => (getCol(a, COLS.navn) || "").localeCompare(getCol(b, COLS.navn) || "", "da", {sensitivity: "base"}));
         visFiltreredeRetter();
 
-        // Event listeners
+        // Lyt til ændringer på tri-state radios + vegetar switch
         document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => {
           r.addEventListener("change", visFiltreredeRetter);
         });
