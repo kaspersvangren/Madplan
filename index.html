@@ -6,7 +6,6 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root{
-      /* Warm, calm palette */
       --bg-page:#faf6f2;
       --bg-panel:#fffaf5;
       --ink:#3a2d25;
@@ -21,7 +20,7 @@
     }
     * { box-sizing: border-box; }
     body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
       background: var(--bg-page);
       margin: 0;
       padding: 0;
@@ -32,25 +31,19 @@
       font-weight: 700;
       letter-spacing: .2px;
     }
-    .container {
-      max-width: 1200px;
-      margin: auto;
-      padding: 1rem;
-    }
-    .layout {
-      display: flex;
-      gap: 2rem;
-      align-items: flex-start;
-    }
+    .container { max-width: 1200px; margin: auto; padding: 1rem; }
+    .layout { display: flex; gap: 2rem; align-items: flex-start; }
+
+    /* Sidebar (plan + filtre + tilbageblik) */
     .sidebar {
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      position: sticky;
+      position: sticky;         /* bliver på skærmen */
       top: 1rem;
       align-self: flex-start;
+      min-width: 380px;
       z-index: 10;
-      min-width: 360px;
     }
     .panel {
       background: var(--bg-panel);
@@ -59,56 +52,38 @@
       padding: 0.75rem 1rem;
       box-shadow: 0 1px 2px rgba(0,0,0,.04);
     }
-    .ugeplan h3{ margin:0.25rem 0 0.5rem; }
-    .ugeplan .dag {
-      border: 1px dashed #d8cfc6;
-      border-radius: 10px;
-      padding: 0.5rem 0.6rem;
-      margin: 0.45rem 0;
-      min-height: 2.2rem;
-      position: relative;
-      overflow: hidden;
-      background:#fff;
-    }
-    .ugeplan .dag .dag-indhold {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }
-    .ugeplan .dag .ret-navn {
-      flex-grow: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight:600;
-    }
-    .ugeplan .dag.dragover { background-color: #f1fbf6; border-color:#7ed9ac; }
-    .ugeplan button.remove {
-      position: static;
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      border: 1px solid #c9bdb2;
-      color: #6e5a4d;
-      background: #fffaf5;
-      font-size: 14px;
-      line-height: 18px;
-      padding: 0;
-      cursor: pointer;
-    }
+    .panel h3{ margin:0.25rem 0 0.5rem; }
 
-    .filters { display: flex; flex-direction: column; gap: 1rem; }
-    fieldset {
-      border: 1px solid var(--c-border);
-      padding: 1rem;
-      border-radius: 12px;
-      background: var(--bg-panel);
-      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    /* Samlet uge-boks (plan / tilbageblik) */
+    .ugeboks .top {
+      display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem;
     }
+    .nav { display:flex; align-items:center; gap:.4rem; }
+    .nav button { border-radius:8px; padding:.3rem .55rem; border:1px solid var(--c-border); background:#fff; cursor:pointer; }
+    .nav button:disabled { opacity:.4; cursor:not-allowed; }
+    .range { font-weight:700; color:#5b463a; }
+
+    .drop-row { 
+      border: 1px dashed #d8cfc6; border-radius: 10px; padding: 0.5rem 0.6rem; 
+      margin: 0.45rem 0; min-height: 2.2rem; position: relative; background:#fff;
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .drop-row.dragover { background-color:#f1fbf6; border-color:#7ed9ac; }
+    .drop-row .label { min-width: 90px; text-align:right; font-weight:600; color:#5b463a; }
+    .ret-chip { flex:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+    .ret-chip .name { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .drop-row .clear { width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; }
+
+    /* Tilbageblik-input (skriv + drop) */
+    .spist-input { flex:1; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem; }
+    .actions { display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-top:.6rem; }
+    .btn { appearance:none; border:1px solid var(--c-border); background:#4a372a; color:#fff; border-radius:10px; padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+    .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+    .muted { color:#8b6f61; font-size:.9rem; }
+
+    /* Filtre */
+    fieldset { border: 1px solid var(--c-border); padding: 1rem; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
     fieldset legend { padding:0 .3rem; font-weight:600; color:var(--ink); }
-
-    /* Tri-state grid */
     .tri-grid { display:grid; grid-template-columns: 1fr repeat(3, 56px); gap:.25rem .6rem; align-items:center; }
     .tri-grid .head { font-size:.9rem; text-align:center; color:#5b463a; font-weight:700; user-select:none; }
     .tri-grid .head.ex { color: var(--c-exclude); }
@@ -116,139 +91,96 @@
     .tri-grid .head.ig { color: var(--c-muted); }
     .tri-grid .row-label { font-size:.95rem; color:var(--ink); font-weight:600; padding:.25rem 0; }
     .tri-grid .cell { display:flex; justify-content:center; }
-
-    /* Custom round radio (accessible) */
     .radio-input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .radio-ui {
-      --size: 18px;
-      width: var(--size); height: var(--size); aspect-ratio: 1 / 1;
-      display:inline-block; border-radius: 999px; border: 2px solid #c9bdb2; background: #ffffff; position: relative; cursor: pointer; forced-color-adjust: none;
-    }
-    .radio-input:focus-visible + .radio-ui { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .radio-ui { --size: 18px; width: var(--size); height: var(--size); border-radius:999px; border: 2px solid #c9bdb2; background:#fff; display:inline-block; cursor:pointer; position:relative; }
+    .radio-input:focus-visible + .radio-ui { outline:2px solid var(--focus); outline-offset:2px; }
     .radio-input:checked + .radio-ui { border-color: var(--ink); }
-    .radio-input:checked + .radio-ui::after {
-      content: ""; position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; transform: translate(-50%, -50%); background: var(--ink); border-radius: 999px;
-    }
-    @media (forced-colors: active) {
-      .radio-ui { border-color: ButtonText; background: Canvas; }
-      .radio-input:checked + .radio-ui { border-color: ButtonText; background: Canvas; }
-      .radio-input:checked + .radio-ui::after { background: ButtonText; }
-    }
-
-    /* Switch */
+    .radio-input:checked + .radio-ui::after { content:""; position:absolute; top:50%; left:50%; width:8px; height:8px; transform:translate(-50%,-50%); background:var(--ink); border-radius:999px; }
     .switch { display:flex; align-items:center; gap:.6rem; }
     .switch input { display:none; }
-    .switch .slider {
-      position:relative; width:46px; height:26px; background:#eadfd6; border-radius:999px; box-shadow: inset 0 1px 2px rgba(0,0,0,.08); transition: background .2s ease; forced-color-adjust: none;
-    }
-    .switch .slider::after{
-      content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.15); transition:left .2s ease;
-    }
+    .switch .slider { position:relative; width:46px; height:26px; background:#eadfd6; border-radius:999px; box-shadow: inset 0 1px 2px rgba(0,0,0,.08); transition: background .2s; }
+    .switch .slider::after{ content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.15); transition:left .2s; }
     .switch input:checked + .slider { background:#bfe6cd; }
     .switch input:checked + .slider::after{ left:23px; }
     .switch .switch-label{ font-weight:600; color:var(--ink); }
 
-    /* Table wrapper for sticky header */
-    .table-wrap{ border:1px solid var(--c-border); border-radius:12px; background:#fff; box-shadow: 0 1px 2px rgba(0,0,0,.04); overflow: visible; }
+    /* Liste med retter – egen scroller, så sidebar bliver */
+    .table-wrap{
+      border:1px solid var(--c-border);
+      border-radius:12px;
+      background:#fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      max-height: calc(100vh - 160px);  /* <- løser issue #1 */
+      overflow:auto;
+    }
     table { width: 100%; border-collapse: separate; border-spacing: 0; background: white; }
     th, td { padding: 0.6rem .7rem; border-bottom: 1px solid #efe7df; white-space: nowrap; font-size:.95rem; color: var(--ink); }
-    thead th {
-      position: sticky; top: 0; z-index: 5; background: #fffaf5; font-weight:700; border-bottom: 1px solid #e6dfd7; box-shadow: 0 1px 0 rgba(0,0,0,0.03);
-    }
+    thead th { position: sticky; top: 0; z-index: 5; background: #fffaf5; font-weight:700; border-bottom: 1px solid #e6dfd7; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
     .navn-cell { max-width: 350px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight:600; }
-    .btn { appearance:none; border:1px solid var(--c-border); background:#4a372a; color:#fff; border-radius:10px; padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-    .btn:hover{ filter:brightness(1.05); }
-    #indkoebsliste-result{ font-size: .95rem; }
-
-    /* Historik panel */
-    .hist-top { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem; }
-    .hist-nav { display:flex; align-items:center; gap:.4rem; }
-    .hist-nav button { border-radius:8px; padding:.3rem .55rem; border:1px solid var(--c-border); background:#fff; cursor:pointer; }
-    .hist-nav button:disabled { opacity:.4; cursor:not-allowed; }
-    .hist-week { font-weight:700; color:#5b463a; }
-    .hist-list { display:grid; grid-template-columns: 120px 1fr; gap:.4rem .6rem; }
-    .hist-list .label { text-align:right; font-weight:600; color:#5b463a; padding:.2rem 0; }
-    .hist-list input[type="text"] {
-      width:100%; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem;
-    }
-    .hist-actions { display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-top:.6rem; }
-    .muted { color:#8b6f61; font-size:.9rem; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 2.2</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 2.3</small></h1>
     <div class="layout">
       <div class="sidebar">
-        <!-- Ugeplan (kommende uge) -->
-        <div class="panel ugeplan">
-          <h3>Kommende uge (fre→tor)</h3>
-          <div class="dag" data-dag="fredag"></div>
-          <div class="dag" data-dag="lørdag"></div>
-          <div class="dag" data-dag="søndag"></div>
-          <div class="dag" data-dag="mandag"></div>
-          <div class="dag" data-dag="tirsdag"></div>
-          <div class="dag" data-dag="onsdag"></div>
-          <div class="dag" data-dag="torsdag"></div>
+        <!-- Samlet boks: Plan (kommende uge) / Tilbageblik (1–3 uger) -->
+        <div class="panel ugeboks">
+          <div class="top">
+            <div class="nav">
+              <button id="view-prev" title="Én uge længere tilbage">‹</button>
+              <span class="range" id="view-range">–</span>
+              <button id="view-next" title="Én uge frem">›</button>
+            </div>
+            <div class="muted" id="view-hint"></div>
+          </div>
+
+          <div id="week-rows"></div>
+
+          <div class="actions">
+            <span id="primary-status" class="muted"></span>
+            <button id="primary-btn" class="btn">Indkøbsliste</button>
+          </div>
         </div>
 
-        <div class="filters">
-          <div class="indkoebsliste-container" style="margin-top: 0.25rem;">
-            <button id="generate-indkoebsliste" class="btn">Indkøbsliste</button>
-            <div id="indkoebsliste-result" style="margin-top: 1rem; white-space: pre-wrap; background: #fff; border: 1px solid var(--c-border); padding: 1rem; border-radius: 12px;"></div>
+        <!-- Filtre -->
+        <fieldset>
+          <legend>Praktisk (vælg pr. felt)</legend>
+          <div class="tri-grid" role="group" aria-label="Tri-state praktisk">
+            <div></div>
+            <div class="head ex">✕</div>
+            <div class="head in">✔</div>
+            <div class="head ig">–</div>
+
+            <div class="row-label" id="rowlabel-agnes">Agnes kan lide</div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"><label class="radio-ui" for="agnes-exclude" aria-label="Agnes: skal ikke have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-include" value="include"><label class="radio-ui" for="agnes-include" aria-label="Agnes: skal have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-ignore" value="ignore" checked><label class="radio-ui" for="agnes-ignore" aria-label="Agnes: ignorér"></label></div>
+
+            <div class="row-label" id="rowlabel-to-dage">Kan spises 2 dage</div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"><label class="radio-ui" for="to-dage-exclude" aria-label="2 dage: skal ikke have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-include" value="include"><label class="radio-ui" for="to-dage-include" aria-label="2 dage: skal have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-ignore" value="ignore" checked><label class="radio-ui" for="to-dage-ignore" aria-label="2 dage: ignorér"></label></div>
+
+            <div class="row-label" id="rowlabel-nem">Nem ret</div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-exclude" value="exclude"><label class="radio-ui" for="nem-exclude" aria-label="Nem: skal ikke have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-include" value="include"><label class="radio-ui" for="nem-include" aria-label="Nem: skal have"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-ignore" value="ignore" checked><label class="radio-ui" for="nem-ignore" aria-label="Nem: ignorér"></label></div>
           </div>
+        </fieldset>
 
-          <fieldset>
-            <legend>Praktisk (vælg pr. felt)</legend>
-            <div class="tri-grid" role="group" aria-label="Tri-state praktisk">
-              <div></div>
-              <div class="head ex">✕</div>
-              <div class="head in">✔</div>
-              <div class="head ig">–</div>
+        <fieldset>
+          <legend>Vegetar</legend>
+          <label id="label-vegetar" class="switch">
+            <input type="checkbox" id="filter-vegetar-only">
+            <span class="slider"></span>
+            <span class="switch-label">Vis kun vegetar</span>
+          </label>
+        </fieldset>
 
-              <div class="row-label" id="rowlabel-agnes">Agnes kan lide</div>
-              <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"><label class="radio-ui" for="agnes-exclude" aria-label="Agnes: skal ikke have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-include" value="include"><label class="radio-ui" for="agnes-include" aria-label="Agnes: skal have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-ignore" value="ignore" checked><label class="radio-ui" for="agnes-ignore" aria-label="Agnes: ignorér"></label></div>
-
-              <div class="row-label" id="rowlabel-to-dage">Kan spises 2 dage</div>
-              <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"><label class="radio-ui" for="to-dage-exclude" aria-label="2 dage: skal ikke have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-include" value="include"><label class="radio-ui" for="to-dage-include" aria-label="2 dage: skal have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-ignore" value="ignore" checked><label class="radio-ui" for="to-dage-ignore" aria-label="2 dage: ignorér"></label></div>
-
-              <div class="row-label" id="rowlabel-nem">Nem ret</div>
-              <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-exclude" value="exclude"><label class="radio-ui" for="nem-exclude" aria-label="Nem: skal ikke have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-include" value="include"><label class="radio-ui" for="nem-include" aria-label="Nem: skal have"></label></div>
-              <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-ignore" value="ignore" checked><label class="radio-ui" for="nem-ignore" aria-label="Nem: ignorér"></label></div>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Vegetar</legend>
-            <label id="label-vegetar" class="switch">
-              <input type="checkbox" id="filter-vegetar-only">
-              <span class="slider"></span>
-              <span class="switch-label">Vis kun vegetar</span>
-            </label>
-          </fieldset>
-
-          <!-- Tilbageblik (3 uger) -->
-          <div class="panel">
-            <div class="hist-top">
-              <div class="hist-nav">
-                <button id="hist-prev" title="Én uge længere tilbage">‹</button>
-                <span class="hist-week" id="hist-range">–</span>
-                <button id="hist-next" title="Én uge frem">›</button>
-              </div>
-              <div class="muted">Tilbageblik (max 3 uger)</div>
-            </div>
-            <div id="hist-list" class="hist-list"></div>
-            <div class="hist-actions">
-              <span id="hist-status" class="muted"></span>
-              <button id="hist-save" class="btn">Gem ændringer</button>
-            </div>
-          </div>
-
+        <!-- Status/tekst for indkøbsliste -->
+        <div class="panel">
+          <div id="indkoebsliste-result" style="white-space: pre-wrap;"></div>
         </div>
       </div>
 
@@ -271,190 +203,222 @@
 
   <script>
     /* =========================
-       v2.2 – Historik-læsning + UI
+       v2.3 – Samlet ugepanel, DnD i tilbageblik, sticky sidebar, optimistisk opdatering
        ========================= */
     const WEBAPP_URL    = "https://script.google.com/macros/s/AKfycbyrbuiVQ0-vDenrKPLC6y1WHzy8BDLo-jK0mLyQTqwuPYRyE41_cZ6ieKwEM4GaqRYbkA/exec";
     const WEBAPP_SECRET = "Freddy";
-    const SHEET_ID = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
+    const SHEET_ID      = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
     const HISTORIK_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historik`;
 
-    // --- Dato-hjælpere
-    function isoLocal(d){
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,"0");
-      const day = String(d.getDate()).padStart(2,"0");
-      return `${y}-${m}-${day}`;
-    }
+    // ---- Dato-hjælpere
+    function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
+    function weekdayDa(idx){ return ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"][idx]; }
     function nextFridayDate(base=new Date()){
-      const dow = base.getDay(); // 0=søn ... 5=fre, 6=lør
-      let delta = (5 - dow + 7) % 7;
-      if (delta === 0) delta = 7; // hvis fredag → næste fredag
-      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta);
-      d.setHours(0,0,0,0);
-      return d;
+      const dow = base.getDay(); let delta = (5 - dow + 7) % 7; if (delta === 0) delta = 7;
+      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta); d.setHours(0,0,0,0); return d;
     }
     function nextWeekDatesFriThu(){
-      const start = nextFridayDate(new Date());
-      const arr = [];
-      for (let i=0;i<7;i++){
-        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
-        arr.push(isoLocal(d));
-      }
-      return arr; // [fre..tor]
+      const start = nextFridayDate(new Date()); const arr=[]; for (let i=0;i<7;i++){ const d=new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); arr.push(isoLocal(d)); } return arr;
     }
-    function backWeekDates(i){ // i = 1..3 (uger tilbage)
-      const nf = nextFridayDate(new Date());
-      const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - (i*7));
-      const arr = [];
-      for (let d=0; d<7; d++){
-        const dt = new Date(start.getFullYear(), start.getMonth(), start.getDate()+d);
-        arr.push(isoLocal(dt));
-      }
-      return arr; // [fre..tor] for uge i tilbage
-    }
-    function weekdayDa(idx){ // 0..6 i ugeplanens rækkefølge
-      return ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"][idx];
+    function backWeekDates(i){ // 1..3
+      const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7);
+      const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr;
     }
 
-    // --- Apps Script POST uden preflight
+    // ---- Apps Script POST (uden preflight / CORS)
     async function postToWebApp(payload){
       try{
-        await fetch(WEBAPP_URL, {
-          method: "POST",
-          body: JSON.stringify(payload),
-          mode: "no-cors",
-          cache: "no-store"
-        });
-      }catch(err){
-        console.warn("WebApp POST fejl:", err);
-      }
+        await fetch(WEBAPP_URL, { method:"POST", body: JSON.stringify(payload), mode:"no-cors", cache:"no-store" });
+      }catch(err){ console.warn("WebApp POST fejl:", err); }
     }
 
-    // --- Historik-data (læst fra CSV)
-    let historikMap = new Map(); // date -> { plan_nu, spist, ugedag }
+    // ---- Historik (læst fra CSV)
+    let historikMap = new Map(); // dato -> { ugedag, plan_nu, spist }
+    let lastEatenByName = new Map(); // lower(name) -> seneste ISO-dato
 
     async function loadHistorik(){
-      try{
-        const text = await fetch(HISTORIK_CSV_URL, { cache: "no-store" }).then(r => r.text());
-        const parsed = Papa.parse(text, { header: true });
-        historikMap = new Map();
-        (parsed.data || []).forEach(row => {
-          const dato = (row["dato"] || "").trim();
-          if (!dato) return;
-          historikMap.set(dato, {
-            ugedag: (row["ugedag"] || "").trim(),
-            plan_nu: (row["plan_nu"] || "").toString(),
-            spist: (row["spist"] || "").toString()
-          });
+      const text = await fetch(HISTORIK_CSV_URL, { cache: "no-store" }).then(r => r.text());
+      const parsed = Papa.parse(text, { header:true });
+      historikMap = new Map();
+      (parsed.data || []).forEach(row => {
+        const dato = (row["dato"] || "").trim(); if (!dato) return;
+        const plan = (row["plan_nu"] || "").toString();
+        const sp   = (row["spist"] || "").toString();
+        historikMap.set(dato, { ugedag:(row["ugedag"]||"").trim(), plan_nu:plan, spist:sp });
+      });
+      recomputeLastEaten();
+    }
+
+    function recomputeLastEaten(){
+      lastEatenByName = new Map();
+      const setIfNewer = (name, date) => {
+        const key = (name||"").trim().toLowerCase(); if (!key) return;
+        const cur = lastEatenByName.get(key);
+        if (!cur || date > cur) lastEatenByName.set(key, date);
+      };
+      historikMap.forEach((v, d) => {
+        if ((v.spist||"").trim())   setIfNewer(v.spist, d);
+        if ((v.plan_nu||"").trim()) setIfNewer(v.plan_nu, d);
+      });
+      // Opdater tooltips på retter i tabellen (hvis allerede loaded)
+      document.querySelectorAll("#madplan tbody tr").forEach(tr => {
+        const name = tr.getAttribute("data-name") || "";
+        const dt   = lastEatenByName.get(name.toLowerCase());
+        tr.title = dt ? `Sidst spist: ${dt}` : "Sidst spist: –";
+      });
+    }
+
+    // ---- Samlet ugepanel (viewIdx=0: kommende plan; 1..3: tilbageblik)
+    let viewIdx = 0; // 0 = kommende uge, 1..3 = uger tilbage
+    const weekRowsEl = () => document.getElementById("week-rows");
+    const rangeEl    = () => document.getElementById("view-range");
+    const hintEl     = () => document.getElementById("view-hint");
+    const btnEl      = () => document.getElementById("primary-btn");
+    const statusEl   = () => document.getElementById("primary-status");
+
+    function renderWeekPanel(){
+      const rows = weekRowsEl(); rows.innerHTML = "";
+      const dates = (viewIdx===0) ? nextWeekDatesFriThu() : backWeekDates(viewIdx);
+      rangeEl().textContent = `${dates[0]} → ${dates[6]}`;
+
+      // Nav-knapper
+      document.getElementById("view-prev").disabled = (viewIdx >= 3);
+      document.getElementById("view-next").disabled = (viewIdx <= 0);
+
+      if (viewIdx === 0){
+        hintEl().textContent = "Planlæg næste uge · Træk retter ind";
+        btnEl().textContent = "Indkøbsliste";
+        btnEl().disabled = false;
+
+        // 7 drop-zoner (som tidligere ugeplan)
+        dates.forEach((ds, i) => {
+          const row = document.createElement("div"); row.className = "drop-row"; row.dataset.date = ds;
+          const label = document.createElement("div"); label.className = "label"; label.textContent = weekdayDa(i).charAt(0).toUpperCase()+weekdayDa(i).slice(1);
+          const chip  = document.createElement("div"); chip.className = "ret-chip"; chip.innerHTML = `<span class="name"></span>`;
+          const clear = document.createElement("button"); clear.className = "clear"; clear.textContent = "×";
+          clear.addEventListener("click", () => setPlanValue(row, ""));
+          row.appendChild(label); row.appendChild(chip); row.appendChild(clear);
+          setupDropRowForPlan(row);
+          rows.appendChild(row);
+
+          // Prefill fra historik (plan_nu)
+          const h = historikMap.get(ds); const v = h && (h.plan_nu||"").trim();
+          if (v) setPlanValue(row, v);
         });
-      }catch(err){
-        console.warn("Kunne ikke hente Historik-CSV:", err);
+
+      } else {
+        hintEl().textContent = "Tilbageblik · Ret hvad der blev spist";
+        btnEl().textContent = "Gem ændringer";
+        btnEl().disabled = false;
+
+        // 7 rækker med input + drop (skriver 'spist')
+        dates.forEach((ds, i) => {
+          const row = document.createElement("div"); row.className = "drop-row"; row.dataset.date = ds;
+          const label = document.createElement("div"); label.className = "label"; label.textContent = weekdayDa(i).charAt(0).toUpperCase()+weekdayDa(i).slice(1);
+
+          const input = document.createElement("input"); input.type = "text"; input.className = "spist-input"; input.placeholder = "Ret-navn";
+          const clear = document.createElement("button"); clear.className = "clear"; clear.textContent = "×";
+          clear.addEventListener("click", () => { input.value=""; });
+
+          row.appendChild(label); row.appendChild(input); row.appendChild(clear);
+          setupDropRowForSpist(row, input);
+          rows.appendChild(row);
+
+          // Prefill fra historik (spist)
+          const h = historikMap.get(ds); const v = h && (h.spist||"").trim();
+          if (v) input.value = v;
+        });
       }
     }
 
-    // --- Ugeplan UI helpers
-    function resetDagEl(dagEl){
-      const dagNavn = dagEl.getAttribute("data-dag");
-      dagEl.removeAttribute("data-ret");
-      dagEl.innerHTML = "";
-      const label = document.createElement("span");
-      label.className = "dag-label";
-      label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
-      dagEl.appendChild(label);
-      dagEl.removeAttribute("draggable");
-    }
-    function setDagRet(dagEl, navn){
-      const dagNavn = dagEl.getAttribute("data-dag");
-      dagEl.setAttribute("data-ret", navn);
+    function setupDropRowForPlan(rowEl){
+      const nameEl = () => rowEl.querySelector(".ret-chip .name");
+      const onDropName = (navn) => setPlanValue(rowEl, navn);
 
-      const wrapper = document.createElement("div");
-      wrapper.className = "dag-indhold";
+      rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
+      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
+      rowEl.addEventListener("drop", e => {
+        e.preventDefault(); rowEl.classList.remove("dragover");
+        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
+        const navn = e.dataTransfer.getData("application/x-ret-navn"); onDropName(navn);
+      });
 
-      const label = document.createElement("span");
-      label.className = "dag-label";
-      label.textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1) + ":";
-
-      const navnSpan = document.createElement("span");
-      navnSpan.className = "ret-navn";
-      navnSpan.textContent = navn;
-
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "remove";
-      removeBtn.textContent = "×";
-      removeBtn.onclick = () => resetDagEl(dagEl);
-
-      wrapper.appendChild(label);
-      wrapper.appendChild(navnSpan);
-      wrapper.appendChild(removeBtn);
-
-      dagEl.innerHTML = "";
-      dagEl.appendChild(wrapper);
-      dagEl.setAttribute("draggable", "true");
-
-      dagEl.addEventListener("dragstart", ev => {
-        ev.dataTransfer.setData("application/x-ret-navn", dagEl.getAttribute("data-ret"));
-      }, { once: true });
+      // Træk ud igen (dragstart)
+      rowEl.addEventListener("dragstart", ev => {
+        ev.dataTransfer.setData("application/x-ret-navn", (nameEl().textContent||""));
+      });
+      rowEl.setAttribute("draggable","true");
     }
 
-    async function prefillNextWeekFromHistorik(){
-      const dates = nextWeekDatesFriThu();
-      const dagEls = Array.from(document.querySelectorAll(".ugeplan .dag")); // fred→tors
-      dates.forEach((ds, idx) => {
-        const r = historikMap.get(ds);
-        if (r && r.plan_nu && r.plan_nu.trim()){
-          setDagRet(dagEls[idx], r.plan_nu.trim());
-        }
+    function setPlanValue(rowEl, navn){
+      const ds = rowEl.dataset.date;
+      const chipName = rowEl.querySelector(".ret-chip .name");
+      chipName.textContent = navn || "";
+      rowEl.dataset.ret = navn || "";
+
+      // Optimistisk opdatering af historikMap (så tooltips mm. virker straks)
+      const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
+      rec.plan_nu = navn || "";
+      historikMap.set(ds, rec);
+      recomputeLastEaten();
+    }
+
+    function setupDropRowForSpist(rowEl, inputEl){
+      rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
+      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
+      rowEl.addEventListener("drop", e => {
+        e.preventDefault(); rowEl.classList.remove("dragover");
+        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
+        const navn = e.dataTransfer.getData("application/x-ret-navn");
+        inputEl.value = navn || "";
+        // Optimistisk opdatering lokalt
+        const ds = rowEl.dataset.date;
+        const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
+        rec.spist = navn || "";
+        historikMap.set(ds, rec);
+        recomputeLastEaten();
       });
     }
 
-    // --- Tilbageblik UI
-    let backIdx = 1; // 1..3
-    function renderBackWeek(){
-      const listEl = document.getElementById("hist-list");
-      const rangeEl = document.getElementById("hist-range");
-      const prevBtn = document.getElementById("hist-prev");
-      const nextBtn = document.getElementById("hist-next");
+    async function doPrimaryAction(){
+      statusEl().textContent = "";
+      if (viewIdx === 0){
+        // Indkøbsliste + snapshot_plan (kun kommende uge)
+        buildLists();
 
-      const dates = backWeekDates(backIdx);
-      const start = dates[0], end = dates[6];
-      rangeEl.textContent = `${start} → ${end}`;
+        const dates = nextWeekDatesFriThu();
+        const items = Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i) => ({
+          date: dates[i],
+          ret: (row.dataset.ret || "").trim()
+        }));
 
-      prevBtn.disabled = (backIdx >= 3);
-      nextBtn.disabled = (backIdx <= 1);
+        const start = dates[0], end = dates[6];
+        statusEl().textContent = `— Sender planen til arket (${start} → ${end}) …`;
+        await postToWebApp({ secret: WEBAPP_SECRET, action:"snapshot_plan", items });
 
-      listEl.innerHTML = "";
-      dates.forEach((ds, i) => {
-        const r = historikMap.get(ds) || {};
-        const wd = weekdayDa(i);
-        const label = document.createElement("div");
-        label.className = "label";
-        label.textContent = wd.charAt(0).toUpperCase() + wd.slice(1) + ` (${ds})`;
+        // Optimistisk: allerede opdateret via setPlanValue
+        statusEl().textContent = `✓ Plan sendt (${start} → ${end})`;
+      } else {
+        // save_spist for den viste uge
+        const dates = (viewIdx===0) ? nextWeekDatesFriThu() : backWeekDates(viewIdx);
+        const inputs = Array.from(document.querySelectorAll("#week-rows .spist-input"));
+        const items = inputs.map((inp,i) => ({ date: dates[i], ret: inp.value.trim() }));
 
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = (r.spist || "");
-        input.dataset.date = ds;
+        statusEl().textContent = "Gemmer…";
+        await postToWebApp({ secret: WEBAPP_SECRET, action:"save_spist", items });
 
-        listEl.appendChild(label);
-        listEl.appendChild(input);
-      });
+        // Optimistisk opdatering: allerede sat ved drop/skriv, sikrer alle værdier:
+        items.forEach(it => {
+          const rec = historikMap.get(it.date) || { ugedag:"", plan_nu:"", spist:"" };
+          rec.spist = it.ret || "";
+          historikMap.set(it.date, rec);
+        });
+        recomputeLastEaten();
+        statusEl().textContent = "✓ Gemt (tjek arket for opdatering)";
+      }
     }
 
-    async function saveBackWeek(){
-      const statusEl = document.getElementById("hist-status");
-      const inputs = Array.from(document.querySelectorAll("#hist-list input[type='text']"));
-      const items = inputs.map(inp => ({ date: inp.dataset.date, ret: inp.value.trim() }));
-
-      statusEl.textContent = "Gemmer…";
-      await postToWebApp({
-        secret: WEBAPP_SECRET,
-        action: "save_spist",
-        items
-      });
-      statusEl.textContent = "✓ Gemt (tjek arket for opdatering)";
-    }
-
-    // --- v1.x / eksisterende
+    // ---- v1.x (retter-listen fra "Madplan"-fanen)
     const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
     const COLS = {
       navn: ["Navn"],
@@ -469,8 +433,8 @@
       tjek: ["Tjek","Tjek om vi har","Tjek liste"],
       overvej: ["Overvej","Tilbehør","Tilbehor"]
     };
-    function getCol(row, keys) { for (const k of keys) { if (k in row) return row[k]; } return ""; }
-    function hasX(row, keys) { return keys.some(k => (row[k] || "").trim().toUpperCase() === "X"); }
+    function getCol(row, keys){ for (const k of keys) if (k in row) return row[k]; return ""; }
+    function hasX(row, keys){ return keys.some(k => (row[k]||"").trim().toUpperCase() === "X"); }
     const tableBody = document.querySelector("#madplan tbody");
     const practicalFilters = [
       { group: "agnes", labelId: "rowlabel-agnes", cols: COLS.agnes },
@@ -478,30 +442,9 @@
       { group: "nem", labelId: "rowlabel-nem", cols: COLS.nem },
     ];
     const vegOnlyId = "filter-vegetar-only";
-    function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+    function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
-    function setupWeekDropZones() {
-      document.querySelectorAll(".ugeplan .dag").forEach(dag => {
-        const dagNavn = dag.getAttribute("data-dag");
-        resetDagEl(dag);
-
-        dag.addEventListener("dragover", e => { e.preventDefault(); dag.classList.add("dragover"); });
-        dag.addEventListener("dragleave", () => { dag.classList.remove("dragover"); });
-        dag.addEventListener("drop", e => {
-          e.preventDefault();
-          dag.classList.remove("dragover");
-          if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
-          const navn = e.dataTransfer.getData("application/x-ret-navn");
-          setDagRet(dag, navn);
-        });
-      });
-    }
-
-    function getMode(group){
-      const checked = document.querySelector('input[name="' + group + '-mode"]:checked');
-      return checked ? checked.value : "ignore";
-    }
-    function updateFilterLabelStyles() {
+    function updateFilterLabelStyles(){
       practicalFilters.forEach(f => {
         const label = document.getElementById(f.labelId);
         if (!label) return;
@@ -512,34 +455,31 @@
       const vegLabel = document.getElementById("label-vegetar");
       if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
     }
-    function passesPractical(row) {
-      for (const f of practicalFilters) {
-        const mode = getMode(f.group);
-        if (mode === "include" && !hasX(row, f.cols)) return false;
-        if (mode === "exclude" && hasX(row, f.cols)) return false;
-      }
-      return true;
+    function getMode(group){ const checked = document.querySelector(`input[name="${group}-mode"]:checked`); return checked ? checked.value : "ignore"; }
+
+    function setupDragSource(tr, name){
+      tr.setAttribute("draggable","true");
+      tr.addEventListener("dragstart", e => { e.dataTransfer.setData("application/x-ret-navn", name); });
     }
-    function passesVegetarian(row) {
-      const vegOnly = document.getElementById(vegOnlyId)?.checked;
-      if (!vegOnly) return true;
-      return hasX(row, COLS.vegetar);
-    }
-    function visFiltreredeRetter() {
+
+    function visFiltreredeRetter(){
       tableBody.innerHTML = "";
       allRows.forEach(row => {
         if (!passesPractical(row)) return;
         if (!passesVegetarian(row)) return;
 
+        const name = (getCol(row, COLS.navn) || "").trim();
         const tr = document.createElement("tr");
-        tr.setAttribute("draggable", "true");
+        tr.setAttribute("data-name", name.toLowerCase());
 
-        const navn = document.createElement("td");
-        const navnDiv = document.createElement("div");
-        navnDiv.className = "navn-cell";
-        navnDiv.textContent = getCol(row, COLS.navn) || "";
-        navn.appendChild(navnDiv);
-        tr.appendChild(navn);
+        // Tooltip: Sidst spist
+        const last = lastEatenByName.get(name.toLowerCase());
+        tr.title = last ? `Sidst spist: ${last}` : "Sidst spist: –";
+
+        const navnTd = document.createElement("td");
+        const navnDiv = document.createElement("div"); navnDiv.className="navn-cell"; navnDiv.textContent = name;
+        navnTd.appendChild(navnDiv);
+        tr.appendChild(navnTd);
 
         const displayCols = [
           { key: "Vegetar", cols: COLS.vegetar },
@@ -548,52 +488,57 @@
           { key: "Agnes", cols: COLS.agnes },
         ];
         displayCols.forEach(dc => {
-          const td = document.createElement("td");
-          td.textContent = hasX(row, dc.cols) ? "✔" : "";
-          tr.appendChild(td);
+          const td = document.createElement("td"); td.textContent = hasX(row, dc.cols) ? "✔" : ""; tr.appendChild(td);
         });
 
-        tr.addEventListener("dragstart", e => {
-          e.dataTransfer.setData("application/x-ret-navn", getCol(row, COLS.navn) || "");
-        });
-
+        setupDragSource(tr, name);
         tableBody.appendChild(tr);
       });
       updateFilterLabelStyles();
     }
 
-    function buildLists() {
-      const dage = Array.from(document.querySelectorAll(".ugeplan .dag"));
-      const ugeValg = [];
-      dage.forEach(dag => {
-        const navn = dag.getAttribute("data-ret");
-        if (navn) {
-          ugeValg.push({ dag: dag.getAttribute("data-dag"), navn });
-        }
-      });
+    function passesPractical(row){
+      for (const f of practicalFilters){
+        const mode = getMode(f.group);
+        if (mode === "include" && !hasX(row, f.cols)) return false;
+        if (mode === "exclude" && hasX(row, f.cols)) return false;
+      }
+      return true;
+    }
+    function passesVegetarian(row){
+      const vegOnly = document.getElementById(vegOnlyId)?.checked;
+      if (!vegOnly) return true;
+      return hasX(row, COLS.vegetar);
+    }
 
+    function buildLists(){
+      // Læs plan fra ugepanelet (viewIdx=0)
+      const dates = nextWeekDatesFriThu();
+      const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
+      const ugeValg = rows.map((row, i) => {
+        const navn = (row.dataset.ret || "").trim();
+        return navn ? { dag: weekdayDa(i), navn } : null;
+      }).filter(Boolean);
+
+      // Match mod masterrækker
       const brugteRækker = ugeValg
-        .map(v => ({ v, row: allRows.find(r => (getCol(r, COLS.navn) || "") === v.navn) }))
+        .map(v => ({ v, row: allRows.find(r => (getCol(r, COLS.navn) || "").trim() === v.navn) }))
         .filter(x => x.row);
 
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
-      const indkoebSet = new Set();
-      const tjekSet = new Set();
+      const indkoebSet = new Set(), tjekSet = new Set();
       brugteRækker.forEach(({row}) => {
-        const koebStr = getCol(row, COLS.koeb);
-        const tjekStr = getCol(row, COLS.tjek);
-        const koeb = (koebStr || "").split(",").map(s => s.trim()).filter(Boolean);
-        const tjek = (tjekStr || "").split(",").map(s => s.trim()).filter(Boolean);
-        koeb.forEach(v => indkoebSet.add(v));
-        tjek.forEach(v => tjekSet.add(v));
+        const koeb = (getCol(row, COLS.koeb) || "").split(",").map(s => s.trim()).filter(Boolean);
+        const tjek = (getCol(row, COLS.tjek) || "").split(",").map(s => s.trim()).filter(Boolean);
+        koeb.forEach(v => indkoebSet.add(v)); tjek.forEach(v => tjekSet.add(v));
       });
       tjekSet.forEach(item => indkoebSet.delete(item));
 
-      const indkoebListe = Array.from(indkoebSet).sort((a,b) => a.localeCompare(b, "da", {sensitivity:"base"}));
-      const tjekListe = Array.from(tjekSet).sort((a,b) => a.localeCompare(b, "da", {sensitivity:"base"}));
-      if (indkoebListe.length > 0) indkoebListe[0] = indkoebListe[0].charAt(0).toUpperCase() + indkoebListe[0].slice(1);
-      if (tjekListe.length > 0) tjekListe[0] = tjekListe[0].charAt(0).toUpperCase() + tjekListe[0].slice(1);
+      const indkoebListe = Array.from(indkoebSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
+      const tjekListe    = Array.from(tjekSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
+      if (indkoebListe.length > 0) indkoebListe[0] = capFirst(indkoebListe[0]);
+      if (tjekListe.length > 0)    tjekListe[0]    = capFirst(tjekListe[0]);
 
       const tilbehoerLinjer = brugteRækker
         .filter(({row}) => (getCol(row, COLS.overvej) || "").trim().toUpperCase() === "X")
@@ -605,12 +550,12 @@
         "3. Tjek om vi har:\n" + (tjekListe.length ? tjekListe.join(", ") : "-"),
         "4. Husk tilbehør til:\n" + (tilbehoerLinjer.length ? tilbehoerLinjer.join("\n") : "-")
       ].join("\n\n");
-
       document.getElementById("indkoebsliste-result").textContent = output;
     }
 
+    // ---- Init
     let allRows = [];
-    fetch(url)
+    fetch("https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan")
       .then(r => r.text())
       .then(csv => {
         const result = Papa.parse(csv, { header: true });
@@ -619,48 +564,25 @@
         visFiltreredeRetter();
 
         document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => r.addEventListener("change", visFiltreredeRetter));
-        document.getElementById(vegOnlyId)?.addEventListener("change", visFiltreredeRetter);
+        document.getElementById("filter-vegetar-only")?.addEventListener("change", visFiltreredeRetter);
       });
 
     document.addEventListener("DOMContentLoaded", async () => {
-      setupWeekDropZones();
-
-      // 1) Hent Historik og udfyld kommende uge med plan_nu
+      // Hent historik og render første view (kommende uge)
       await loadHistorik();
-      await prefillNextWeekFromHistorik();
+      renderWeekPanel();
 
-      // 2) Historik: init uge 1 tilbage
-      renderBackWeek();
+      // Nav
+      document.getElementById("view-prev").addEventListener("click", () => { if (viewIdx < 3) { viewIdx++; renderWeekPanel(); } });
+      document.getElementById("view-next").addEventListener("click", () => { if (viewIdx > 0) { viewIdx--; renderWeekPanel(); } });
 
-      // Uge-nav knapper
-      document.getElementById("hist-prev").addEventListener("click", () => { if (backIdx < 3) { backIdx++; renderBackWeek(); } });
-      document.getElementById("hist-next").addEventListener("click", () => { if (backIdx > 1) { backIdx--; renderBackWeek(); } });
-
-      // Gem tilbageblik
-      document.getElementById("hist-save").addEventListener("click", saveBackWeek);
-
-      // Indkøbsliste: generér tekst + gem snapshot_plan
-      document.getElementById("generate-indkoebsliste").addEventListener("click", async () => {
-        buildLists();
-
-        const items = (() => {
-          const zones = Array.from(document.querySelectorAll(".ugeplan .dag"));
-          const dates = nextWeekDatesFriThu();
-          return zones.map((el, idx) => ({ date: dates[idx], ret: (el.getAttribute("data-ret") || "").trim() }));
-        })();
-
-        const dates = nextWeekDatesFriThu();
-        const start = dates[0], end = dates[6];
-
-        const resultEl = document.getElementById("indkoebsliste-result");
-        const prev = resultEl.textContent || "";
-        resultEl.textContent = prev + "\n\n— Sender planen til arket (" + start + " → " + end + ") …";
-
-        await postToWebApp({ secret: WEBAPP_SECRET, action: "snapshot_plan", items });
-
-        resultEl.textContent = prev + "\n\n✓ Plan sendt til arket for perioden " + start + " → " + end + ".";
-      });
+      // Primær knap (Indkøbsliste / Gem ændringer)
+      document.getElementById("primary-btn").addEventListener("click", doPrimaryAction);
     });
+
+    /* Hjælpere til filtre */
+    function getMode(group){ const checked = document.querySelector(`input[name="${group}-mode"]:checked`); return checked ? checked.value : "ignore"; }
+    function passesVegetarian(row){ const vegOnly = document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, COLS.vegetar); }
   </script>
 </body>
 </html>
