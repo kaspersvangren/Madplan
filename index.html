@@ -14,117 +14,87 @@
       --focus:#d97706;
       --c-include:#2e7d5b;
       --c-exclude:#b84a4a;
-      --bg-include:#ecf7f1;
-      --bg-exclude:#fdeeed;
-      --bg-ignore:#f3f0eb;
     }
-    * { box-sizing: border-box; }
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-      background: var(--bg-page);
-      margin: 0;
-      padding: 0;
-      color: var(--ink);
-    }
-    h1 {
-      text-align: center;
-      font-weight: 700;
-      letter-spacing: .2px;
-    }
-    .container { max-width: 1200px; margin: auto; padding: 1rem; }
-    .layout { display: flex; gap: 2rem; align-items: flex-start; }
+    *{ box-sizing:border-box; }
+    body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans"; background:var(--bg-page); margin:0; color:var(--ink); }
+    h1{ text-align:center; font-weight:700; letter-spacing:.2px; }
+    .container{ max-width:1200px; margin:auto; padding:1rem; }
+    .layout{ display:flex; gap:2rem; align-items:flex-start; }
 
-    /* Sidebar (plan + filtre + tilbageblik) */
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      position: sticky;         /* bliver på skærmen */
-      top: 1rem;
-      align-self: flex-start;
-      min-width: 380px;
-      z-index: 10;
-    }
-    .panel {
-      background: var(--bg-panel);
-      border: 1px solid var(--c-border);
-      border-radius: 12px;
-      padding: 0.75rem 1rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,.04);
-    }
-    .panel h3{ margin:0.25rem 0 0.5rem; }
+    /* Sidebar med sticky */
+    .sidebar{ display:flex; flex-direction:column; gap:1rem; position:sticky; top:1rem; align-self:flex-start; min-width:380px; z-index:10; }
+    .panel{ background:var(--bg-panel); border:1px solid var(--c-border); border-radius:12px; padding:.75rem 1rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    .panel h3{ margin:.25rem 0 .5rem; }
 
-    /* Samlet uge-boks (plan / tilbageblik) */
-    .ugeboks .top {
-      display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem;
-    }
-    .nav { display:flex; align-items:center; gap:.4rem; }
-    .nav button { border-radius:8px; padding:.3rem .55rem; border:1px solid var(--c-border); background:#fff; cursor:pointer; }
-    .nav button:disabled { opacity:.4; cursor:not-allowed; }
-    .range { font-weight:700; color:#5b463a; }
+    /* Samlet uge-boks */
+    .ugeboks .top{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem; }
+    .nav{ display:flex; align-items:center; gap:.4rem; }
+    .nav button{ border-radius:8px; padding:.3rem .55rem; border:1px solid var(--c-border); background:#fff; cursor:pointer; }
+    .nav button:disabled{ opacity:.4; cursor:not-allowed; }
+    .range{ font-weight:700; color:#5b463a; }
+    .muted{ color:#8b6f61; font-size:.9rem; }
 
-    .drop-row { 
-      border: 1px dashed #d8cfc6; border-radius: 10px; padding: 0.5rem 0.6rem; 
-      margin: 0.45rem 0; min-height: 2.2rem; position: relative; background:#fff;
+    .drop-row{
+      border:1px dashed #d8cfc6; border-radius:10px; padding:.5rem .6rem; margin:.45rem 0; min-height:2.2rem; background:#fff;
       display:flex; align-items:center; gap:.6rem;
     }
-    .drop-row.dragover { background-color:#f1fbf6; border-color:#7ed9ac; }
-    .drop-row .label { min-width: 90px; text-align:right; font-weight:600; color:#5b463a; }
-    .ret-chip { flex:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
-    .ret-chip .name { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .drop-row .clear { width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; }
+    .drop-row.dragover{ background-color:#f1fbf6; border-color:#7ed9ac; }
+    .drop-row .label{ min-width:120px; text-align:right; font-weight:600; color:#5b463a; }
+    .ret-chip{ flex:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+    .ret-chip .name{ flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .clear{ width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; }
 
-    /* Tilbageblik-input (skriv + drop) */
-    .spist-input { flex:1; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem; }
-    .actions { display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-top:.6rem; }
-    .btn { appearance:none; border:1px solid var(--c-border); background:#4a372a; color:#fff; border-radius:10px; padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+    .spist-input{ flex:1; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem; }
+
+    .actions{ display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-top:.6rem; }
+    .btn{ appearance:none; border:1px solid var(--c-border); background:#4a372a; color:#fff; border-radius:10px; padding:.55rem .9rem; font-weight:700; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
     .btn[disabled]{ opacity:.5; cursor:not-allowed; }
-    .muted { color:#8b6f61; font-size:.9rem; }
 
     /* Filtre */
-    fieldset { border: 1px solid var(--c-border); padding: 1rem; border-radius: 12px; background: var(--bg-panel); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-    fieldset legend { padding:0 .3rem; font-weight:600; color:var(--ink); }
-    .tri-grid { display:grid; grid-template-columns: 1fr repeat(3, 56px); gap:.25rem .6rem; align-items:center; }
-    .tri-grid .head { font-size:.9rem; text-align:center; color:#5b463a; font-weight:700; user-select:none; }
-    .tri-grid .head.ex { color: var(--c-exclude); }
-    .tri-grid .head.in { color: var(--c-include); }
-    .tri-grid .head.ig { color: var(--c-muted); }
-    .tri-grid .row-label { font-size:.95rem; color:var(--ink); font-weight:600; padding:.25rem 0; }
-    .tri-grid .cell { display:flex; justify-content:center; }
-    .radio-input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .radio-ui { --size: 18px; width: var(--size); height: var(--size); border-radius:999px; border: 2px solid #c9bdb2; background:#fff; display:inline-block; cursor:pointer; position:relative; }
-    .radio-input:focus-visible + .radio-ui { outline:2px solid var(--focus); outline-offset:2px; }
-    .radio-input:checked + .radio-ui { border-color: var(--ink); }
-    .radio-input:checked + .radio-ui::after { content:""; position:absolute; top:50%; left:50%; width:8px; height:8px; transform:translate(-50%,-50%); background:var(--ink); border-radius:999px; }
-    .switch { display:flex; align-items:center; gap:.6rem; }
-    .switch input { display:none; }
-    .switch .slider { position:relative; width:46px; height:26px; background:#eadfd6; border-radius:999px; box-shadow: inset 0 1px 2px rgba(0,0,0,.08); transition: background .2s; }
+    fieldset{ border:1px solid var(--c-border); padding:1rem; border-radius:12px; background:var(--bg-panel); box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    fieldset legend{ padding:0 .3rem; font-weight:600; color:var(--ink); }
+    .tri-grid{ display:grid; grid-template-columns: 1fr repeat(3,56px); gap:.25rem .6rem; align-items:center; }
+    .tri-grid .head{ font-size:.9rem; text-align:center; color:#5b463a; font-weight:700; user-select:none; }
+    .tri-grid .head.ex{ color:#b84a4a; }
+    .tri-grid .head.in{ color:#2e7d5b; }
+    .tri-grid .row-label{ font-size:.95rem; color:var(--ink); font-weight:600; padding:.25rem 0; }
+    .radio-input{ position:absolute; opacity:0; width:0; height:0; }
+    .radio-ui{ --size:18px; width:var(--size); height:var(--size); border-radius:999px; border:2px solid #c9bdb2; background:#fff; display:inline-block; cursor:pointer; position:relative; }
+    .radio-input:focus-visible + .radio-ui{ outline:2px solid var(--focus); outline-offset:2px; }
+    .radio-input:checked + .radio-ui{ border-color:var(--ink); }
+    .radio-input:checked + .radio-ui::after{ content:""; position:absolute; top:50%; left:50%; width:8px; height:8px; transform:translate(-50%,-50%); background:var(--ink); border-radius:999px; }
+
+    .switch{ display:flex; align-items:center; gap:.6rem; }
+    .switch input{ display:none; }
+    .switch .slider{ position:relative; width:46px; height:26px; background:#eadfd6; border-radius:999px; box-shadow: inset 0 1px 2px rgba(0,0,0,.08); transition:background .2s; }
     .switch .slider::after{ content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.15); transition:left .2s; }
-    .switch input:checked + .slider { background:#bfe6cd; }
+    .switch input:checked + .slider{ background:#bfe6cd; }
     .switch input:checked + .slider::after{ left:23px; }
     .switch .switch-label{ font-weight:600; color:var(--ink); }
 
-    /* Liste med retter – egen scroller, så sidebar bliver */
-    .table-wrap{
-      border:1px solid var(--c-border);
-      border-radius:12px;
-      background:#fff;
-      box-shadow: 0 1px 2px rgba(0,0,0,.04);
-      max-height: calc(100vh - 160px);  /* <- løser issue #1 */
-      overflow:auto;
+    /* Liste – egen scroller (sidebar forbliver) */
+    .table-wrap{ border:1px solid var(--c-border); border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); max-height:calc(100vh - 160px); overflow:auto; }
+    table{ width:100%; border-collapse:separate; border-spacing:0; background:white; }
+    th,td{ padding:.6rem .7rem; border-bottom:1px solid #efe7df; white-space:nowrap; font-size:.95rem; color:var(--ink); }
+    thead th{ position:sticky; top:0; z-index:5; background:#fffaf5; font-weight:700; border-bottom:1px solid #e6dfd7; box-shadow:0 1px 0 rgba(0,0,0,0.03); }
+    .navn-cell{ max-width:350px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+
+    /* Print kun indkøbsliste pænt */
+    @media print{
+      body{ background:white; }
+      .layout > *:not(.sidebar){ display:none !important; }
+      .sidebar > *:not(#print-panel){ display:none !important; }
+      #print-panel{ border:none; box-shadow:none; }
+      #indkoebsliste-result{ white-space:pre-wrap; font-size:12pt; }
     }
-    table { width: 100%; border-collapse: separate; border-spacing: 0; background: white; }
-    th, td { padding: 0.6rem .7rem; border-bottom: 1px solid #efe7df; white-space: nowrap; font-size:.95rem; color: var(--ink); }
-    thead th { position: sticky; top: 0; z-index: 5; background: #fffaf5; font-weight:700; border-bottom: 1px solid #e6dfd7; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
-    .navn-cell { max-width: 350px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight:600; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 2.3</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.4</small></h1>
     <div class="layout">
       <div class="sidebar">
-        <!-- Samlet boks: Plan (kommende uge) / Tilbageblik (1–3 uger) -->
+        <!-- Samlet boks: Plan (kommende) / Tilbageblik (1–3 uger) -->
         <div class="panel ugeboks">
           <div class="top">
             <div class="nav">
@@ -134,9 +104,7 @@
             </div>
             <div class="muted" id="view-hint"></div>
           </div>
-
           <div id="week-rows"></div>
-
           <div class="actions">
             <span id="primary-status" class="muted"></span>
             <button id="primary-btn" class="btn">Indkøbsliste</button>
@@ -153,19 +121,19 @@
             <div class="head ig">–</div>
 
             <div class="row-label" id="rowlabel-agnes">Agnes kan lide</div>
-            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"><label class="radio-ui" for="agnes-exclude" aria-label="Agnes: skal ikke have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-include" value="include"><label class="radio-ui" for="agnes-include" aria-label="Agnes: skal have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-ignore" value="ignore" checked><label class="radio-ui" for="agnes-ignore" aria-label="Agnes: ignorér"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-exclude" value="exclude"><label class="radio-ui" for="agnes-exclude"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-include" value="include"><label class="radio-ui" for="agnes-include"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="agnes-mode" id="agnes-ignore" value="ignore" checked><label class="radio-ui" for="agnes-ignore"></label></div>
 
             <div class="row-label" id="rowlabel-to-dage">Kan spises 2 dage</div>
-            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"><label class="radio-ui" for="to-dage-exclude" aria-label="2 dage: skal ikke have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-include" value="include"><label class="radio-ui" for="to-dage-include" aria-label="2 dage: skal have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-ignore" value="ignore" checked><label class="radio-ui" for="to-dage-ignore" aria-label="2 dage: ignorér"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-exclude" value="exclude"><label class="radio-ui" for="to-dage-exclude"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-include" value="include"><label class="radio-ui" for="to-dage-include"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="to-dage-mode" id="to-dage-ignore" value="ignore" checked><label class="radio-ui" for="to-dage-ignore"></label></div>
 
             <div class="row-label" id="rowlabel-nem">Nem ret</div>
-            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-exclude" value="exclude"><label class="radio-ui" for="nem-exclude" aria-label="Nem: skal ikke have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-include" value="include"><label class="radio-ui" for="nem-include" aria-label="Nem: skal have"></label></div>
-            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-ignore" value="ignore" checked><label class="radio-ui" for="nem-ignore" aria-label="Nem: ignorér"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-exclude" value="exclude"><label class="radio-ui" for="nem-exclude"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-include" value="include"><label class="radio-ui" for="nem-include"></label></div>
+            <div class="cell"><input class="radio-input" type="radio" name="nem-mode" id="nem-ignore" value="ignore" checked><label class="radio-ui" for="nem-ignore"></label></div>
           </div>
         </fieldset>
 
@@ -178,12 +146,20 @@
           </label>
         </fieldset>
 
-        <!-- Status/tekst for indkøbsliste -->
-        <div class="panel">
-          <div id="indkoebsliste-result" style="white-space: pre-wrap;"></div>
+        <!-- Indkøbsliste + kopi/print -->
+        <div class="panel" id="print-panel">
+          <div style="display:flex; gap:.5rem; align-items:center; justify-content:space-between; margin-bottom:.5rem;">
+            <strong>Indkøbsliste</strong>
+            <span>
+              <button id="copy-btn" class="btn" style="padding:.35rem .6rem;">Kopiér</button>
+              <button id="print-btn" class="btn" style="padding:.35rem .6rem;">Print</button>
+            </span>
+          </div>
+          <div id="indkoebsliste-result" style="white-space:pre-wrap;"></div>
         </div>
       </div>
 
+      <!-- Retter-listen -->
       <div class="table-wrap">
         <table id="madplan">
           <thead>
@@ -202,17 +178,25 @@
   </div>
 
   <script>
-    /* =========================
-       v2.3 – Samlet ugepanel, DnD i tilbageblik, sticky sidebar, optimistisk opdatering
-       ========================= */
+    /* =========
+       Konstanter
+       ========= */
     const WEBAPP_URL    = "https://script.google.com/macros/s/AKfycbyrbuiVQ0-vDenrKPLC6y1WHzy8BDLo-jK0mLyQTqwuPYRyE41_cZ6ieKwEM4GaqRYbkA/exec";
     const WEBAPP_SECRET = "Freddy";
     const SHEET_ID      = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
     const HISTORIK_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historik`;
+    const MADPLAN_CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Madplan`;
 
-    // ---- Dato-hjælpere
+    /* =========
+       Dato-format (DK)
+       ========= */
+    const WD_SHORT = ["søn","man","tir","ons","tor","fre","lør"];
+    const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"]; // planrækkefølge
     function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
-    function weekdayDa(idx){ return ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"][idx]; }
+    function ddmm(d){ const dt = (d instanceof Date)? d : new Date(d); return String(dt.getDate()).padStart(2,"0")+"."+String(dt.getMonth()+1).padStart(2,"0"); }
+    function labelDdMm(ds, idx){ const wd = WD_PLAN[idx]; return wd.charAt(0).toUpperCase()+wd.slice(1) + " (" + ddmm(ds) + ")"; }
+    function rangeLabel(d1, d7){ const a = new Date(d1), b = new Date(d7); const w1=WD_PLAN[0].slice(0,3), w7=WD_PLAN[6].slice(0,3); return `${w1} ${ddmm(a)} → ${w7} ${ddmm(b)}`; }
+
     function nextFridayDate(base=new Date()){
       const dow = base.getDay(); let delta = (5 - dow + 7) % 7; if (delta === 0) delta = 7;
       const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta); d.setHours(0,0,0,0); return d;
@@ -220,31 +204,33 @@
     function nextWeekDatesFriThu(){
       const start = nextFridayDate(new Date()); const arr=[]; for (let i=0;i<7;i++){ const d=new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); arr.push(isoLocal(d)); } return arr;
     }
-    function backWeekDates(i){ // 1..3
-      const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7);
-      const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr;
-    }
+    function backWeekDates(i){ const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7); const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
 
-    // ---- Apps Script POST (uden preflight / CORS)
+    /* =========
+       WebApp POST (no-cors)
+       ========= */
     async function postToWebApp(payload){
-      try{
-        await fetch(WEBAPP_URL, { method:"POST", body: JSON.stringify(payload), mode:"no-cors", cache:"no-store" });
-      }catch(err){ console.warn("WebApp POST fejl:", err); }
+      try{ await fetch(WEBAPP_URL, { method:"POST", body: JSON.stringify(payload), mode:"no-cors", cache:"no-store" }); }
+      catch(err){ console.warn("WebApp POST fejl:", err); }
     }
 
-    // ---- Historik (læst fra CSV)
+    /* =========
+       Historik-CSV
+       ========= */
     let historikMap = new Map(); // dato -> { ugedag, plan_nu, spist }
     let lastEatenByName = new Map(); // lower(name) -> seneste ISO-dato
 
     async function loadHistorik(){
-      const text = await fetch(HISTORIK_CSV_URL, { cache: "no-store" }).then(r => r.text());
+      const text = await fetch(HISTORIK_CSV_URL, { cache:"no-store" }).then(r => r.text());
       const parsed = Papa.parse(text, { header:true });
       historikMap = new Map();
       (parsed.data || []).forEach(row => {
         const dato = (row["dato"] || "").trim(); if (!dato) return;
-        const plan = (row["plan_nu"] || "").toString();
-        const sp   = (row["spist"] || "").toString();
-        historikMap.set(dato, { ugedag:(row["ugedag"]||"").trim(), plan_nu:plan, spist:sp });
+        historikMap.set(dato, {
+          ugedag: (row["ugedag"]||"").trim(),
+          plan_nu: (row["plan_nu"]||"").toString(),
+          spist:   (row["spist"]||"").toString()
+        });
       });
       recomputeLastEaten();
     }
@@ -252,36 +238,35 @@
     function recomputeLastEaten(){
       lastEatenByName = new Map();
       const setIfNewer = (name, date) => {
-        const key = (name||"").trim().toLowerCase(); if (!key) return;
-        const cur = lastEatenByName.get(key);
-        if (!cur || date > cur) lastEatenByName.set(key, date);
+        const key=(name||"").trim().toLowerCase(); if(!key) return;
+        const cur=lastEatenByName.get(key); if(!cur || date>cur) lastEatenByName.set(key,date);
       };
-      historikMap.forEach((v, d) => {
-        if ((v.spist||"").trim())   setIfNewer(v.spist, d);
-        if ((v.plan_nu||"").trim()) setIfNewer(v.plan_nu, d);
+      historikMap.forEach((rec, ds) => {
+        if ((rec.spist||"").trim()) setIfNewer(rec.spist, ds);
+        if ((rec.plan_nu||"").trim()) setIfNewer(rec.plan_nu, ds);
       });
-      // Opdater tooltips på retter i tabellen (hvis allerede loaded)
+      // opdater tooltips i tabellen
       document.querySelectorAll("#madplan tbody tr").forEach(tr => {
-        const name = tr.getAttribute("data-name") || "";
-        const dt   = lastEatenByName.get(name.toLowerCase());
+        const name = tr.getAttribute("data-name")||"";
+        const dt = lastEatenByName.get(name.toLowerCase());
         tr.title = dt ? `Sidst spist: ${dt}` : "Sidst spist: –";
       });
     }
 
-    // ---- Samlet ugepanel (viewIdx=0: kommende plan; 1..3: tilbageblik)
-    let viewIdx = 0; // 0 = kommende uge, 1..3 = uger tilbage
-    const weekRowsEl = () => document.getElementById("week-rows");
-    const rangeEl    = () => document.getElementById("view-range");
-    const hintEl     = () => document.getElementById("view-hint");
-    const btnEl      = () => document.getElementById("primary-btn");
-    const statusEl   = () => document.getElementById("primary-status");
+    /* =========
+       Ugepanel (viewIdx=0 plan; 1..3 tilbage)
+       ========= */
+    let viewIdx = 0;
+    function weekRowsEl(){ return document.getElementById("week-rows"); }
+    function rangeEl(){ return document.getElementById("view-range"); }
+    function hintEl(){ return document.getElementById("view-hint"); }
+    function btnEl(){ return document.getElementById("primary-btn"); }
+    function statusEl(){ return document.getElementById("primary-status"); }
 
     function renderWeekPanel(){
       const rows = weekRowsEl(); rows.innerHTML = "";
       const dates = (viewIdx===0) ? nextWeekDatesFriThu() : backWeekDates(viewIdx);
-      rangeEl().textContent = `${dates[0]} → ${dates[6]}`;
-
-      // Nav-knapper
+      rangeEl().textContent = rangeLabel(dates[0], dates[6]);
       document.getElementById("view-prev").disabled = (viewIdx >= 3);
       document.getElementById("view-next").disabled = (viewIdx <= 0);
 
@@ -290,18 +275,15 @@
         btnEl().textContent = "Indkøbsliste";
         btnEl().disabled = false;
 
-        // 7 drop-zoner (som tidligere ugeplan)
         dates.forEach((ds, i) => {
-          const row = document.createElement("div"); row.className = "drop-row"; row.dataset.date = ds;
-          const label = document.createElement("div"); label.className = "label"; label.textContent = weekdayDa(i).charAt(0).toUpperCase()+weekdayDa(i).slice(1);
-          const chip  = document.createElement("div"); chip.className = "ret-chip"; chip.innerHTML = `<span class="name"></span>`;
-          const clear = document.createElement("button"); clear.className = "clear"; clear.textContent = "×";
-          clear.addEventListener("click", () => setPlanValue(row, ""));
+          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan";
+          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const chip  = document.createElement("div"); chip.className="ret-chip"; chip.innerHTML = `<span class="name"></span>`;
+          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => setPlanValue(row,""));
           row.appendChild(label); row.appendChild(chip); row.appendChild(clear);
-          setupDropRowForPlan(row);
+          setupDnDRow(row);
           rows.appendChild(row);
 
-          // Prefill fra historik (plan_nu)
           const h = historikMap.get(ds); const v = h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
@@ -311,121 +293,112 @@
         btnEl().textContent = "Gem ændringer";
         btnEl().disabled = false;
 
-        // 7 rækker med input + drop (skriver 'spist')
         dates.forEach((ds, i) => {
-          const row = document.createElement("div"); row.className = "drop-row"; row.dataset.date = ds;
-          const label = document.createElement("div"); label.className = "label"; label.textContent = weekdayDa(i).charAt(0).toUpperCase()+weekdayDa(i).slice(1);
-
-          const input = document.createElement("input"); input.type = "text"; input.className = "spist-input"; input.placeholder = "Ret-navn";
-          const clear = document.createElement("button"); clear.className = "clear"; clear.textContent = "×";
-          clear.addEventListener("click", () => { input.value=""; });
-
+          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="spist";
+          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const input = document.createElement("input"); input.type="text"; input.className="spist-input"; input.placeholder="Ret-navn";
+          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => { input.value=""; updateSpistLocal(ds, ""); });
           row.appendChild(label); row.appendChild(input); row.appendChild(clear);
-          setupDropRowForSpist(row, input);
+          setupDnDRow(row, input);
           rows.appendChild(row);
 
-          // Prefill fra historik (spist)
-          const h = historikMap.get(ds); const v = h && (h.spist||"").trim();
-          if (v) input.value = v;
+          const h = historikMap.get(ds); const v = h && (h.spist||"").trim(); if (v) input.value = v;
         });
       }
     }
 
-    function setupDropRowForPlan(rowEl){
-      const nameEl = () => rowEl.querySelector(".ret-chip .name");
-      const onDropName = (navn) => setPlanValue(rowEl, navn);
+    // Global reference for flytning mellem rækker
+    let dragSource = null;
 
+    function setupDnDRow(rowEl, inputEl){
+      // Tillad drop (fra tabel eller andre rækker)
       rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
       rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
       rowEl.addEventListener("drop", e => {
         e.preventDefault(); rowEl.classList.remove("dragover");
-        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
-        const navn = e.dataTransfer.getData("application/x-ret-navn"); onDropName(navn);
+        const navn = e.dataTransfer.getData("application/x-ret-navn") || "";
+        if (!navn) return;
+
+        if (rowEl.dataset.type === "plan"){
+          setPlanValue(rowEl, navn);
+        } else {
+          if (inputEl) inputEl.value = navn;
+          updateSpistLocal(rowEl.dataset.date, navn);
+        }
+        // Flyt (ryd kilde), hvis kilden er en anden uge-række
+        if (dragSource && dragSource !== rowEl){
+          const srcType = dragSource.dataset.type;
+          if (srcType === "plan"){
+            setPlanValue(dragSource, "");
+          } else {
+            const inp = dragSource.querySelector(".spist-input");
+            if (inp){ inp.value = ""; updateSpistLocal(dragSource.dataset.date, ""); }
+          }
+        }
+        dragSource = null;
       });
 
-      // Træk ud igen (dragstart)
-      rowEl.addEventListener("dragstart", ev => {
-        ev.dataTransfer.setData("application/x-ret-navn", (nameEl().textContent||""));
-      });
+      // Gør rækken selv "draggable" (flyt mellem dagene)
       rowEl.setAttribute("draggable","true");
+      rowEl.addEventListener("dragstart", ev => {
+        dragSource = rowEl;
+        const val = (rowEl.dataset.type === "plan")
+          ? (rowEl.querySelector(".ret-chip .name").textContent || "")
+          : (rowEl.querySelector(".spist-input")?.value || "");
+        ev.dataTransfer.setData("application/x-ret-navn", val);
+      });
     }
 
     function setPlanValue(rowEl, navn){
-      const ds = rowEl.dataset.date;
       const chipName = rowEl.querySelector(".ret-chip .name");
       chipName.textContent = navn || "";
       rowEl.dataset.ret = navn || "";
-
-      // Optimistisk opdatering af historikMap (så tooltips mm. virker straks)
+      const ds = rowEl.dataset.date;
       const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
       rec.plan_nu = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
     }
 
-    function setupDropRowForSpist(rowEl, inputEl){
-      rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
-      rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
-      rowEl.addEventListener("drop", e => {
-        e.preventDefault(); rowEl.classList.remove("dragover");
-        if (!e.dataTransfer.types || !e.dataTransfer.types.includes("application/x-ret-navn")) return;
-        const navn = e.dataTransfer.getData("application/x-ret-navn");
-        inputEl.value = navn || "";
-        // Optimistisk opdatering lokalt
-        const ds = rowEl.dataset.date;
-        const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
-        rec.spist = navn || "";
-        historikMap.set(ds, rec);
-        recomputeLastEaten();
-      });
+    function updateSpistLocal(ds, navn){
+      const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
+      rec.spist = navn || "";
+      historikMap.set(ds, rec);
+      recomputeLastEaten();
     }
 
     async function doPrimaryAction(){
       statusEl().textContent = "";
       if (viewIdx === 0){
-        // Indkøbsliste + snapshot_plan (kun kommende uge)
+        // Indkøbsliste + snapshot_plan
         buildLists();
-
         const dates = nextWeekDatesFriThu();
         const items = Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i) => ({
-          date: dates[i],
-          ret: (row.dataset.ret || "").trim()
+          date: dates[i], ret: (row.dataset.ret || "").trim()
         }));
-
-        const start = dates[0], end = dates[6];
-        statusEl().textContent = `— Sender planen til arket (${start} → ${end}) …`;
+        statusEl().textContent = `— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
         await postToWebApp({ secret: WEBAPP_SECRET, action:"snapshot_plan", items });
-
-        // Optimistisk: allerede opdateret via setPlanValue
-        statusEl().textContent = `✓ Plan sendt (${start} → ${end})`;
+        statusEl().textContent = `✓ Plan sendt (${rangeLabel(dates[0], dates[6])})`;
       } else {
         // save_spist for den viste uge
-        const dates = (viewIdx===0) ? nextWeekDatesFriThu() : backWeekDates(viewIdx);
-        const inputs = Array.from(document.querySelectorAll("#week-rows .spist-input"));
-        const items = inputs.map((inp,i) => ({ date: dates[i], ret: inp.value.trim() }));
-
+        const dates = backWeekDates(viewIdx);
+        const items = dates.map((ds, i) => {
+          const inp = document.querySelectorAll("#week-rows .spist-input")[i];
+          return { date: ds, ret: (inp?.value||"").trim() };
+        });
         statusEl().textContent = "Gemmer…";
         await postToWebApp({ secret: WEBAPP_SECRET, action:"save_spist", items });
-
-        // Optimistisk opdatering: allerede sat ved drop/skriv, sikrer alle værdier:
-        items.forEach(it => {
-          const rec = historikMap.get(it.date) || { ugedag:"", plan_nu:"", spist:"" };
-          rec.spist = it.ret || "";
-          historikMap.set(it.date, rec);
-        });
-        recomputeLastEaten();
-        statusEl().textContent = "✓ Gemt (tjek arket for opdatering)";
+        items.forEach(it => updateSpistLocal(it.date, it.ret)); // optimistisk
+        statusEl().textContent = "✓ Gemt (tjek arket)";
       }
     }
 
-    // ---- v1.x (retter-listen fra "Madplan"-fanen)
-    const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
+    /* =========
+       Retter fra Madplan-fanen
+       ========= */
     const COLS = {
       navn: ["Navn"],
       vegetar: ["Vegetar"],
-      okse: ["Oksekød","Okse","Oksekoed"],
-      kylling: ["Kyllingekød","Kylling"],
-      gris: ["Grisekød","Svinekød","Svin","Svinekod"],
       toDage: ["2 dage","To dage","2dage"],
       nem: ["Nem ret","Nem"],
       agnes: ["Agnes"],
@@ -433,34 +406,11 @@
       tjek: ["Tjek","Tjek om vi har","Tjek liste"],
       overvej: ["Overvej","Tilbehør","Tilbehor"]
     };
-    function getCol(row, keys){ for (const k of keys) if (k in row) return row[k]; return ""; }
-    function hasX(row, keys){ return keys.some(k => (row[k]||"").trim().toUpperCase() === "X"); }
+    function getCol(row, keys){ for (const k of keys){ if (k in row) return row[k]; } return ""; }
+    function hasX(row, keys){ return keys.some(k => (row[k]||"").trim().toUpperCase()==="X"); }
+
+    let allRows = [];
     const tableBody = document.querySelector("#madplan tbody");
-    const practicalFilters = [
-      { group: "agnes", labelId: "rowlabel-agnes", cols: COLS.agnes },
-      { group: "to-dage", labelId: "rowlabel-to-dage", cols: COLS.toDage },
-      { group: "nem", labelId: "rowlabel-nem", cols: COLS.nem },
-    ];
-    const vegOnlyId = "filter-vegetar-only";
-    function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
-
-    function updateFilterLabelStyles(){
-      practicalFilters.forEach(f => {
-        const label = document.getElementById(f.labelId);
-        if (!label) return;
-        const mode = getMode(f.group);
-        label.style.color = (mode === "include") ? "#2e7d5b" : (mode === "exclude" ? "#b84a4a" : "var(--ink)");
-      });
-      const vegEl = document.getElementById(vegOnlyId);
-      const vegLabel = document.getElementById("label-vegetar");
-      if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
-    }
-    function getMode(group){ const checked = document.querySelector(`input[name="${group}-mode"]:checked`); return checked ? checked.value : "ignore"; }
-
-    function setupDragSource(tr, name){
-      tr.setAttribute("draggable","true");
-      tr.addEventListener("dragstart", e => { e.dataTransfer.setData("application/x-ret-navn", name); });
-    }
 
     function visFiltreredeRetter(){
       tableBody.innerHTML = "";
@@ -469,120 +419,135 @@
         if (!passesVegetarian(row)) return;
 
         const name = (getCol(row, COLS.navn) || "").trim();
-        const tr = document.createElement("tr");
-        tr.setAttribute("data-name", name.toLowerCase());
-
-        // Tooltip: Sidst spist
+        const tr = document.createElement("tr"); tr.setAttribute("data-name", name.toLowerCase());
         const last = lastEatenByName.get(name.toLowerCase());
         tr.title = last ? `Sidst spist: ${last}` : "Sidst spist: –";
 
         const navnTd = document.createElement("td");
         const navnDiv = document.createElement("div"); navnDiv.className="navn-cell"; navnDiv.textContent = name;
-        navnTd.appendChild(navnDiv);
-        tr.appendChild(navnTd);
+        navnTd.appendChild(navnDiv); tr.appendChild(navnTd);
 
         const displayCols = [
-          { key: "Vegetar", cols: COLS.vegetar },
-          { key: "2 dage", cols: COLS.toDage },
-          { key: "Nem ret", cols: COLS.nem },
-          { key: "Agnes", cols: COLS.agnes },
+          { cols: COLS.vegetar }, { cols: COLS.toDage }, { cols: COLS.nem }, { cols: COLS.agnes }
         ];
         displayCols.forEach(dc => {
           const td = document.createElement("td"); td.textContent = hasX(row, dc.cols) ? "✔" : ""; tr.appendChild(td);
         });
 
-        setupDragSource(tr, name);
+        // drag source (kopierer navn ind i rækker ved drop)
+        tr.setAttribute("draggable","true");
+        tr.addEventListener("dragstart", e => { e.dataTransfer.setData("application/x-ret-navn", name); });
+
         tableBody.appendChild(tr);
       });
       updateFilterLabelStyles();
     }
 
     function passesPractical(row){
-      for (const f of practicalFilters){
-        const mode = getMode(f.group);
-        if (mode === "include" && !hasX(row, f.cols)) return false;
-        if (mode === "exclude" && hasX(row, f.cols)) return false;
+      const rules = [
+        { group:"agnes", cols: COLS.agnes },
+        { group:"to-dage", cols: COLS.toDage },
+        { group:"nem", cols: COLS.nem },
+      ];
+      for (const r of rules){
+        const mode = getMode(r.group);
+        if (mode === "include" && !hasX(row, r.cols)) return false;
+        if (mode === "exclude" && hasX(row, r.cols)) return false;
       }
       return true;
     }
-    function passesVegetarian(row){
-      const vegOnly = document.getElementById(vegOnlyId)?.checked;
-      if (!vegOnly) return true;
-      return hasX(row, COLS.vegetar);
+    function getMode(group){ const el = document.querySelector(`input[name="${group}-mode"]:checked`); return el? el.value : "ignore"; }
+    function passesVegetarian(row){ const vegOnly = document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, ["Vegetar"]); }
+    function updateFilterLabelStyles(){
+      const sets=[["agnes","rowlabel-agnes"],["to-dage","rowlabel-to-dage"],["nem","rowlabel-nem"]];
+      sets.forEach(([g,id]) => {
+        const m = getMode(g), el = document.getElementById(id);
+        if(!el) return; el.style.color = (m==="include")?"#2e7d5b":(m==="exclude"?"#b84a4a":"var(--ink)");
+      });
+      const vegEl = document.getElementById("filter-vegetar-only"); const vegLabel = document.getElementById("label-vegetar");
+      if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
     }
 
+    /* =========
+       Indkøbsliste (tekst) + kopi/print
+       ========= */
+    function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
     function buildLists(){
-      // Læs plan fra ugepanelet (viewIdx=0)
       const dates = nextWeekDatesFriThu();
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
-      const ugeValg = rows.map((row, i) => {
+      const ugeValg = rows.map((row,i) => {
         const navn = (row.dataset.ret || "").trim();
-        return navn ? { dag: weekdayDa(i), navn } : null;
+        return navn ? { dag: WD_PLAN[i], navn } : null;
       }).filter(Boolean);
 
-      // Match mod masterrækker
-      const brugteRækker = ugeValg
-        .map(v => ({ v, row: allRows.find(r => (getCol(r, COLS.navn) || "").trim() === v.navn) }))
-        .filter(x => x.row);
+      const brugte = ugeValg.map(v => ({ v, row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn) })).filter(x => x.row);
 
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
       const indkoebSet = new Set(), tjekSet = new Set();
-      brugteRækker.forEach(({row}) => {
-        const koeb = (getCol(row, COLS.koeb) || "").split(",").map(s => s.trim()).filter(Boolean);
-        const tjek = (getCol(row, COLS.tjek) || "").split(",").map(s => s.trim()).filter(Boolean);
-        koeb.forEach(v => indkoebSet.add(v)); tjek.forEach(v => tjekSet.add(v));
+      brugte.forEach(({row}) => {
+        const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        koeb.forEach(v=>indkoebSet.add(v)); tjek.forEach(v=>tjekSet.add(v));
       });
       tjekSet.forEach(item => indkoebSet.delete(item));
 
       const indkoebListe = Array.from(indkoebSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
       const tjekListe    = Array.from(tjekSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
-      if (indkoebListe.length > 0) indkoebListe[0] = capFirst(indkoebListe[0]);
-      if (tjekListe.length > 0)    tjekListe[0]    = capFirst(tjekListe[0]);
+      if (indkoebListe.length) indkoebListe[0] = capFirst(indkoebListe[0]);
+      if (tjekListe.length)    tjekListe[0]    = capFirst(tjekListe[0]);
 
-      const tilbehoerLinjer = brugteRækker
-        .filter(({row}) => (getCol(row, COLS.overvej) || "").trim().toUpperCase() === "X")
-        .map(({v}) => capFirst(v.dag) + ": " + v.navn);
-
-      const output = [
+      const out = [
         "1. Ugens madretter:\n" + (ugeLinjer.length ? ugeLinjer.join("\n") : "- (ingen valgt)"),
         "2. Indkøbsliste:\n" + (indkoebListe.length ? indkoebListe.join(", ") : "-"),
-        "3. Tjek om vi har:\n" + (tjekListe.length ? tjekListe.join(", ") : "-"),
-        "4. Husk tilbehør til:\n" + (tilbehoerLinjer.length ? tilbehoerLinjer.join("\n") : "-")
+        "3. Tjek om vi har:\n" + (tjekListe.length ? tjekListe.join(", ") : "-")
       ].join("\n\n");
-      document.getElementById("indkoebsliste-result").textContent = output;
+      document.getElementById("indkoebsliste-result").textContent = out;
     }
 
-    // ---- Init
-    let allRows = [];
-    fetch("https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan")
-      .then(r => r.text())
-      .then(csv => {
-        const result = Papa.parse(csv, { header: true });
-        allRows = (result.data || []).filter(row => ((getCol(row, COLS.navn) || "").trim().length > 0));
-        allRows.sort((a, b) => (getCol(a, COLS.navn) || "").localeCompare(getCol(b, COLS.navn) || "", "da", {sensitivity: "base"}));
-        visFiltreredeRetter();
+    async function copyList(){
+      const txt = document.getElementById("indkoebsliste-result").textContent || "";
+      try{
+        await navigator.clipboard.writeText(txt);
+        alert("Indkøbsliste kopieret ✅");
+      }catch{
+        // fallback
+        const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select();
+        try{ document.execCommand("copy"); alert("Indkøbsliste kopieret ✅"); }finally{ document.body.removeChild(ta); }
+      }
+    }
+    function printList(){ window.print(); }
 
-        document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => r.addEventListener("change", visFiltreredeRetter));
-        document.getElementById("filter-vegetar-only")?.addEventListener("change", visFiltreredeRetter);
-      });
-
+    /* =========
+       Init
+       ========= */
     document.addEventListener("DOMContentLoaded", async () => {
-      // Hent historik og render første view (kommende uge)
+      // Hent historik først (til tooltips + forudfyldning)
       await loadHistorik();
       renderWeekPanel();
 
-      // Nav
-      document.getElementById("view-prev").addEventListener("click", () => { if (viewIdx < 3) { viewIdx++; renderWeekPanel(); } });
-      document.getElementById("view-next").addEventListener("click", () => { if (viewIdx > 0) { viewIdx--; renderWeekPanel(); } });
-
-      // Primær knap (Indkøbsliste / Gem ændringer)
+      // Nav-knapper
+      document.getElementById("view-prev").addEventListener("click", () => { if (viewIdx < 3){ viewIdx++; renderWeekPanel(); } });
+      document.getElementById("view-next").addEventListener("click", () => { if (viewIdx > 0){ viewIdx--; renderWeekPanel(); } });
       document.getElementById("primary-btn").addEventListener("click", doPrimaryAction);
+
+      // Indkøbsliste kopi/print
+      document.getElementById("copy-btn").addEventListener("click", copyList);
+      document.getElementById("print-btn").addEventListener("click", printList);
     });
 
-    /* Hjælpere til filtre */
-    function getMode(group){ const checked = document.querySelector(`input[name="${group}-mode"]:checked`); return checked ? checked.value : "ignore"; }
-    function passesVegetarian(row){ const vegOnly = document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, COLS.vegetar); }
+    // Hent retter og byg tabel
+    fetch(MADPLAN_CSV_URL).then(r=>r.text()).then(csv=>{
+      const result = Papa.parse(csv, { header:true });
+      allRows = (result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
+      allRows.sort((a,b)=>(getCol(a, COLS.navn)||"").localeCompare(getCol(b, COLS.navn)||"","da",{sensitivity:"base"}));
+      visFiltreredeRetter();
+
+      // filter events
+      document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => r.addEventListener("change", visFiltreredeRetter));
+      document.getElementById("filter-vegetar-only")?.addEventListener("change", visFiltreredeRetter);
+    });
   </script>
 </body>
 </html>
