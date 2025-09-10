@@ -256,7 +256,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 1.30</small></h1>
+    <h1>Madplan <small style="font-size: 0.6em; color: #8b6f61;">version 2.0</small></h1>
     <div class="layout">
       <div class="sidebar">
         <div class="ugeplan">
@@ -356,6 +356,72 @@
   </div>
 
   <script>
+    /* =========================
+       v2.0 – Web App integration
+       ========================= */
+    const WEBAPP_URL    = "https://script.google.com/macros/s/AKfycbyrbuiVQ0-vDenrKPLC6y1WHzy8BDLo-jK0mLyQTqwuPYRyE41_cZ6ieKwEM4GaqRYbkA/exec";
+    const WEBAPP_SECRET = "Freddy";
+
+    // Returnér YYYY-MM-DD i lokal tid (ingen UTC-skrub)
+    function isoLocal(d){
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const day = String(d.getDate()).padStart(2,"0");
+      return `${y}-${m}-${day}`;
+    }
+
+    // Find NÆSTE fredag (hvis i dag er fredag, så +7 dage)
+    function nextFridayDate(base=new Date()){
+      const dow = base.getDay(); // 0=søn ... 5=fre, 6=lør
+      let delta = (5 - dow + 7) % 7;
+      if (delta === 0) delta = 7; // på en fredag → næste fredag
+      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta);
+      d.setHours(0,0,0,0);
+      return d;
+    }
+
+    // Giv listen af 7 datoer (fre→tor) for næste uge
+    function nextWeekDatesFriThu(){
+      const start = nextFridayDate(new Date());
+      const arr = [];
+      for (let i=0;i<7;i++){
+        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+        arr.push(isoLocal(d));
+      }
+      return arr; // [fre, lør, søn, man, tir, ons, tor]
+    }
+
+    // Læs de valgte retter i ugeplan-kasserne og bind dem til næste fre→tor datoer
+    function collectPlanSnapshotItems(){
+      const zones = Array.from(document.querySelectorAll(".ugeplan .dag")); // rækkefølge er fre→tor i DOM
+      const dates = nextWeekDatesFriThu();
+      return zones.map((el, idx) => ({
+        date: dates[idx],
+        ret: (el.getAttribute("data-ret") || "").trim()
+      }));
+    }
+
+    // Send 7-dages snapshot til Apps Script. Ingen special-headers → ingen CORS-preflight.
+    async function savePlanSnapshot(items){
+      try{
+        await fetch(WEBAPP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            secret: WEBAPP_SECRET,
+            action: "snapshot_plan",
+            items
+          }),
+          mode: "no-cors",
+          cache: "no-store"
+        });
+      }catch(err){
+        console.warn("snapshot_plan fejlede:", err);
+      }
+    }
+
+    /* =========================
+       v1.x – eksisterende kode
+       ========================= */
     const url = "https://docs.google.com/spreadsheets/d/1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4/gviz/tq?tqx=out:csv&sheet=Madplan";
 
     // Kolonnenavne (tolerante)
@@ -597,7 +663,25 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       setupWeekDropZones();
-      document.getElementById("generate-indkoebsliste").addEventListener("click", buildLists);
+
+      // v2.0: Indkøbsliste-knappen sender også snapshot_plan for næste fre→tor
+      document.getElementById("generate-indkoebsliste").addEventListener("click", async () => {
+        buildLists();
+
+        const items = collectPlanSnapshotItems();
+        const dates = nextWeekDatesFriThu();
+        const start = dates[0], end = dates[6];
+
+        const resultEl = document.getElementById("indkoebsliste-result");
+        const prev = resultEl.textContent || "";
+        resultEl.textContent = prev + "\n\n— Sender planen til arket (" + start + " → " + end + ") …";
+
+        await savePlanSnapshot(items);
+
+        // Vi kan ikke læse svaret (no-cors), men kaldet er sendt.
+        resultEl.textContent = prev + "\n\n✓ Plan sendt til arket for perioden " + start + " → " + end + ".";
+      });
+
       updateFilterLabelStyles();
     });
   </script>
