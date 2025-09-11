@@ -425,7 +425,7 @@
         statusEl().textContent = "Gemmer…";
         await postToWebApp({ secret: WEBAPP_SECRET, action:"save_spist", items });
         items.forEach(it => updateSpistLocal(it.date, it.ret)); // optimistisk
-        statusEl().textContent = "✓ Gemt (tjek arket)";
+        statusEl().textContent = "✓ Gemt";
       }
     }
 
