@@ -21,8 +21,12 @@
     .container{ max-width:1200px; margin:auto; padding:1rem; }
     .layout{ display:flex; gap:2rem; align-items:flex-start; }
 
-    /* Sidebar med sticky */
-    .sidebar{ display:flex; flex-direction:column; gap:1rem; position:sticky; top:1rem; align-self:flex-start; min-width:380px; z-index:10; }
+    /* Sidebar med fast bredde (så den ikke maser tabellen) */
+    .sidebar{
+      display:flex; flex-direction:column; gap:1rem;
+      position:sticky; top:1rem; align-self:flex-start;
+      flex:0 0 380px; width:380px; max-width:420px; z-index:10;
+    }
     .panel{ background:var(--bg-panel); border:1px solid var(--c-border); border-radius:12px; padding:.75rem 1rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
     .panel h3{ margin:.25rem 0 .5rem; }
 
@@ -72,12 +76,25 @@
     .switch input:checked + .slider::after{ left:23px; }
     .switch .switch-label{ font-weight:600; color:var(--ink); }
 
-    /* Liste – egen scroller (sidebar forbliver) */
-    .table-wrap{ border:1px solid var(--c-border); border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04); max-height:calc(100vh - 160px); overflow:auto; }
+    /* Retter-listen – lad den fylde resten, og undgå at min-content tvinger vandret scroll */
+    .table-wrap{
+      border:1px solid var(--c-border); border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04);
+      max-height:calc(100vh - 160px); overflow:auto;
+      flex:1 1 auto; min-width:0;
+    }
     table{ width:100%; border-collapse:separate; border-spacing:0; background:white; }
     th,td{ padding:.6rem .7rem; border-bottom:1px solid #efe7df; white-space:nowrap; font-size:.95rem; color:var(--ink); }
-    thead th{ position:sticky; top:0; z-index:5; background:#fffaf5; font-weight:700; border-bottom:1px solid #e6dfd7; box-shadow:0 1px 0 rgba(0,0,0,0.03); }
+    thead th{ position:sticky; top:0; z-index:5; background:#fffaf5; font-weight:700; border-bottom:1px solid var(--c-border); box-shadow:0 1px 0 rgba(0,0,0,0.03); }
     .navn-cell{ max-width:350px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+
+    /* Gør indkøbslisten smal-venlig */
+    #indkoebsliste-result{
+      white-space:pre-wrap;           /* behold linjeskift */
+      overflow-wrap:anywhere;         /* må bryde næsten hvor som helst */
+      word-break:break-word;          /* fallback */
+      line-height:1.35;
+      font-size:0.95rem;
+    }
 
     /* Print kun indkøbsliste pænt */
     @media print{
@@ -91,7 +108,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.4</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.6</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Samlet boks: Plan (kommende) / Tilbageblik (1–3 uger) -->
@@ -155,7 +172,7 @@
               <button id="print-btn" class="btn" style="padding:.35rem .6rem;">Print</button>
             </span>
           </div>
-          <div id="indkoebsliste-result" style="white-space:pre-wrap;"></div>
+          <div id="indkoebsliste-result"></div>
         </div>
       </div>
 
@@ -241,9 +258,12 @@
         const key=(name||"").trim().toLowerCase(); if(!key) return;
         const cur=lastEatenByName.get(key); if(!cur || date>cur) lastEatenByName.set(key,date);
       };
+      // Vælg spist hvis udfyldt, ellers plan_nu
       historikMap.forEach((rec, ds) => {
-        if ((rec.spist||"").trim()) setIfNewer(rec.spist, ds);
-        if ((rec.plan_nu||"").trim()) setIfNewer(rec.plan_nu, ds);
+        const consumed = (rec.spist||"").trim();
+        const planned  = (rec.plan_nu||"").trim();
+        const name = consumed || planned;
+        if (name) setIfNewer(name, ds);
       });
       // opdater tooltips i tabellen
       document.querySelectorAll("#madplan tbody tr").forEach(tr => {
@@ -302,7 +322,10 @@
           setupDnDRow(row, input);
           rows.appendChild(row);
 
-          const h = historikMap.get(ds); const v = h && (h.spist||"").trim(); if (v) input.value = v;
+          const h = historikMap.get(ds);
+          const vSpist = h && (h.spist||"").trim();
+          const vPlan  = h && (h.plan_nu||"").trim();
+          input.value = vSpist || vPlan || "";
         });
       }
     }
@@ -498,11 +521,19 @@
       if (indkoebListe.length) indkoebListe[0] = capFirst(indkoebListe[0]);
       if (tjekListe.length)    tjekListe[0]    = capFirst(tjekListe[0]);
 
+      // Én pr. linje for at undgå bredde-problemer
+      const formatList = arr => arr.length ? "• " + arr.join("\n• ") : "-";
+
       const out = [
-        "1. Ugens madretter:\n" + (ugeLinjer.length ? ugeLinjer.join("\n") : "- (ingen valgt)"),
-        "2. Indkøbsliste:\n" + (indkoebListe.length ? indkoebListe.join(", ") : "-"),
-        "3. Tjek om vi har:\n" + (tjekListe.length ? tjekListe.join(", ") : "-")
-      ].join("\n\n");
+        "1. Ugens madretter:",
+        (ugeLinjer.length ? ugeLinjer.join("\n") : "- (ingen valgt)"),
+        "",
+        "2. Indkøbsliste:",
+        formatList(indkoebListe),
+        "",
+        "3. Tjek om vi har:",
+        formatList(tjekListe)
+      ].join("\n");
       document.getElementById("indkoebsliste-result").textContent = out;
     }
 
