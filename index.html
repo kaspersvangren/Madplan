@@ -36,7 +36,7 @@
     .nav button{ border-radius:8px; padding:.3rem .55rem; border:1px solid var(--c-border); background:#fff; cursor:pointer; }
     .nav button:disabled{ opacity:.4; cursor:not-allowed; }
     .range{ font-weight:700; color:#5b463a; }
-    .muted{ color:#8b6f61; font-size:.9rem; }
+    .muted{ color:var(--c-muted); font-size:.9rem; }
 
     .drop-row{
       border:1px dashed #d8cfc6; border-radius:10px; padding:.5rem .6rem; margin:.45rem 0; min-height:2.2rem; background:#fff;
@@ -109,6 +109,16 @@
       font-size:0.95rem;
     }
 
+    /* v2.8 — Mobil: vis KUN ugeboksen (read-only) */
+    @media (max-width: 800px){
+      .layout{ display:block; }
+      /* skjul alt undtagen ugeboks-panel i sidebaren */
+      .layout > *:not(.sidebar){ display:none !important; }
+      .sidebar > *:not(.ugeboks){ display:none !important; }
+      /* skjul handlinger (knapper/status) i ugeboks */
+      .ugeboks .actions{ display:none !important; }
+    }
+
     /* Print kun indkøbsliste pænt */
     @media print{
       body{ background:white; }
@@ -121,7 +131,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.7</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.8</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Samlet boks: Plan (kommende) / Tilbageblik (1–3 uger) -->
@@ -237,6 +247,20 @@
     function backWeekDates(i){ const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7); const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
 
     /* =========
+       v2.8 Mobil-heuristik & hjælpefunktion
+       ========= */
+    const MOBILE_VIEWER = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 800px)").matches || (new URLSearchParams(location.search).get("viewer")==="1");
+
+    function hasPlansNextWeek(){
+      const dates = nextWeekDatesFriThu();
+      for (const ds of dates){
+        const rec = historikMap.get(ds);
+        if (rec && (rec.plan_nu||"").toString().trim().length>0){ return true; }
+      }
+      return false;
+    }
+
+    /* =========
        WebApp POST (no-cors)
        ========= */
     async function postToWebApp(payload){
@@ -300,6 +324,31 @@
       const rows = weekRowsEl(); rows.innerHTML = "";
       const dates = (viewIdx===0) ? nextWeekDatesFriThu() : backWeekDates(viewIdx);
       rangeEl().textContent = rangeLabel(dates[0], dates[6]);
+
+      // v2.8: Navigationstilstand afhænger af desktop vs mobil
+      if (MOBILE_VIEWER){
+        // Tilbage op til 3; frem kun hvis (viewIdx>1) eller (viewIdx===1 og næste uge har plan)
+        const canPrev = viewIdx < 3;
+        const canNext = (viewIdx > 1) || (viewIdx === 1 && hasPlansNextWeek());
+        document.getElementById("view-prev").disabled = !canPrev;
+        document.getElementById("view-next").disabled = !canNext;
+
+        // READ-ONLY visning: vis spist hvis findes, ellers plan — ingen inputs/clear/draggable
+        hintEl().textContent = "Visning (mobil)";
+        dates.forEach((ds, i) => {
+          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="readonly";
+          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const chip  = document.createElement("div"); chip.className="ret-chip";
+          const rec = historikMap.get(ds) || {};
+          const name = (rec.spist || rec.plan_nu || "").toString().trim();
+          chip.innerHTML = `<span class="name">${name || "—"}</span>`;
+          row.appendChild(label); row.appendChild(chip);
+          rows.appendChild(row);
+        });
+        return; // vigtigt: desktop-rendering nedenfor springes over
+      }
+
+      // Desktop (uændret adfærd fra 2.7)
       document.getElementById("view-prev").disabled = (viewIdx >= 3);
       document.getElementById("view-next").disabled = (viewIdx <= 0);
 
@@ -567,11 +616,26 @@
     document.addEventListener("DOMContentLoaded", async () => {
       // Hent historik først (til tooltips + forudfyldning)
       await loadHistorik();
+
+      // v2.8: På mobil starter vi i aktuel uge (viewIdx=1). Desktop starter som før (viewIdx=0).
+      viewIdx = MOBILE_VIEWER ? 1 : 0;
       renderWeekPanel();
 
-      // Nav-knapper
-      document.getElementById("view-prev").addEventListener("click", () => { if (viewIdx < 3){ viewIdx++; renderWeekPanel(); } });
-      document.getElementById("view-next").addEventListener("click", () => { if (viewIdx > 0){ viewIdx--; renderWeekPanel(); } });
+      // Nav-knapper — desktop som før; mobil med speciel fremad-regel
+      document.getElementById("view-prev").addEventListener("click", () => {
+        const maxBack = 3;
+        if (viewIdx < maxBack){ viewIdx++; renderWeekPanel(); }
+      });
+      document.getElementById("view-next").addEventListener("click", () => {
+        if (!MOBILE_VIEWER){
+          if (viewIdx > 0){ viewIdx--; renderWeekPanel(); }
+        } else {
+          // Mobil: 3->2->1 altid; 1->0 kun hvis næste uge er planlagt
+          if (viewIdx > 1){ viewIdx--; renderWeekPanel(); }
+          else if (viewIdx === 1 && hasPlansNextWeek()){ viewIdx = 0; renderWeekPanel(); }
+        }
+      });
+
       document.getElementById("primary-btn").addEventListener("click", doPrimaryAction);
 
       // Indkøbsliste kopi/print
