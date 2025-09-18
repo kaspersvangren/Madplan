@@ -1,7 +1,8 @@
 {
   "name": "Madplan",
   "short_name": "Madplan",
-  "start_url": "/index.html",
+  "start_url": "index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0a4030",
   "theme_color": "#0a4030",
