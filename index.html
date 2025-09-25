@@ -104,6 +104,8 @@
       line-height:1.35;
       font-size:0.95rem;
     }
+    /* lille forbedring til hover-indikation på ingredienser */
+    #indkoebsliste-result .ing-item{ cursor:help; }
 
     /* v2.9 — Mobil: vis KUN ugeboksen (read-only) */
     @media (max-width: 800px){
@@ -127,7 +129,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.1</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.2</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -523,6 +525,7 @@
        ========= */
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
+    // v2.9.2: ny buildLists med optælling + mouse-over kilde-retter
     function buildLists(){
       const dates = nextWeekDatesFriThu();
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
@@ -531,34 +534,107 @@
         return navn ? { dag: WD_PLAN[i], navn } : null;
       }).filter(Boolean);
 
-      const brugte = ugeValg.map(v => ({ v, row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn) })).filter(x => x.row);
+      // Find de underliggende regneark-rækker for de valgte retter
+      const brugte = ugeValg.map(v => ({
+        v,
+        row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn)
+      })).filter(x => x.row);
 
+      // Opbyg tjek-set (varer man skal tjekke derhjemme)
+      const tjekSet = new Set();
+      brugte.forEach(({row}) => {
+        const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        tjek.forEach(v => tjekSet.add(v.toLowerCase()));
+      });
+
+      // Opbyg indkøbs-Map med optælling + kilde-retter
+      // key: lower-case vare, val: { name: "Pasta", count: 2, recipes: Set(["Lasagne","Pasta bolognese"]) }
+      const indkoebMap = new Map();
+
+      const pushItem = (rawName, recipeName) => {
+        const clean = rawName.trim();
+        if (!clean) return;
+        const key = clean.toLowerCase();
+        // hvis varen også står på "tjek", så kommer den IKKE på indkøbsliste (som hidtil)
+        if (tjekSet.has(key)) return;
+
+        const entry = indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
+        entry.count += 1;
+        if (recipeName) entry.recipes.add(recipeName);
+        indkoebMap.set(key, entry);
+      };
+
+      brugte.forEach(({v, row}) => {
+        const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        koeb.forEach(item => pushItem(item, v.navn));
+      });
+
+      // Sorter alfabetisk på visningsnavn (DA)
+      const indkoebArr = Array.from(indkoebMap.values())
+        .sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
+
+      // Saml “tjek-om-vi-har” (visningsliste – uændret logik, men vi normaliserer store bogstaver)
+      const tjekArr = Array.from(tjekSet.values())
+        .map(x => capFirst(x))
+        .sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
+
+      // Ugens valgte retter som før (tekst)
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
-      const indkoebSet = new Set(), tjekSet = new Set();
-      brugte.forEach(({row}) => {
-        const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
-        const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
-        koeb.forEach(v=>indkoebSet.add(v)); tjek.forEach(v=>tjekSet.add(v));
-      });
-      tjekSet.forEach(item => indkoebSet.delete(item));
+      // Byg HTML med elementer pr. ingrediens, så mouse-over virker;
+      // Samtidig er det stadig ren tekst ved kopiering/print (textContent bruges).
+      const container = document.getElementById("indkoebsliste-result");
+      container.innerHTML = "";
 
-      const indkoebListe = Array.from(indkoebSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
-      const tjekListe    = Array.from(tjekSet).sort((a,b)=>a.localeCompare(b,"da",{sensitivity:"base"}));
+      const section = (titleText) => {
+        const h = document.createElement("div");
+        h.style.fontWeight = "700";
+        h.style.marginTop = "0.35rem";
+        h.textContent = titleText;
+        return h;
+      };
 
-      const formatList = arr => arr.length ? "• " + arr.join("\n• ") : "-";
+      const bulletLine = (text, title=null) => {
+        const line = document.createElement("div");
+        line.textContent = "• "; // startpunkt
+        const span = document.createElement("span");
+        span.textContent = text;
+        if (title) { span.className = "ing-item"; span.title = title; }
+        line.appendChild(span);
+        return line;
+      };
 
-      const out = [
-        "1. Ugens madretter:",
-        (ugeLinjer.length ? ugeLinjer.join("\n") : "- (ingen valgt)"),
-        "",
-        "2. Indkøbsliste:",
-        formatList(indkoebListe),
-        "",
-        "3. Tjek om vi har:",
-        formatList(tjekListe)
-      ].join("\n");
-      document.getElementById("indkoebsliste-result").textContent = out;
+      // 1. Ugens madretter
+      container.appendChild(bulletLine("1. Ugens madretter:"));
+      if (ugeLinjer.length){
+        ugeLinjer.forEach(l => container.appendChild(bulletLine("  " + l)));
+      } else {
+        container.appendChild(bulletLine("  - (ingen valgt)"));
+      }
+
+      // 2. Indkøbsliste
+      container.appendChild(document.createElement("br"));
+      container.appendChild(bulletLine("2. Indkøbsliste:"));
+
+      if (indkoebArr.length){
+        indkoebArr.forEach(it => {
+          const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
+          const who = it.recipes.size ? "Til: " + Array.from(it.recipes).join(", ") : "";
+          container.appendChild(bulletLine("  " + it.name + qty, who || null));
+        });
+      } else {
+        container.appendChild(bulletLine("  -"));
+      }
+
+      // 3. Tjek om vi har
+      container.appendChild(document.createElement("br"));
+      container.appendChild(bulletLine("3. Tjek om vi har:"));
+
+      if (tjekArr.length){
+        tjekArr.forEach(name => container.appendChild(bulletLine("  " + name)));
+      } else {
+        container.appendChild(bulletLine("  -"));
+      }
     }
 
     async function copyList(){
@@ -617,7 +693,7 @@
       document.getElementById("filter-vegetar-only")?.addEventListener("change", visFiltreredeRetter);
     });
 
-    // Bevar eksisterende implementering af doPrimaryAction (uændret fra 2.7)
+    // Bevar eksisterende implementering af doPrimaryAction (uændret fra 2.7), men bruger ny buildLists
     async function doPrimaryAction(){
       const status = statusEl(); status.textContent = "";
       if (viewIdx === 0){
