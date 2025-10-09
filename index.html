@@ -51,7 +51,11 @@
     .drop-row.dragover{ background-color:#f1fbf6; border-color:#7ed9ac; }
     .drop-row .label{ min-width:120px; text-align:right; font-weight:600; color:#5b463a; }
     .ret-chip{ flex:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; min-width:0; }
-    .ret-chip .name{ flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .ret-chip .name, .ret-chip .name-link{
+      flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+    }
+    .ret-chip .name-link{ color:#1b5e8a; text-decoration:none; }
+    .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
     .clear{ width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; flex-shrink:0; }
 
     .spist-input{
@@ -96,7 +100,7 @@
     thead th{ position:sticky; top:0; z-index:5; background:#fffaf5; font-weight:700; border-bottom:1px solid var(--c-border); box-shadow:0 1px 0 rgba(0,0,0,0.03); }
     .navn-cell{ max-width:350px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
 
-    /* Gør indkøbslisten smal-venlig */
+    /* Indkøbsliste layout */
     #indkoebsliste-result{
       white-space:pre-wrap;
       overflow-wrap:anywhere;
@@ -104,6 +108,9 @@
       line-height:1.35;
       font-size:0.95rem;
     }
+    #indkoebsliste-result .section-title{ font-weight:700; margin-top:.35rem; }
+    #indkoebsliste-result ul{ margin:.25rem 0 .5rem 1.2rem; padding:0; }
+    #indkoebsliste-result li{ margin: .15rem 0; }
     /* hover-indikation på ingredienser */
     #indkoebsliste-result .ing-item{ cursor:help; }
 
@@ -127,7 +134,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.3</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.4</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -305,6 +312,15 @@
     }
 
     /* =========
+       Opslag: navn -> URL
+       ========= */
+    let nameToUrl = new Map();
+    function urlForName(name){
+      if (!name) return "";
+      return nameToUrl.get(String(name).trim().toLowerCase()) || "";
+    }
+
+    /* =========
        Ugepanel (viewIdx=0 plan; 1..3 tilbage)
        ========= */
     let viewIdx = 0;
@@ -313,6 +329,22 @@
     function hintEl(){ return document.getElementById("view-hint"); }
     function btnEl(){ return document.getElementById("primary-btn"); }
     function statusEl(){ return document.getElementById("primary-status"); }
+
+    function makeNameNode(navn){
+      const url = urlForName(navn);
+      if (url){
+        const a = document.createElement("a");
+        a.className = "name-link";
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = navn;
+        return a;
+      }else{
+        const span = document.createElement("span");
+        span.className = "name";
+        span.textContent = navn;
+        return span;
+      }
+    }
 
     function renderWeekPanel(){
       const rows = weekRowsEl(); rows.innerHTML = "";
@@ -332,7 +364,8 @@
           const chip  = document.createElement("div"); chip.className="ret-chip";
           const rec = historikMap.get(ds) || {};
           const name = (rec.spist || rec.plan_nu || "").toString().trim();
-          chip.innerHTML = `<span class="name">${name || "—"}</span>`;
+          chip.innerHTML = "";
+          chip.appendChild(makeNameNode(name || "—"));
           row.appendChild(label); row.appendChild(chip);
           rows.appendChild(row);
         });
@@ -350,7 +383,8 @@
         dates.forEach((ds, i) => {
           const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan";
           const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
-          const chip  = document.createElement("div"); chip.className="ret-chip"; chip.innerHTML = `<span class="name"></span>`;
+          const chip  = document.createElement("div"); chip.className="ret-chip";
+          chip.appendChild(makeNameNode(""));
           const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => setPlanValue(row,""));
           row.appendChild(label); row.appendChild(chip); row.appendChild(clear);
           setupDnDRow(row);
@@ -414,15 +448,22 @@
       rowEl.addEventListener("dragstart", ev => {
         dragSource = rowEl;
         const val = (rowEl.dataset.type === "plan")
-          ? (rowEl.querySelector(".ret-chip .name")?.textContent || "")
+          ? (rowEl.querySelector(".ret-chip .name, .ret-chip .name-link")?.textContent || "")
           : (rowEl.querySelector(".spist-input")?.value || "");
         ev.dataTransfer.setData("application/x-ret-navn", val);
       });
     }
 
+    function renderChipName(rowEl, navn){
+      const chip = rowEl.querySelector(".ret-chip");
+      if (!chip) return;
+      chip.innerHTML = "";
+      if (!navn){ chip.appendChild(makeNameNode("")); return; }
+      chip.appendChild(makeNameNode(navn));
+    }
+
     function setPlanValue(rowEl, navn){
-      const chipName = rowEl.querySelector(".ret-chip .name");
-      if (chipName) chipName.textContent = navn || "";
+      renderChipName(rowEl, navn || "");
       rowEl.dataset.ret = navn || "";
       const ds = rowEl.dataset.date;
       const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
@@ -439,10 +480,11 @@
     }
 
     /* =========
-       Retter fra Madplan-fanen (uændret)
+       Retter fra Madplan-fanen
        ========= */
     const COLS = {
       navn: ["Navn"],
+      url: ["URL","Url","Link"],
       vegetar: ["Vegetar"],
       toDage: ["2 dage","To dage","2dage"],
       nem: ["Nem ret","Nem"],
@@ -513,11 +555,13 @@
     }
 
     /* =========
-       Indkøbsliste
+       Indkøbsliste (HTML + tekst til clipboard)
        ========= */
+    let lastClipboardText = ""; // opdateres i buildLists()
+
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
-    // v2.9.3: buildLists med optælling + mouse-over for både Indkøb og Tjek
+    // v2.9.4: bygger semantisk UL/LI og genererer også ren tekst med \n
     function buildLists(){
       const dates = nextWeekDatesFriThu();
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
@@ -532,9 +576,7 @@
         row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn)
       })).filter(x => x.row);
 
-      // TJEK: Map med optælling + kilde-retter
-      // key: lower-case vare
-      // val: { name:"Tomat", count:3, recipes:Set(["Pasta", "Salat"]) }
+      // TJEK
       const tjekMap = new Map();
       const pushTjek = (rawName, recipeName) => {
         const clean = rawName.trim();
@@ -545,92 +587,113 @@
         if (recipeName) entry.recipes.add(recipeName);
         tjekMap.set(key, entry);
       };
-
       brugte.forEach(({v, row}) => {
         const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
         tjek.forEach(item => pushTjek(item, v.navn));
       });
 
-      // Indkøb: Map med optælling + kilde-retter
+      // INDKØB (ekskluder "tjek")
       const indkoebMap = new Map();
-      const tjekKeySet = new Set(Array.from(tjekMap.keys())); // stadig: indkøb ekskluderer "tjek"
-
+      const tjekKeySet = new Set(Array.from(tjekMap.keys()));
       const pushKoeb = (rawName, recipeName) => {
         const clean = rawName.trim();
         if (!clean) return;
         const key = clean.toLowerCase();
-        if (tjekKeySet.has(key)) return; // samme logik som før: fjern ting vi skal tjekke
+        if (tjekKeySet.has(key)) return;
         const entry = indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
         entry.count += 1;
         if (recipeName) entry.recipes.add(recipeName);
         indkoebMap.set(key, entry);
       };
-
       brugte.forEach(({v, row}) => {
         const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
         koeb.forEach(item => pushKoeb(item, v.navn));
       });
 
-      // Sorter
       const indkoebArr = Array.from(indkoebMap.values())
         .sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
       const tjekArr = Array.from(tjekMap.values())
         .sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
 
-      // Ugens valgte retter (tekstlinjer)
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
-      // Render HTML med bullets og title tooltips
+      // --- Render HTML (semantisk) ---
       const container = document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
-      const bulletLine = (text, title=null) => {
-        const line = document.createElement("div");
-        line.textContent = "• ";
-        const span = document.createElement("span");
-        span.textContent = text;
-        if (title) { span.className = "ing-item"; span.title = title; }
-        line.appendChild(span);
-        return line;
-      };
+      function section(title, lines, makeTitleTooltip){
+        const titleDiv = document.createElement("div");
+        titleDiv.className = "section-title";
+        titleDiv.textContent = title;
+        container.appendChild(titleDiv);
 
-      // 1. Ugens madretter
-      container.appendChild(bulletLine("1. Ugens madretter:"));
-      if (ugeLinjer.length){
-        ugeLinjer.forEach(l => container.appendChild(bulletLine("  " + l)));
-      } else {
-        container.appendChild(bulletLine("  - (ingen valgt)"));
+        const ul = document.createElement("ul");
+        if (!lines || !lines.length){
+          const li = document.createElement("li"); li.textContent = "-";
+          ul.appendChild(li);
+        } else {
+          lines.forEach(obj => {
+            const li = document.createElement("li");
+            if (typeof obj === "string"){
+              li.textContent = obj;
+            } else {
+              // { text, title? }
+              const span = document.createElement("span");
+              span.textContent = obj.text || "";
+              if (obj.title){ span.className = "ing-item"; span.title = obj.title; }
+              li.appendChild(span);
+            }
+            ul.appendChild(li);
+          });
+        }
+        container.appendChild(ul);
       }
 
-      // 2. Indkøbsliste
-      container.appendChild(document.createElement("br"));
-      container.appendChild(bulletLine("2. Indkøbsliste:"));
+      const asLineObj = (it) => {
+        const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
+        const who = it.recipes.size ? "Til: " + Array.from(it.recipes).join(", ") : "";
+        return { text: `${it.name}${qty}`, title: (who || null) };
+      };
+
+      section("1. Ugens madretter:", ugeLinjer);
+      section("2. Indkøbsliste:", indkoebArr.map(asLineObj));
+      section("3. Tjek om vi har:", tjekArr.map(asLineObj));
+
+      // --- Generér ren tekst til clipboard ---
+      const lines = [];
+      lines.push("1. Ugens madretter:");
+      if (ugeLinjer.length){
+        ugeLinjer.forEach(l => lines.push("• " + l));
+      } else {
+        lines.push("• -");
+      }
+      lines.push("");
+      lines.push("2. Indkøbsliste:");
       if (indkoebArr.length){
         indkoebArr.forEach(it => {
           const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
-          const who = it.recipes.size ? "Til: " + Array.from(it.recipes).join(", ") : "";
-          container.appendChild(bulletLine("  " + it.name + qty, who || null));
+          lines.push("• " + it.name + qty);
         });
       } else {
-        container.appendChild(bulletLine("  -"));
+        lines.push("• -");
       }
-
-      // 3. Tjek om vi har
-      container.appendChild(document.createElement("br"));
-      container.appendChild(bulletLine("3. Tjek om vi har:"));
+      lines.push("");
+      lines.push("3. Tjek om vi har:");
       if (tjekArr.length){
         tjekArr.forEach(it => {
           const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
-          const who = it.recipes.size ? "Til: " + Array.from(it.recipes).join(", ") : "";
-          container.appendChild(bulletLine("  " + it.name + qty, who || null));
+          lines.push("• " + it.name + qty);
         });
       } else {
-        container.appendChild(bulletLine("  -"));
+        lines.push("• -");
       }
+
+      lastClipboardText = lines.join("\n");
     }
 
     async function copyList(){
-      const txt = document.getElementById("indkoebsliste-result").textContent || "";
+      // Brug den eksplicit genererede tekst, fallback til innerText
+      const txt = lastClipboardText || document.getElementById("indkoebsliste-result").innerText || "";
       try{
         await navigator.clipboard.writeText(txt);
         alert("Indkøbsliste kopieret ✅");
@@ -669,10 +732,17 @@
       document.getElementById("print-btn").addEventListener("click", printList);
     });
 
-    // Hent retter og byg tabel
+    // Hent retter og byg tabel + URL-opslag
     fetch(MADPLAN_CSV_URL).then(r=>r.text()).then(csv=>{
       const result = Papa.parse(csv, { header:true });
       allRows = (result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
+      // navn -> url map
+      nameToUrl = new Map();
+      allRows.forEach(r => {
+        const n = (getCol(r, COLS.navn) || "").trim();
+        const u = (getCol(r, COLS.url) || "").trim();
+        if (n && u) nameToUrl.set(n.toLowerCase(), u);
+      });
       allRows.sort((a,b)=>(getCol(a, COLS.navn)||"").localeCompare(getCol(b, COLS.navn)||"","da",{sensitivity:"base"}));
       visFiltreredeRetter();
 
@@ -705,10 +775,10 @@
       }
     }
   </script>
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
-}
-</script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+  </script>
 </body>
 </html>
