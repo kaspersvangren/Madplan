@@ -6,7 +6,6 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0a4030">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <!-- v2.9: vigtigt for mobil CSS-pixels -->
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
@@ -26,7 +25,7 @@
     .container{ max-width:1200px; margin:auto; padding:1rem; }
     .layout{ display:flex; gap:2rem; align-items:flex-start; }
 
-    /* Sidebar med fast bredde */
+    /* Sidebar */
     .sidebar{
       display:flex; flex-direction:column; gap:1rem;
       position:sticky; top:1rem; align-self:flex-start;
@@ -44,24 +43,32 @@
     .muted{ color:var(--c-muted); font-size:.9rem; }
 
     .drop-row{
-      border:1px dashed #d8cfc6; border-radius:10px; padding:.5rem .6rem; margin:.45rem 0; min-height:2.2rem; background:#fff;
-      display:flex; align-items:center; gap:.6rem;
-      overflow:hidden;
+      border:1px dashed #d8cfc6; border-radius:10px;
+      padding:.45rem .5rem; margin:.45rem 0; min-height:2.2rem; background:#fff;
+      display:flex; align-items:center; gap:.35rem; overflow:hidden;
     }
     .drop-row.dragover{ background-color:#f1fbf6; border-color:#7ed9ac; }
-    .drop-row .label{ min-width:120px; text-align:right; font-weight:600; color:#5b463a; }
-    .ret-chip{ flex:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; min-width:0; }
+    .drop-row .label{ min-width:90px; text-align:right; font-weight:600; color:#5b463a; }
+    .drop-row .label .wd{ font-weight:600; }
+    .drop-row .label .dt{ font-size:.85em; color:var(--c-muted); }
+
+    .ret-chip{ flex:1 1 auto; display:flex; align-items:center; justify-content:space-between; gap:.45rem; min-width:0; }
     .ret-chip .name, .ret-chip .name-link{
       flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
     }
     .ret-chip .name-link{ color:#1b5e8a; text-decoration:none; }
     .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
-    .clear{ width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; flex-shrink:0; }
 
-    /* Repeat UI (minimal styling) */
-    .repeat-wrap{ display:flex; align-items:center; gap:.35rem; }
+    /* Repeat: ikon i stedet for tekstlabel */
+    .repeat-wrap{ display:flex; align-items:center; }
     .repeat-wrap input{ width:16px; height:16px; }
-    .repeat-label{ font-size:.85rem; color:#6b584d; user-select:none; }
+    .repeat-label{ display:none; }
+    .repeat-wrap::after{
+      content:"↻"; /* evt. "🔁" hvis du foretrækker emoji */
+      font-size:1rem; line-height:1; margin-left:.1rem; opacity:.85;
+    }
+
+    .clear{ width:20px; height:20px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; flex-shrink:0; }
 
     .spist-input{
       flex:1 1 0%; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem;
@@ -105,20 +112,17 @@
     thead th{ position:sticky; top:0; z-index:5; background:#fffaf5; font-weight:700; border-bottom:1px solid var(--c-border); box-shadow:0 1px 0 rgba(0,0,0,0.03); }
     .navn-cell{ max-width:350px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
 
-    /* Indkøbsliste layout */
+    /* Indkøbsliste */
     #indkoebsliste-result{
-      white-space:pre-wrap;
-      overflow-wrap:anywhere;
-      word-break:break-word;
-      line-height:1.35;
-      font-size:0.95rem;
+      white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word;
+      line-height:1.35; font-size:0.95rem;
     }
     #indkoebsliste-result .section-title{ font-weight:700; margin-top:.35rem; }
     #indkoebsliste-result ul{ margin:.25rem 0 .5rem 1.2rem; padding:0; }
-    #indkoebsliste-result li{ margin: .15rem 0; }
+    #indkoebsliste-result li{ margin:.15rem 0; }
     #indkoebsliste-result .ing-item{ cursor:help; }
 
-    /* v2.9 — Mobil: vis KUN ugeboksen (read-only) */
+    /* Mobil: vis kun ugeboksen (read-only) */
     @media (max-width: 800px){
       .layout{ display:block; }
       .layout > *:not(.sidebar){ display:none !important; }
@@ -126,7 +130,7 @@
       .ugeboks .actions{ display:none !important; }
     }
 
-    /* Print kun indkøbsliste pænt (uændret) */
+    /* Print */
     @media print{
       body{ background:white; }
       .layout > *:not(.sidebar){ display:none !important; }
@@ -138,7 +142,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.5</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.6</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -225,24 +229,26 @@
   </div>
 
   <script>
-    /* =========
-       Konstanter
-       ========= */
+    /* ========= Konstanter ========= */
     const WEBAPP_URL    = "https://script.google.com/macros/s/AKfycbyrbuiVQ0-vDenrKPLC6y1WHzy8BDLo-jK0mLyQTqwuPYRyE41_cZ6ieKwEM4GaqRYbkA/exec";
     const WEBAPP_SECRET = "Freddy";
     const SHEET_ID      = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
     const HISTORIK_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historik`;
     const MADPLAN_CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Madplan`;
 
-    /* =========
-       Dato-format (DK)
-       ========= */
+    /* ========= Dato-format (DK) ========= */
     const WD_SHORT = ["søn","man","tir","ons","tor","fre","lør"];
     const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"]; // planrækkefølge
     function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
     function ddmm(d){ const dt = (d instanceof Date)? d : new Date(d); return String(dt.getDate()).padStart(2,"0")+"."+String(dt.getMonth()+1).padStart(2,"0"); }
-    function labelDdMm(ds, idx){ const wd = WD_PLAN[idx]; return wd.charAt(0).toUpperCase()+wd.slice(1) + " (" + ddmm(ds) + ")"; }
-    function rangeLabel(d1, d7){ const a = new Date(d1), b = new Date(d7); const w1=WD_PLAN[0].slice(0,3), w7=WD_PLAN[6].slice(0,3); return `${w1} ${ddmm(a)} → ${w7} ${ddmm(b)}`; }
+    function labelDdMmParts(ds, idx){
+      return { wd: WD_PLAN[idx].charAt(0).toUpperCase()+WD_PLAN[idx].slice(1), dt: ddmm(ds) };
+    }
+    function setRowLabel(el, ds, idx){
+      const {wd, dt} = labelDdMmParts(ds, idx);
+      el.innerHTML = `<span class="wd">${wd}</span> <span class="dt">(${dt})</span>`;
+    }
+    function rangeLabel(d1, d7){ const a=new Date(d1), b=new Date(d7); return `${WD_PLAN[0].slice(0,3)} ${ddmm(a)} → ${WD_PLAN[6].slice(0,3)} ${ddmm(b)}`; }
 
     function nextFridayDate(base=new Date()){
       const dow = base.getDay(); let delta = (5 - dow + 7) % 7; if (delta === 0) delta = 7;
@@ -253,31 +259,21 @@
     }
     function backWeekDates(i){ const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7); const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
 
-    /* =========
-       v2.9 Mobil-heuristik & hjælpefunktioner
-       ========= */
+    /* ========= Mobilheuristik ========= */
     const MOBILE_VIEWER = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 800px)").matches || (new URLSearchParams(location.search).get("viewer")==="1");
-
     function hasPlansNextWeek(){
       const dates = nextWeekDatesFriThu();
-      for (const ds of dates){
-        const rec = historikMap.get(ds);
-        if (rec && (rec.plan_nu||"").toString().trim().length>0){ return true; }
-      }
+      for (const ds of dates){ const rec = historikMap.get(ds); if (rec && (rec.plan_nu||"").toString().trim().length>0){ return true; } }
       return false;
     }
 
-    /* =========
-       WebApp POST (no-cors)
-       ========= */
+    /* ========= WebApp POST ========= */
     async function postToWebApp(payload){
       try{ await fetch(WEBAPP_URL, { method:"POST", body: JSON.stringify(payload), mode:"no-cors", cache:"no-store" }); }
       catch(err){ console.warn("WebApp POST fejl:", err); }
     }
 
-    /* =========
-       Historik-CSV
-       ========= */
+    /* ========= Historik ========= */
     let historikMap = new Map(); // dato -> { ugedag, plan_nu, spist }
     let lastEatenByName = new Map(); // lower(name) -> seneste ISO-dato
 
@@ -315,18 +311,14 @@
       });
     }
 
-    /* =========
-       Opslag: navn -> URL
-       ========= */
+    /* ========= Navn -> URL ========= */
     let nameToUrl = new Map();
     function urlForName(name){
       if (!name) return "";
       return nameToUrl.get(String(name).trim().toLowerCase()) || "";
     }
 
-    /* =========
-       Ugepanel (viewIdx=0 plan; 1..3 tilbage)
-       ========= */
+    /* ========= Ugepanel ========= */
     let viewIdx = 0;
     function weekRowsEl(){ return document.getElementById("week-rows"); }
     function rangeEl(){ return document.getElementById("view-range"); }
@@ -364,11 +356,10 @@
         hintEl().textContent = "Visning (mobil)";
         dates.forEach((ds, i) => {
           const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="readonly";
-          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
           const chip  = document.createElement("div"); chip.className="ret-chip";
           const rec = historikMap.get(ds) || {};
           const name = (rec.spist || rec.plan_nu || "").toString().trim();
-          chip.innerHTML = "";
           chip.appendChild(makeNameNode(name || "—"));
           row.appendChild(label); row.appendChild(chip);
           rows.appendChild(row);
@@ -388,7 +379,7 @@
           const row = document.createElement("div");
           row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan"; row.dataset.repeat="0";
 
-          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
 
           const chip  = document.createElement("div"); chip.className="ret-chip";
           chip.appendChild(makeNameNode(""));
@@ -415,12 +406,10 @@
           setupDnDRow(row);
           rows.appendChild(row);
 
-          // Prefill fra historik
           const h = historikMap.get(ds); const v = h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
 
-        // Efter opbygning: sync repeat-tilstande (enable/disable + evt. auto-udfyld)
         syncRepeatRows();
 
       } else {
@@ -430,7 +419,7 @@
 
         dates.forEach((ds, i) => {
           const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="spist";
-          const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
           const input = document.createElement("input"); input.type="text"; input.className="spist-input"; input.placeholder="Ret-navn";
           const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => { input.value=""; updateSpistLocal(ds, ""); });
           row.appendChild(label); row.appendChild(input); row.appendChild(clear);
@@ -445,7 +434,7 @@
       }
     }
 
-    // Hold repeat-UI i sync og auto-udfyld navne hvor valgt
+    /* ========= Repeat sync ========= */
     function syncRepeatRows(){
       const rows = Array.from(document.querySelectorAll('#week-rows .drop-row[data-type="plan"]'));
       rows.forEach((row, i) => {
@@ -456,25 +445,19 @@
         const hasPrev = !!prevName;
 
         cb.disabled = !hasPrev;
-        if (!hasPrev){
-          // ingen forrige ret — kan ikke gentage
-          cb.checked = false;
-          row.dataset.repeat = "0";
-        }
+        if (!hasPrev){ cb.checked=false; row.dataset.repeat="0"; }
 
         if (cb.checked && hasPrev){
-          // udfyld navnet med forrige dags ret (registreres i arket som samme ret)
           if ((row.dataset.ret||"") !== prevName){
             setPlanValue(row, prevName);
           } else {
-            // opdater visningen (link mm.) hvis samme navn
             renderChipName(row, prevName);
           }
         }
       });
     }
 
-    // DnD
+    /* ========= DnD ========= */
     let dragSource = null;
     function setupDnDRow(rowEl, inputEl){
       rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
@@ -486,7 +469,6 @@
 
         if (rowEl.dataset.type === "plan"){
           setPlanValue(rowEl, navn);
-          // slå repeat fra ved manuel indsætning
           rowEl.dataset.repeat="0"; const cb=rowEl.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
         } else {
           if (inputEl) inputEl.value = navn;
@@ -532,7 +514,6 @@
       rec.plan_nu = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
-      // når et navn ændres, kan det påvirke downstream repeat
       if (rowEl.dataset.type === "plan") syncRepeatRows();
     }
 
@@ -543,9 +524,7 @@
       recomputeLastEaten();
     }
 
-    /* =========
-       Retter fra Madplan-fanen
-       ========= */
+    /* ========= Retter fra Madplan-fanen ========= */
     const COLS = {
       navn: ["Navn"],
       url: ["URL","Url","Link"],
@@ -618,22 +597,17 @@
       if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
     }
 
-    /* =========
-       Indkøbsliste (HTML + tekst til clipboard)
-       ========= */
-    let lastClipboardText = ""; // opdateres i buildLists()
-
+    /* ========= Indkøbsliste ========= */
+    let lastClipboardText = "";
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
     function buildLists(){
-      const dates = nextWeekDatesFriThu();
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
       const ugeValg = rows.map((row,i) => {
         const navn = (row.dataset.ret || "").trim();
         return navn ? { dag: WD_PLAN[i], navn } : null;
       }).filter(Boolean);
 
-      // Find underliggende rækker for valgte retter
       const brugte = ugeValg.map((v, i) => ({
         v,
         rowEl: rows[i],
@@ -643,68 +617,51 @@
       // TJEK
       const tjekMap = new Map();
       const pushTjek = (rawName, recipeName) => {
-        const clean = rawName.trim();
-        if (!clean) return;
+        const clean = rawName.trim(); if (!clean) return;
         const key = clean.toLowerCase();
         const entry = tjekMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
-        entry.count += 1;
-        if (recipeName) entry.recipes.add(recipeName);
+        entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
         tjekMap.set(key, entry);
       };
       brugte.forEach(({v, row, rowEl}) => {
-        if (rowEl.dataset.repeat === "1") return; // IGNORER gentagelser i optælling
+        if (rowEl.dataset.repeat === "1") return;
         const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
         tjek.forEach(item => pushTjek(item, v.navn));
       });
 
-      // INDKØB (ekskluder "tjek", og ignorer gentagelser)
+      // INDKØB
       const indkoebMap = new Map();
       const tjekKeySet = new Set(Array.from(tjekMap.keys()));
       const pushKoeb = (rawName, recipeName) => {
-        const clean = rawName.trim();
-        if (!clean) return;
-        const key = clean.toLowerCase();
-        if (tjekKeySet.has(key)) return;
+        const clean = rawName.trim(); if (!clean) return;
+        const key = clean.toLowerCase(); if (tjekKeySet.has(key)) return;
         const entry = indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
-        entry.count += 1;
-        if (recipeName) entry.recipes.add(recipeName);
+        entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
         indkoebMap.set(key, entry);
       };
       brugte.forEach(({v, row, rowEl}) => {
-        if (rowEl.dataset.repeat === "1") return; // IGNORER gentagelser i optælling
+        if (rowEl.dataset.repeat === "1") return;
         const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
         koeb.forEach(item => pushKoeb(item, v.navn));
       });
 
-      const indkoebArr = Array.from(indkoebMap.values())
-        .sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
-      const tjekArr = Array.from(tjekMap.values())
-        .sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
-
+      const indkoebArr = Array.from(indkoebMap.values()).sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
+      const tjekArr = Array.from(tjekMap.values()).sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
-      // --- Render HTML (semantisk) ---
       const container = document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
       function section(title, lines){
-        const titleDiv = document.createElement("div");
-        titleDiv.className = "section-title";
-        titleDiv.textContent = title;
-        container.appendChild(titleDiv);
-
+        const titleDiv = document.createElement("div"); titleDiv.className = "section-title"; titleDiv.textContent = title; container.appendChild(titleDiv);
         const ul = document.createElement("ul");
-        if (!lines || !lines.length){
-          const li = document.createElement("li"); li.textContent = "-";
-          ul.appendChild(li);
-        } else {
+        if (!lines || !lines.length){ const li = document.createElement("li"); li.textContent = "-"; ul.appendChild(li); }
+        else{
           lines.forEach(obj => {
             const li = document.createElement("li");
-            if (typeof obj === "string"){
-              li.textContent = obj;
-            } else {
-              const span = document.createElement("span");
-              span.textContent = obj.text || "";
+            if (typeof obj === "string"){ li.textContent = obj; }
+            else{
+              const span = document.createElement("span"); span.textContent = obj.text || "";
               if (obj.title){ span.className = "ing-item"; span.title = obj.title; }
               li.appendChild(span);
             }
@@ -724,53 +681,30 @@
       section("2. Indkøbsliste:", indkoebArr.map(asLineObj));
       section("3. Tjek om vi har:", tjekArr.map(asLineObj));
 
-      // --- Generér ren tekst til clipboard ---
+      // Tekst til copy
       const lines = [];
       lines.push("1. Ugens madretter:");
-      if (ugeLinjer.length){
-        ugeLinjer.forEach(l => lines.push("• " + l));
-      } else {
-        lines.push("• -");
-      }
+      if (ugeLinjer.length){ ugeLinjer.forEach(l => lines.push("• " + l)); } else { lines.push("• -"); }
       lines.push("");
       lines.push("2. Indkøbsliste:");
-      if (indkoebArr.length){
-        indkoebArr.forEach(it => {
-          const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
-          lines.push("• " + it.name + qty);
-        });
-      } else {
-        lines.push("• -");
-      }
+      if (indkoebArr.length){ indkoebArr.forEach(it => { const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
       lines.push("");
       lines.push("3. Tjek om vi har:");
-      if (tjekArr.length){
-        tjekArr.forEach(it => {
-          const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
-          lines.push("• " + it.name + qty);
-        });
-      } else {
-        lines.push("• -");
-      }
-
+      if (tjekArr.length){ tjekArr.forEach(it => { const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
       lastClipboardText = lines.join("\n");
     }
 
     async function copyList(){
       const txt = lastClipboardText || document.getElementById("indkoebsliste-result").innerText || "";
-      try{
-        await navigator.clipboard.writeText(txt);
-        alert("Indkøbsliste kopieret ✅");
-      }catch{
+      try{ await navigator.clipboard.writeText(txt); alert("Indkøbsliste kopieret ✅"); }
+      catch{
         const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select();
         try{ document.execCommand("copy"); alert("Indkøbsliste kopieret ✅"); }finally{ document.body.removeChild(ta); }
       }
     }
     function printList(){ window.print(); }
 
-    /* =========
-       Init
-       ========= */
+    /* ========= Init ========= */
     document.addEventListener("DOMContentLoaded", async () => {
       await loadHistorik();
 
@@ -800,7 +734,6 @@
     fetch(MADPLAN_CSV_URL).then(r=>r.text()).then(csv=>{
       const result = Papa.parse(csv, { header:true });
       allRows = (result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
-      // navn -> url map
       nameToUrl = new Map();
       allRows.forEach(r => {
         const n = (getCol(r, COLS.navn) || "").trim();
