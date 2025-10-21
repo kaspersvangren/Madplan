@@ -64,7 +64,7 @@
     .repeat-wrap input{ width:16px; height:16px; }
     .repeat-label{ display:none; }
     .repeat-wrap::after{
-      content:"↻"; /* evt. "🔁" hvis du foretrækker emoji */
+      content:"↻";
       font-size:1rem; line-height:1; margin-left:.1rem; opacity:.85;
     }
 
@@ -138,6 +138,21 @@
       #print-panel{ border:none; box-shadow:none; }
       #indkoebsliste-result{ white-space:pre-wrap; font-size:12pt; }
     }
+
+    /* === PATCH: tving dag/dato til én linje og hold kontroller kompakte === */
+    .drop-row{ flex-wrap:nowrap; }
+    .drop-row .label{
+      min-width:88px;
+      white-space:nowrap;
+      flex:0 0 auto;
+    }
+    .repeat-wrap, .clear{ flex:0 0 auto; }
+    .ret-chip{ flex:1 1 auto; min-width:0; }
+    .ret-chip .name, .ret-chip .name-link{
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .drop-row .label .dt{ font-size:.8em; color:var(--c-muted); }
+    /* === /PATCH === */
   </style>
 </head>
 <body>
@@ -238,9 +253,9 @@
 
     /* ========= Dato-format (DK) ========= */
     const WD_SHORT = ["søn","man","tir","ons","tor","fre","lør"];
-    const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"]; // planrækkefølge
+    const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
     function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
-    function ddmm(d){ const dt = (d instanceof Date)? d : new Date(d); return String(dt.getDate()).padStart(2,"0")+"."+String(dt.getMonth()+1).padStart(2,"0"); }
+    function ddmm(d){ const dt=(d instanceof Date)? d : new Date(d); return String(dt.getDate()).padStart(2,"0")+"."+String(dt.getMonth()+1).padStart(2,"0"); }
     function labelDdMmParts(ds, idx){
       return { wd: WD_PLAN[idx].charAt(0).toUpperCase()+WD_PLAN[idx].slice(1), dt: ddmm(ds) };
     }
@@ -251,13 +266,13 @@
     function rangeLabel(d1, d7){ const a=new Date(d1), b=new Date(d7); return `${WD_PLAN[0].slice(0,3)} ${ddmm(a)} → ${WD_PLAN[6].slice(0,3)} ${ddmm(b)}`; }
 
     function nextFridayDate(base=new Date()){
-      const dow = base.getDay(); let delta = (5 - dow + 7) % 7; if (delta === 0) delta = 7;
-      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta); d.setHours(0,0,0,0); return d;
+      const dow=base.getDay(); let delta=(5-dow+7)%7; if(delta===0) delta=7;
+      const d=new Date(base.getFullYear(), base.getMonth(), base.getDate()+delta); d.setHours(0,0,0,0); return d;
     }
     function nextWeekDatesFriThu(){
-      const start = nextFridayDate(new Date()); const arr=[]; for (let i=0;i<7;i++){ const d=new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); arr.push(isoLocal(d)); } return arr;
+      const start=nextFridayDate(new Date()); const arr=[]; for(let i=0;i<7;i++){ const d=new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); arr.push(isoLocal(d)); } return arr;
     }
-    function backWeekDates(i){ const nf = nextFridayDate(new Date()); const start = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() - i*7); const arr=[]; for (let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
+    function backWeekDates(i){ const nf=nextFridayDate(new Date()); const start=new Date(nf.getFullYear(), nf.getMonth(), nf.getDate()-i*7); const arr=[]; for(let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
 
     /* ========= Mobilheuristik ========= */
     const MOBILE_VIEWER = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 800px)").matches || (new URLSearchParams(location.search).get("viewer")==="1");
@@ -274,8 +289,8 @@
     }
 
     /* ========= Historik ========= */
-    let historikMap = new Map(); // dato -> { ugedag, plan_nu, spist }
-    let lastEatenByName = new Map(); // lower(name) -> seneste ISO-dato
+    let historikMap = new Map();
+    let lastEatenByName = new Map();
 
     async function loadHistorik(){
       const text = await fetch(HISTORIK_CSV_URL, { cache:"no-store" }).then(r => r.text());
@@ -299,8 +314,8 @@
         const cur=lastEatenByName.get(key); if(!cur || date>cur) lastEatenByName.set(key,date);
       };
       historikMap.forEach((rec, ds) => {
-        const consumed = (rec.spist||"").trim();
-        const planned  = (rec.plan_nu||"").trim();
+        const consumed=(rec.spist||"").trim();
+        const planned =(rec.plan_nu||"").trim();
         const name = consumed || planned;
         if (name) setIfNewer(name, ds);
       });
@@ -329,15 +344,15 @@
     function makeNameNode(navn){
       const url = urlForName(navn);
       if (url){
-        const a = document.createElement("a");
-        a.className = "name-link";
-        a.href = url; a.target = "_blank"; a.rel = "noopener";
-        a.textContent = navn;
+        const a=document.createElement("a");
+        a.className="name-link";
+        a.href=url; a.target="_blank"; a.rel="noopener";
+        a.textContent=navn;
         return a;
-      }else{
-        const span = document.createElement("span");
-        span.className = "name";
-        span.textContent = navn;
+      } else {
+        const span=document.createElement("span");
+        span.className="name";
+        span.textContent=navn;
         return span;
       }
     }
@@ -355,11 +370,11 @@
 
         hintEl().textContent = "Visning (mobil)";
         dates.forEach((ds, i) => {
-          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="readonly";
-          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
-          const chip  = document.createElement("div"); chip.className="ret-chip";
-          const rec = historikMap.get(ds) || {};
-          const name = (rec.spist || rec.plan_nu || "").toString().trim();
+          const row=document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="readonly";
+          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
+          const chip=document.createElement("div"); chip.className="ret-chip";
+          const rec=historikMap.get(ds) || {};
+          const name=(rec.spist || rec.plan_nu || "").toString().trim();
           chip.appendChild(makeNameNode(name || "—"));
           row.appendChild(label); row.appendChild(chip);
           rows.appendChild(row);
@@ -376,37 +391,37 @@
         btnEl().disabled = false;
 
         dates.forEach((ds, i) => {
-          const row = document.createElement("div");
+          const row=document.createElement("div");
           row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan"; row.dataset.repeat="0";
 
-          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
+          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
 
-          const chip  = document.createElement("div"); chip.className="ret-chip";
+          const chip=document.createElement("div"); chip.className="ret-chip";
           chip.appendChild(makeNameNode(""));
 
-          const repeatWrap = document.createElement("label");
-          repeatWrap.className = "repeat-wrap";
-          const repeatCb = document.createElement("input");
-          repeatCb.type = "checkbox"; repeatCb.className = "repeat-cb";
-          repeatCb.title = "Gentag forrige ret (tæller ikke indkøb)";
+          const repeatWrap=document.createElement("label");
+          repeatWrap.className="repeat-wrap";
+          const repeatCb=document.createElement("input");
+          repeatCb.type="checkbox"; repeatCb.className="repeat-cb";
+          repeatCb.title="Gentag forrige ret (tæller ikke indkøb)";
           repeatCb.addEventListener("change", () => {
             row.dataset.repeat = repeatCb.checked ? "1" : "0";
             syncRepeatRows();
           });
-          const repeatLbl = document.createElement("span");
-          repeatLbl.className = "repeat-label";
-          repeatLbl.textContent = "Gentag";
+          const repeatLbl=document.createElement("span");
+          repeatLbl.className="repeat-label";
+          repeatLbl.textContent="Gentag";
           repeatWrap.appendChild(repeatCb);
           repeatWrap.appendChild(repeatLbl);
 
-          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×";
+          const clear=document.createElement("button"); clear.className="clear"; clear.textContent="×";
           clear.addEventListener("click", () => { setPlanValue(row,""); row.dataset.repeat="0"; const cb=row.querySelector('.repeat-cb'); if(cb) cb.checked=false; syncRepeatRows(); });
 
           row.appendChild(label); row.appendChild(chip); row.appendChild(repeatWrap); row.appendChild(clear);
           setupDnDRow(row);
           rows.appendChild(row);
 
-          const h = historikMap.get(ds); const v = h && (h.plan_nu||"").trim();
+          const h=historikMap.get(ds); const v=h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
 
@@ -418,17 +433,17 @@
         btnEl().disabled = false;
 
         dates.forEach((ds, i) => {
-          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="spist";
-          const label = document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
-          const input = document.createElement("input"); input.type="text"; input.className="spist-input"; input.placeholder="Ret-navn";
-          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => { input.value=""; updateSpistLocal(ds, ""); });
+          const row=document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="spist";
+          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
+          const input=document.createElement("input"); input.type="text"; input.className="spist-input"; input.placeholder="Ret-navn";
+          const clear=document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => { input.value=""; updateSpistLocal(ds, ""); });
           row.appendChild(label); row.appendChild(input); row.appendChild(clear);
           setupDnDRow(row, input);
           rows.appendChild(row);
 
-          const h = historikMap.get(ds);
-          const vSpist = h && (h.spist||"").trim();
-          const vPlan  = h && (h.plan_nu||"").trim();
+          const h=historikMap.get(ds);
+          const vSpist=h && (h.spist||"").trim();
+          const vPlan =h && (h.plan_nu||"").trim();
           input.value = vSpist || vPlan || "";
         });
       }
@@ -438,11 +453,11 @@
     function syncRepeatRows(){
       const rows = Array.from(document.querySelectorAll('#week-rows .drop-row[data-type="plan"]'));
       rows.forEach((row, i) => {
-        const cb = row.querySelector('.repeat-cb');
+        const cb=row.querySelector('.repeat-cb');
         if (!cb) return;
-        const prev = rows[i-1];
-        const prevName = i>0 ? ((prev?.dataset.ret)||"").trim() : "";
-        const hasPrev = !!prevName;
+        const prev=rows[i-1];
+        const prevName=i>0 ? ((prev?.dataset.ret)||"").trim() : "";
+        const hasPrev=!!prevName;
 
         cb.disabled = !hasPrev;
         if (!hasPrev){ cb.checked=false; row.dataset.repeat="0"; }
@@ -464,7 +479,7 @@
       rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
       rowEl.addEventListener("drop", e => {
         e.preventDefault(); rowEl.classList.remove("dragover");
-        const navn = e.dataTransfer.getData("application/x-ret-navn") || "";
+        const navn=e.dataTransfer.getData("application/x-ret-navn") || "";
         if (!navn) return;
 
         if (rowEl.dataset.type === "plan"){
@@ -475,12 +490,12 @@
           updateSpistLocal(rowEl.dataset.date, navn);
         }
         if (dragSource && dragSource !== rowEl){
-          const srcType = dragSource.dataset.type;
+          const srcType=dragSource.dataset.type;
           if (srcType === "plan"){
             setPlanValue(dragSource, "");
             dragSource.dataset.repeat="0"; const cb=dragSource.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
           } else {
-            const inp = dragSource.querySelector(".spist-input");
+            const inp=dragSource.querySelector(".spist-input");
             if (inp){ inp.value = ""; updateSpistLocal(dragSource.dataset.date, ""); }
           }
         }
@@ -499,9 +514,9 @@
     }
 
     function renderChipName(rowEl, navn){
-      const chip = rowEl.querySelector(".ret-chip");
+      const chip=rowEl.querySelector(".ret-chip");
       if (!chip) return;
-      chip.innerHTML = "";
+      chip.innerHTML="";
       if (!navn){ chip.appendChild(makeNameNode("")); return; }
       chip.appendChild(makeNameNode(navn));
     }
@@ -509,8 +524,8 @@
     function setPlanValue(rowEl, navn){
       renderChipName(rowEl, navn || "");
       rowEl.dataset.ret = navn || "";
-      const ds = rowEl.dataset.date;
-      const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
+      const ds=rowEl.dataset.date;
+      const rec=historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
       rec.plan_nu = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
@@ -518,7 +533,7 @@
     }
 
     function updateSpistLocal(ds, navn){
-      const rec = historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
+      const rec=historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
       rec.spist = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
@@ -548,20 +563,18 @@
         if (!passesPractical(row)) return;
         if (!passesVegetarian(row)) return;
 
-        const name = (getCol(row, COLS.navn) || "").trim();
-        const tr = document.createElement("tr"); tr.setAttribute("data-name", name.toLowerCase());
-        const last = lastEatenByName.get(name.toLowerCase());
+        const name=(getCol(row, COLS.navn) || "").trim();
+        const tr=document.createElement("tr"); tr.setAttribute("data-name", name.toLowerCase());
+        const last=lastEatenByName.get(name.toLowerCase());
         tr.title = last ? `Sidst spist: ${last}` : "Sidst spist: –";
 
-        const navnTd = document.createElement("td");
-        const navnDiv = document.createElement("div"); navnDiv.className="navn-cell"; navnDiv.textContent = name;
+        const navnTd=document.createElement("td");
+        const navnDiv=document.createElement("div"); navnDiv.className="navn-cell"; navnDiv.textContent=name;
         navnTd.appendChild(navnDiv); tr.appendChild(navnTd);
 
-        const displayCols = [
-          { cols: COLS.vegetar }, { cols: COLS.toDage }, { cols: COLS.nem }, { cols: COLS.agnes }
-        ];
+        const displayCols=[ { cols: COLS.vegetar }, { cols: COLS.toDage }, { cols: COLS.nem }, { cols: COLS.agnes } ];
         displayCols.forEach(dc => {
-          const td = document.createElement("td"); td.textContent = hasX(row, dc.cols) ? "✔" : ""; tr.appendChild(td);
+          const td=document.createElement("td"); td.textContent = hasX(row, dc.cols) ? "✔" : ""; tr.appendChild(td);
         });
 
         tr.setAttribute("draggable","true");
@@ -573,27 +586,23 @@
     }
 
     function passesPractical(row){
-      const rules = [
-        { group:"agnes", cols: COLS.agnes },
-        { group:"to-dage", cols: COLS.toDage },
-        { group:"nem", cols: COLS.nem },
-      ];
+      const rules=[ { group:"agnes", cols: COLS.agnes }, { group:"to-dage", cols: COLS.toDage }, { group:"nem", cols: COLS.nem } ];
       for (const r of rules){
-        const mode = getMode(r.group);
-        if (mode === "include" && !hasX(row, r.cols)) return false;
-        if (mode === "exclude" && hasX(row, r.cols)) return false;
+        const mode=getMode(r.group);
+        if (mode==="include" && !hasX(row, r.cols)) return false;
+        if (mode==="exclude" && hasX(row, r.cols)) return false;
       }
       return true;
     }
-    function getMode(group){ const el = document.querySelector(`input[name="${group}-mode"]:checked`); return el? el.value : "ignore"; }
-    function passesVegetarian(row){ const vegOnly = document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, ["Vegetar"]); }
+    function getMode(group){ const el=document.querySelector(`input[name="${group}-mode"]:checked`); return el? el.value : "ignore"; }
+    function passesVegetarian(row){ const vegOnly=document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, ["Vegetar"]); }
     function updateFilterLabelStyles(){
       const sets=[["agnes","rowlabel-agnes"],["to-dage","rowlabel-to-dage"],["nem","rowlabel-nem"]];
       sets.forEach(([g,id]) => {
-        const m = getMode(g), el = document.getElementById(id);
+        const m=getMode(g), el=document.getElementById(id);
         if(!el) return; el.style.color = (m==="include")?"#2e7d5b":(m==="exclude"?"#b84a4a":"var(--ink)");
       });
-      const vegEl = document.getElementById("filter-vegetar-only"); const vegLabel = document.getElementById("label-vegetar");
+      const vegEl=document.getElementById("filter-vegetar-only"); const vegLabel=document.getElementById("label-vegetar");
       if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
     }
 
@@ -604,7 +613,7 @@
     function buildLists(){
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
       const ugeValg = rows.map((row,i) => {
-        const navn = (row.dataset.ret || "").trim();
+        const navn=(row.dataset.ret || "").trim();
         return navn ? { dag: WD_PLAN[i], navn } : null;
       }).filter(Boolean);
 
@@ -617,15 +626,15 @@
       // TJEK
       const tjekMap = new Map();
       const pushTjek = (rawName, recipeName) => {
-        const clean = rawName.trim(); if (!clean) return;
-        const key = clean.toLowerCase();
-        const entry = tjekMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
+        const clean=rawName.trim(); if (!clean) return;
+        const key=clean.toLowerCase();
+        const entry=tjekMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
         entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
         tjekMap.set(key, entry);
       };
       brugte.forEach(({v, row, rowEl}) => {
         if (rowEl.dataset.repeat === "1") return;
-        const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        const tjek=(getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
         tjek.forEach(item => pushTjek(item, v.navn));
       });
 
@@ -633,15 +642,15 @@
       const indkoebMap = new Map();
       const tjekKeySet = new Set(Array.from(tjekMap.keys()));
       const pushKoeb = (rawName, recipeName) => {
-        const clean = rawName.trim(); if (!clean) return;
-        const key = clean.toLowerCase(); if (tjekKeySet.has(key)) return;
-        const entry = indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
+        const clean=rawName.trim(); if (!clean) return;
+        const key=clean.toLowerCase(); if (tjekKeySet.has(key)) return;
+        const entry=indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
         entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
         indkoebMap.set(key, entry);
       };
       brugte.forEach(({v, row, rowEl}) => {
         if (rowEl.dataset.repeat === "1") return;
-        const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        const koeb=(getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
         koeb.forEach(item => pushKoeb(item, v.navn));
       });
 
@@ -649,20 +658,20 @@
       const tjekArr = Array.from(tjekMap.values()).sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
-      const container = document.getElementById("indkoebsliste-result");
+      const container=document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
       function section(title, lines){
-        const titleDiv = document.createElement("div"); titleDiv.className = "section-title"; titleDiv.textContent = title; container.appendChild(titleDiv);
-        const ul = document.createElement("ul");
-        if (!lines || !lines.length){ const li = document.createElement("li"); li.textContent = "-"; ul.appendChild(li); }
+        const titleDiv=document.createElement("div"); titleDiv.className="section-title"; titleDiv.textContent=title; container.appendChild(titleDiv);
+        const ul=document.createElement("ul");
+        if (!lines || !lines.length){ const li=document.createElement("li"); li.textContent="-"; ul.appendChild(li); }
         else{
           lines.forEach(obj => {
-            const li = document.createElement("li");
-            if (typeof obj === "string"){ li.textContent = obj; }
+            const li=document.createElement("li");
+            if (typeof obj === "string"){ li.textContent=obj; }
             else{
-              const span = document.createElement("span"); span.textContent = obj.text || "";
-              if (obj.title){ span.className = "ing-item"; span.title = obj.title; }
+              const span=document.createElement("span"); span.textContent=obj.text || "";
+              if (obj.title){ span.className="ing-item"; span.title=obj.title; }
               li.appendChild(span);
             }
             ul.appendChild(li);
@@ -682,15 +691,15 @@
       section("3. Tjek om vi har:", tjekArr.map(asLineObj));
 
       // Tekst til copy
-      const lines = [];
+      const lines=[];
       lines.push("1. Ugens madretter:");
       if (ugeLinjer.length){ ugeLinjer.forEach(l => lines.push("• " + l)); } else { lines.push("• -"); }
       lines.push("");
       lines.push("2. Indkøbsliste:");
-      if (indkoebArr.length){ indkoebArr.forEach(it => { const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
+      if (indkoebArr.length){ indkoebArr.forEach(it => { const qty=it.count>1 ? ` (${it.count===2 ? "x2" : "x"+it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
       lines.push("");
       lines.push("3. Tjek om vi har:");
-      if (tjekArr.length){ tjekArr.forEach(it => { const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
+      if (tjekArr.length){ tjekArr.forEach(it => { const qty=it.count>1 ? ` (${it.count===2 ? "x2" : "x"+it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
       lastClipboardText = lines.join("\n");
     }
 
@@ -698,7 +707,7 @@
       const txt = lastClipboardText || document.getElementById("indkoebsliste-result").innerText || "";
       try{ await navigator.clipboard.writeText(txt); alert("Indkøbsliste kopieret ✅"); }
       catch{
-        const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select();
+        const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
         try{ document.execCommand("copy"); alert("Indkøbsliste kopieret ✅"); }finally{ document.body.removeChild(ta); }
       }
     }
@@ -732,12 +741,12 @@
 
     // Hent retter og byg tabel + URL-opslag
     fetch(MADPLAN_CSV_URL).then(r=>r.text()).then(csv=>{
-      const result = Papa.parse(csv, { header:true });
-      allRows = (result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
-      nameToUrl = new Map();
+      const result=Papa.parse(csv, { header:true });
+      allRows=(result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
+      nameToUrl=new Map();
       allRows.forEach(r => {
-        const n = (getCol(r, COLS.navn) || "").trim();
-        const u = (getCol(r, COLS.url) || "").trim();
+        const n=(getCol(r, COLS.navn) || "").trim();
+        const u=(getCol(r, COLS.url) || "").trim();
         if (n && u) nameToUrl.set(n.toLowerCase(), u);
       });
       allRows.sort((a,b)=>(getCol(a, COLS.navn)||"").localeCompare(getCol(b, COLS.navn)||"","da",{sensitivity:"base"}));
@@ -748,26 +757,26 @@
     });
 
     async function doPrimaryAction(){
-      const status = statusEl(); status.textContent = "";
+      const status=statusEl(); status.textContent="";
       if (viewIdx === 0){
         buildLists();
-        const dates = nextWeekDatesFriThu();
-        const items = Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i) => ({
+        const dates=nextWeekDatesFriThu();
+        const items=Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i)=>({
           date: dates[i], ret: (row.dataset.ret || "").trim()
         }));
-        status.textContent = `— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
+        status.textContent=`— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
         await postToWebApp({ secret: WEBAPP_SECRET, action:"snapshot_plan", items });
-        status.textContent = `✓ Plan sendt (${rangeLabel(dates[0], dates[6])})`;
+        status.textContent=`✓ Plan sendt (${rangeLabel(dates[0], dates[6])})`;
       } else {
-        const dates = backWeekDates(viewIdx);
-        const items = dates.map((ds, i) => {
-          const inp = document.querySelectorAll("#week-rows .spist-input")[i];
+        const dates=backWeekDates(viewIdx);
+        const items=dates.map((ds, i) => {
+          const inp=document.querySelectorAll("#week-rows .spist-input")[i];
           return { date: ds, ret: (inp?.value||"").trim() };
         });
-        status.textContent = "Gemmer…";
+        status.textContent="Gemmer…";
         await postToWebApp({ secret: WEBAPP_SECRET, action:"save_spist", items });
         items.forEach(it => updateSpistLocal(it.date, it.ret));
-        status.textContent = "✓ Gemt";
+        status.textContent="✓ Gemt";
       }
     }
   </script>
