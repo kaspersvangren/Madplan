@@ -58,6 +58,11 @@
     .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
     .clear{ width:22px; height:22px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; flex-shrink:0; }
 
+    /* Repeat UI (minimal styling) */
+    .repeat-wrap{ display:flex; align-items:center; gap:.35rem; }
+    .repeat-wrap input{ width:16px; height:16px; }
+    .repeat-label{ font-size:.85rem; color:#6b584d; user-select:none; }
+
     .spist-input{
       flex:1 1 0%; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem;
       min-width:0;
@@ -111,7 +116,6 @@
     #indkoebsliste-result .section-title{ font-weight:700; margin-top:.35rem; }
     #indkoebsliste-result ul{ margin:.25rem 0 .5rem 1.2rem; padding:0; }
     #indkoebsliste-result li{ margin: .15rem 0; }
-    /* hover-indikation på ingredienser */
     #indkoebsliste-result .ing-item{ cursor:help; }
 
     /* v2.9 — Mobil: vis KUN ugeboksen (read-only) */
@@ -134,7 +138,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.4</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.5</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -381,18 +385,43 @@
         btnEl().disabled = false;
 
         dates.forEach((ds, i) => {
-          const row = document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan";
+          const row = document.createElement("div");
+          row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan"; row.dataset.repeat="0";
+
           const label = document.createElement("div"); label.className="label"; label.textContent = labelDdMm(ds, i);
+
           const chip  = document.createElement("div"); chip.className="ret-chip";
           chip.appendChild(makeNameNode(""));
-          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => setPlanValue(row,""));
-          row.appendChild(label); row.appendChild(chip); row.appendChild(clear);
+
+          const repeatWrap = document.createElement("label");
+          repeatWrap.className = "repeat-wrap";
+          const repeatCb = document.createElement("input");
+          repeatCb.type = "checkbox"; repeatCb.className = "repeat-cb";
+          repeatCb.title = "Gentag forrige ret (tæller ikke indkøb)";
+          repeatCb.addEventListener("change", () => {
+            row.dataset.repeat = repeatCb.checked ? "1" : "0";
+            syncRepeatRows();
+          });
+          const repeatLbl = document.createElement("span");
+          repeatLbl.className = "repeat-label";
+          repeatLbl.textContent = "Gentag";
+          repeatWrap.appendChild(repeatCb);
+          repeatWrap.appendChild(repeatLbl);
+
+          const clear = document.createElement("button"); clear.className="clear"; clear.textContent="×";
+          clear.addEventListener("click", () => { setPlanValue(row,""); row.dataset.repeat="0"; const cb=row.querySelector('.repeat-cb'); if(cb) cb.checked=false; syncRepeatRows(); });
+
+          row.appendChild(label); row.appendChild(chip); row.appendChild(repeatWrap); row.appendChild(clear);
           setupDnDRow(row);
           rows.appendChild(row);
 
+          // Prefill fra historik
           const h = historikMap.get(ds); const v = h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
+
+        // Efter opbygning: sync repeat-tilstande (enable/disable + evt. auto-udfyld)
+        syncRepeatRows();
 
       } else {
         hintEl().textContent = "Tilbageblik · Ret hvad der blev spist";
@@ -416,6 +445,35 @@
       }
     }
 
+    // Hold repeat-UI i sync og auto-udfyld navne hvor valgt
+    function syncRepeatRows(){
+      const rows = Array.from(document.querySelectorAll('#week-rows .drop-row[data-type="plan"]'));
+      rows.forEach((row, i) => {
+        const cb = row.querySelector('.repeat-cb');
+        if (!cb) return;
+        const prev = rows[i-1];
+        const prevName = i>0 ? ((prev?.dataset.ret)||"").trim() : "";
+        const hasPrev = !!prevName;
+
+        cb.disabled = !hasPrev;
+        if (!hasPrev){
+          // ingen forrige ret — kan ikke gentage
+          cb.checked = false;
+          row.dataset.repeat = "0";
+        }
+
+        if (cb.checked && hasPrev){
+          // udfyld navnet med forrige dags ret (registreres i arket som samme ret)
+          if ((row.dataset.ret||"") !== prevName){
+            setPlanValue(row, prevName);
+          } else {
+            // opdater visningen (link mm.) hvis samme navn
+            renderChipName(row, prevName);
+          }
+        }
+      });
+    }
+
     // DnD
     let dragSource = null;
     function setupDnDRow(rowEl, inputEl){
@@ -428,6 +486,8 @@
 
         if (rowEl.dataset.type === "plan"){
           setPlanValue(rowEl, navn);
+          // slå repeat fra ved manuel indsætning
+          rowEl.dataset.repeat="0"; const cb=rowEl.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
         } else {
           if (inputEl) inputEl.value = navn;
           updateSpistLocal(rowEl.dataset.date, navn);
@@ -436,12 +496,14 @@
           const srcType = dragSource.dataset.type;
           if (srcType === "plan"){
             setPlanValue(dragSource, "");
+            dragSource.dataset.repeat="0"; const cb=dragSource.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
           } else {
             const inp = dragSource.querySelector(".spist-input");
             if (inp){ inp.value = ""; updateSpistLocal(dragSource.dataset.date, ""); }
           }
         }
         dragSource = null;
+        syncRepeatRows();
       });
 
       rowEl.setAttribute("draggable","true");
@@ -470,6 +532,8 @@
       rec.plan_nu = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
+      // når et navn ændres, kan det påvirke downstream repeat
+      if (rowEl.dataset.type === "plan") syncRepeatRows();
     }
 
     function updateSpistLocal(ds, navn){
@@ -561,7 +625,6 @@
 
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
-    // v2.9.4: bygger semantisk UL/LI og genererer også ren tekst med \n
     function buildLists(){
       const dates = nextWeekDatesFriThu();
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
@@ -571,8 +634,9 @@
       }).filter(Boolean);
 
       // Find underliggende rækker for valgte retter
-      const brugte = ugeValg.map(v => ({
+      const brugte = ugeValg.map((v, i) => ({
         v,
+        rowEl: rows[i],
         row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn)
       })).filter(x => x.row);
 
@@ -587,12 +651,13 @@
         if (recipeName) entry.recipes.add(recipeName);
         tjekMap.set(key, entry);
       };
-      brugte.forEach(({v, row}) => {
+      brugte.forEach(({v, row, rowEl}) => {
+        if (rowEl.dataset.repeat === "1") return; // IGNORER gentagelser i optælling
         const tjek = (getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
         tjek.forEach(item => pushTjek(item, v.navn));
       });
 
-      // INDKØB (ekskluder "tjek")
+      // INDKØB (ekskluder "tjek", og ignorer gentagelser)
       const indkoebMap = new Map();
       const tjekKeySet = new Set(Array.from(tjekMap.keys()));
       const pushKoeb = (rawName, recipeName) => {
@@ -605,7 +670,8 @@
         if (recipeName) entry.recipes.add(recipeName);
         indkoebMap.set(key, entry);
       };
-      brugte.forEach(({v, row}) => {
+      brugte.forEach(({v, row, rowEl}) => {
+        if (rowEl.dataset.repeat === "1") return; // IGNORER gentagelser i optælling
         const koeb = (getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
         koeb.forEach(item => pushKoeb(item, v.navn));
       });
@@ -621,7 +687,7 @@
       const container = document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
-      function section(title, lines, makeTitleTooltip){
+      function section(title, lines){
         const titleDiv = document.createElement("div");
         titleDiv.className = "section-title";
         titleDiv.textContent = title;
@@ -637,7 +703,6 @@
             if (typeof obj === "string"){
               li.textContent = obj;
             } else {
-              // { text, title? }
               const span = document.createElement("span");
               span.textContent = obj.text || "";
               if (obj.title){ span.className = "ing-item"; span.title = obj.title; }
@@ -692,7 +757,6 @@
     }
 
     async function copyList(){
-      // Brug den eksplicit genererede tekst, fallback til innerText
       const txt = lastClipboardText || document.getElementById("indkoebsliste-result").innerText || "";
       try{
         await navigator.clipboard.writeText(txt);
@@ -750,7 +814,6 @@
       document.getElementById("filter-vegetar-only")?.addEventListener("change", visFiltreredeRetter);
     });
 
-    // doPrimaryAction uændret logik; bruger buildLists() til at opdatere visningen ved planlægning
     async function doPrimaryAction(){
       const status = statusEl(); status.textContent = "";
       if (viewIdx === 0){
