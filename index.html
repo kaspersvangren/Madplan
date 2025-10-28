@@ -46,21 +46,41 @@
       border:1px dashed #d8cfc6; border-radius:10px;
       padding:.45rem .5rem; margin:.45rem 0; min-height:2.2rem; background:#fff;
       display:flex; align-items:center; gap:.35rem; overflow:hidden;
+      flex-wrap:nowrap;
     }
     .drop-row.dragover{ background-color:#f1fbf6; border-color:#7ed9ac; }
-    .drop-row .label{ min-width:90px; text-align:right; font-weight:600; color:#5b463a; }
+    .drop-row .label{
+      min-width:88px;
+      text-align:right;
+      font-weight:600;
+      color:#5b463a;
+      white-space:nowrap;
+      flex:0 0 auto;
+    }
     .drop-row .label .wd{ font-weight:600; }
-    .drop-row .label .dt{ font-size:.85em; color:var(--c-muted); }
+    .drop-row .label .dt{ font-size:.8em; color:var(--c-muted); }
 
-    .ret-chip{ flex:1 1 auto; display:flex; align-items:center; justify-content:space-between; gap:.45rem; min-width:0; }
+    .ret-chip{
+      flex:1 1 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:.45rem;
+      min-width:0;
+    }
     .ret-chip .name, .ret-chip .name-link{
-      flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+      flex:1;
+      font-weight:600;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      min-width:0;
     }
     .ret-chip .name-link{ color:#1b5e8a; text-decoration:none; }
     .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
 
     /* Repeat: ikon i stedet for tekstlabel */
-    .repeat-wrap{ display:flex; align-items:center; }
+    .repeat-wrap{ display:flex; align-items:center; flex:0 0 auto; }
     .repeat-wrap input{ width:16px; height:16px; }
     .repeat-label{ display:none; }
     .repeat-wrap::after{
@@ -68,7 +88,12 @@
       font-size:1rem; line-height:1; margin-left:.1rem; opacity:.85;
     }
 
-    .clear{ width:20px; height:20px; border-radius:999px; border:1px solid #c9bdb2; background:#fffaf5; cursor:pointer; flex-shrink:0; }
+    .clear{
+      width:20px; height:20px;
+      border-radius:999px; border:1px solid #c9bdb2;
+      background:#fffaf5; cursor:pointer;
+      flex-shrink:0; flex:0 0 auto;
+    }
 
     .spist-input{
       flex:1 1 0%; padding:.45rem .6rem; border:1px solid #e0d7cf; border-radius:8px; font-size:.95rem;
@@ -138,26 +163,11 @@
       #print-panel{ border:none; box-shadow:none; }
       #indkoebsliste-result{ white-space:pre-wrap; font-size:12pt; }
     }
-
-    /* === PATCH: tving dag/dato til én linje og hold kontroller kompakte === */
-    .drop-row{ flex-wrap:nowrap; }
-    .drop-row .label{
-      min-width:88px;
-      white-space:nowrap;
-      flex:0 0 auto;
-    }
-    .repeat-wrap, .clear{ flex:0 0 auto; }
-    .ret-chip{ flex:1 1 auto; min-width:0; }
-    .ret-chip .name, .ret-chip .name-link{
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
-    .drop-row .label .dt{ font-size:.8em; color:var(--c-muted); }
-    /* === /PATCH === */
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.6</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.7</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -252,7 +262,6 @@
     const MADPLAN_CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Madplan`;
 
     /* ========= Dato-format (DK) ========= */
-    const WD_SHORT = ["søn","man","tir","ons","tor","fre","lør"];
     const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
     function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
     function ddmm(d){ const dt=(d instanceof Date)? d : new Date(d); return String(dt.getDate()).padStart(2,"0")+"."+String(dt.getMonth()+1).padStart(2,"0"); }
@@ -272,25 +281,41 @@
     function nextWeekDatesFriThu(){
       const start=nextFridayDate(new Date()); const arr=[]; for(let i=0;i<7;i++){ const d=new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); arr.push(isoLocal(d)); } return arr;
     }
-    function backWeekDates(i){ const nf=nextFridayDate(new Date()); const start=new Date(nf.getFullYear(), nf.getMonth(), nf.getDate()-i*7); const arr=[]; for(let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); } return arr; }
+    function backWeekDates(i){
+      const nf=nextFridayDate(new Date());
+      const start=new Date(nf.getFullYear(), nf.getMonth(), nf.getDate()-i*7);
+      const arr=[]; for(let d=0; d<7; d++){ const dt=new Date(start.getFullYear(), start.getMonth(), start.getDate()+d); arr.push(isoLocal(dt)); }
+      return arr;
+    }
 
     /* ========= Mobilheuristik ========= */
     const MOBILE_VIEWER = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 800px)").matches || (new URLSearchParams(location.search).get("viewer")==="1");
     function hasPlansNextWeek(){
       const dates = nextWeekDatesFriThu();
-      for (const ds of dates){ const rec = historikMap.get(ds); if (rec && (rec.plan_nu||"").toString().trim().length>0){ return true; } }
+      for (const ds of dates){
+        const rec = historikMap.get(ds);
+        if (rec && (rec.plan_nu||"").toString().trim().length>0){ return true; }
+      }
       return false;
     }
 
     /* ========= WebApp POST ========= */
     async function postToWebApp(payload){
-      try{ await fetch(WEBAPP_URL, { method:"POST", body: JSON.stringify(payload), mode:"no-cors", cache:"no-store" }); }
-      catch(err){ console.warn("WebApp POST fejl:", err); }
+      try{
+        await fetch(WEBAPP_URL, {
+          method:"POST",
+          body: JSON.stringify(payload),
+          mode:"no-cors",
+          cache:"no-store"
+        });
+      }catch(err){
+        console.warn("WebApp POST fejl:", err);
+      }
     }
 
     /* ========= Historik ========= */
-    let historikMap = new Map();
-    let lastEatenByName = new Map();
+    let historikMap = new Map(); // dato -> { ugedag, plan_nu, spist }
+    let lastEatenByName = new Map(); // lower(name) -> seneste ISO-dato
 
     async function loadHistorik(){
       const text = await fetch(HISTORIK_CSV_URL, { cache:"no-store" }).then(r => r.text());
@@ -311,7 +336,8 @@
       lastEatenByName = new Map();
       const setIfNewer = (name, date) => {
         const key=(name||"").trim().toLowerCase(); if(!key) return;
-        const cur=lastEatenByName.get(key); if(!cur || date>cur) lastEatenByName.set(key,date);
+        const cur=lastEatenByName.get(key);
+        if(!cur || date>cur) lastEatenByName.set(key,date);
       };
       historikMap.forEach((rec, ds) => {
         const consumed=(rec.spist||"").trim();
@@ -370,13 +396,24 @@
 
         hintEl().textContent = "Visning (mobil)";
         dates.forEach((ds, i) => {
-          const row=document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="readonly";
-          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
-          const chip=document.createElement("div"); chip.className="ret-chip";
+          const row=document.createElement("div");
+          row.className="drop-row";
+          row.dataset.date=ds;
+          row.dataset.type="readonly";
+
+          const label=document.createElement("div");
+          label.className="label";
+          setRowLabel(label, ds, i);
+
+          const chip=document.createElement("div");
+          chip.className="ret-chip";
+
           const rec=historikMap.get(ds) || {};
           const name=(rec.spist || rec.plan_nu || "").toString().trim();
+
           chip.appendChild(makeNameNode(name || "—"));
-          row.appendChild(label); row.appendChild(chip);
+          row.appendChild(label);
+          row.appendChild(chip);
           rows.appendChild(row);
         });
         return;
@@ -392,17 +429,24 @@
 
         dates.forEach((ds, i) => {
           const row=document.createElement("div");
-          row.className="drop-row"; row.dataset.date=ds; row.dataset.type="plan"; row.dataset.repeat="0";
+          row.className="drop-row";
+          row.dataset.date=ds;
+          row.dataset.type="plan";
+          row.dataset.repeat="0";
 
-          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
+          const label=document.createElement("div");
+          label.className="label";
+          setRowLabel(label, ds, i);
 
-          const chip=document.createElement("div"); chip.className="ret-chip";
+          const chip=document.createElement("div");
+          chip.className="ret-chip";
           chip.appendChild(makeNameNode(""));
 
           const repeatWrap=document.createElement("label");
           repeatWrap.className="repeat-wrap";
           const repeatCb=document.createElement("input");
-          repeatCb.type="checkbox"; repeatCb.className="repeat-cb";
+          repeatCb.type="checkbox";
+          repeatCb.className="repeat-cb";
           repeatCb.title="Gentag forrige ret (tæller ikke indkøb)";
           repeatCb.addEventListener("change", () => {
             row.dataset.repeat = repeatCb.checked ? "1" : "0";
@@ -414,14 +458,27 @@
           repeatWrap.appendChild(repeatCb);
           repeatWrap.appendChild(repeatLbl);
 
-          const clear=document.createElement("button"); clear.className="clear"; clear.textContent="×";
-          clear.addEventListener("click", () => { setPlanValue(row,""); row.dataset.repeat="0"; const cb=row.querySelector('.repeat-cb'); if(cb) cb.checked=false; syncRepeatRows(); });
+          const clear=document.createElement("button");
+          clear.className="clear";
+          clear.textContent="×";
+          clear.addEventListener("click", () => {
+            setPlanValue(row,"");
+            row.dataset.repeat="0";
+            const cb=row.querySelector('.repeat-cb');
+            if(cb) cb.checked=false;
+            syncRepeatRows();
+          });
 
-          row.appendChild(label); row.appendChild(chip); row.appendChild(repeatWrap); row.appendChild(clear);
+          row.appendChild(label);
+          row.appendChild(chip);
+          row.appendChild(repeatWrap);
+          row.appendChild(clear);
+
           setupDnDRow(row);
           rows.appendChild(row);
 
-          const h=historikMap.get(ds); const v=h && (h.plan_nu||"").trim();
+          const h=historikMap.get(ds);
+          const v=h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
 
@@ -433,11 +490,32 @@
         btnEl().disabled = false;
 
         dates.forEach((ds, i) => {
-          const row=document.createElement("div"); row.className="drop-row"; row.dataset.date=ds; row.dataset.type="spist";
-          const label=document.createElement("div"); label.className="label"; setRowLabel(label, ds, i);
-          const input=document.createElement("input"); input.type="text"; input.className="spist-input"; input.placeholder="Ret-navn";
-          const clear=document.createElement("button"); clear.className="clear"; clear.textContent="×"; clear.addEventListener("click", () => { input.value=""; updateSpistLocal(ds, ""); });
-          row.appendChild(label); row.appendChild(input); row.appendChild(clear);
+          const row=document.createElement("div");
+          row.className="drop-row";
+          row.dataset.date=ds;
+          row.dataset.type="spist";
+
+          const label=document.createElement("div");
+          label.className="label";
+          setRowLabel(label, ds, i);
+
+          const input=document.createElement("input");
+          input.type="text";
+          input.className="spist-input";
+          input.placeholder="Ret-navn";
+
+          const clear=document.createElement("button");
+          clear.className="clear";
+          clear.textContent="×";
+          clear.addEventListener("click", () => {
+            input.value="";
+            updateSpistLocal(ds, "");
+          });
+
+          row.appendChild(label);
+          row.appendChild(input);
+          row.appendChild(clear);
+
           setupDnDRow(row, input);
           rows.appendChild(row);
 
@@ -460,7 +538,10 @@
         const hasPrev=!!prevName;
 
         cb.disabled = !hasPrev;
-        if (!hasPrev){ cb.checked=false; row.dataset.repeat="0"; }
+        if (!hasPrev){
+          cb.checked=false;
+          row.dataset.repeat="0";
+        }
 
         if (cb.checked && hasPrev){
           if ((row.dataset.ret||"") !== prevName){
@@ -475,28 +556,40 @@
     /* ========= DnD ========= */
     let dragSource = null;
     function setupDnDRow(rowEl, inputEl){
-      rowEl.addEventListener("dragover", e => { e.preventDefault(); rowEl.classList.add("dragover"); });
+      rowEl.addEventListener("dragover", e => {
+        e.preventDefault();
+        rowEl.classList.add("dragover");
+      });
       rowEl.addEventListener("dragleave", () => rowEl.classList.remove("dragover"));
       rowEl.addEventListener("drop", e => {
-        e.preventDefault(); rowEl.classList.remove("dragover");
+        e.preventDefault();
+        rowEl.classList.remove("dragover");
         const navn=e.dataTransfer.getData("application/x-ret-navn") || "";
         if (!navn) return;
 
         if (rowEl.dataset.type === "plan"){
           setPlanValue(rowEl, navn);
-          rowEl.dataset.repeat="0"; const cb=rowEl.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
+          rowEl.dataset.repeat="0";
+          const cb=rowEl.querySelector('.repeat-cb');
+          if(cb){ cb.checked=false; }
         } else {
           if (inputEl) inputEl.value = navn;
           updateSpistLocal(rowEl.dataset.date, navn);
         }
+
         if (dragSource && dragSource !== rowEl){
           const srcType=dragSource.dataset.type;
           if (srcType === "plan"){
             setPlanValue(dragSource, "");
-            dragSource.dataset.repeat="0"; const cb=dragSource.querySelector('.repeat-cb'); if(cb){ cb.checked=false; }
+            dragSource.dataset.repeat="0";
+            const cb=dragSource.querySelector('.repeat-cb');
+            if(cb){ cb.checked=false; }
           } else {
             const inp=dragSource.querySelector(".spist-input");
-            if (inp){ inp.value = ""; updateSpistLocal(dragSource.dataset.date, ""); }
+            if (inp){
+              inp.value = "";
+              updateSpistLocal(dragSource.dataset.date, "");
+            }
           }
         }
         dragSource = null;
@@ -517,7 +610,10 @@
       const chip=rowEl.querySelector(".ret-chip");
       if (!chip) return;
       chip.innerHTML="";
-      if (!navn){ chip.appendChild(makeNameNode("")); return; }
+      if (!navn){
+        chip.appendChild(makeNameNode(""));
+        return;
+      }
       chip.appendChild(makeNameNode(navn));
     }
 
@@ -564,21 +660,29 @@
         if (!passesVegetarian(row)) return;
 
         const name=(getCol(row, COLS.navn) || "").trim();
-        const tr=document.createElement("tr"); tr.setAttribute("data-name", name.toLowerCase());
+        const tr=document.createElement("tr");
+        tr.setAttribute("data-name", name.toLowerCase());
         const last=lastEatenByName.get(name.toLowerCase());
         tr.title = last ? `Sidst spist: ${last}` : "Sidst spist: –";
 
         const navnTd=document.createElement("td");
-        const navnDiv=document.createElement("div"); navnDiv.className="navn-cell"; navnDiv.textContent=name;
-        navnTd.appendChild(navnDiv); tr.appendChild(navnTd);
+        const navnDiv=document.createElement("div");
+        navnDiv.className="navn-cell";
+        navnDiv.textContent=name;
+        navnTd.appendChild(navnDiv);
+        tr.appendChild(navnTd);
 
         const displayCols=[ { cols: COLS.vegetar }, { cols: COLS.toDage }, { cols: COLS.nem }, { cols: COLS.agnes } ];
         displayCols.forEach(dc => {
-          const td=document.createElement("td"); td.textContent = hasX(row, dc.cols) ? "✔" : ""; tr.appendChild(td);
+          const td=document.createElement("td");
+          td.textContent = hasX(row, dc.cols) ? "✔" : "";
+          tr.appendChild(td);
         });
 
         tr.setAttribute("draggable","true");
-        tr.addEventListener("dragstart", e => { e.dataTransfer.setData("application/x-ret-navn", name); });
+        tr.addEventListener("dragstart", e => {
+          e.dataTransfer.setData("application/x-ret-navn", name);
+        });
 
         tableBody.appendChild(tr);
       });
@@ -586,7 +690,11 @@
     }
 
     function passesPractical(row){
-      const rules=[ { group:"agnes", cols: COLS.agnes }, { group:"to-dage", cols: COLS.toDage }, { group:"nem", cols: COLS.nem } ];
+      const rules=[
+        { group:"agnes", cols: COLS.agnes },
+        { group:"to-dage", cols: COLS.toDage },
+        { group:"nem", cols: COLS.nem },
+      ];
       for (const r of rules){
         const mode=getMode(r.group);
         if (mode==="include" && !hasX(row, r.cols)) return false;
@@ -594,84 +702,270 @@
       }
       return true;
     }
-    function getMode(group){ const el=document.querySelector(`input[name="${group}-mode"]:checked`); return el? el.value : "ignore"; }
-    function passesVegetarian(row){ const vegOnly=document.getElementById("filter-vegetar-only")?.checked; return !vegOnly || hasX(row, ["Vegetar"]); }
+    function getMode(group){
+      const el=document.querySelector(`input[name="${group}-mode"]:checked`);
+      return el? el.value : "ignore";
+    }
+    function passesVegetarian(row){
+      const vegOnly=document.getElementById("filter-vegetar-only")?.checked;
+      return !vegOnly || hasX(row, ["Vegetar"]);
+    }
     function updateFilterLabelStyles(){
       const sets=[["agnes","rowlabel-agnes"],["to-dage","rowlabel-to-dage"],["nem","rowlabel-nem"]];
       sets.forEach(([g,id]) => {
         const m=getMode(g), el=document.getElementById(id);
-        if(!el) return; el.style.color = (m==="include")?"#2e7d5b":(m==="exclude"?"#b84a4a":"var(--ink)");
+        if(!el) return;
+        el.style.color = (m==="include")?"#2e7d5b":(m==="exclude"?"#b84a4a":"var(--ink)");
       });
-      const vegEl=document.getElementById("filter-vegetar-only"); const vegLabel=document.getElementById("label-vegetar");
-      if (vegEl && vegLabel) vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
+      const vegEl=document.getElementById("filter-vegetar-only");
+      const vegLabel=document.getElementById("label-vegetar");
+      if (vegEl && vegLabel){
+        vegLabel.style.opacity = vegEl.checked ? "1" : "0.8";
+      }
     }
 
     /* ========= Indkøbsliste ========= */
+
+    // Hjælp: parse "Navn (tal enhed)" -> {base, qty, unit}
+    // Eksempler:
+    // "Oksekød (500 g)"          -> { base:"Oksekød", qty:500, unit:"g" }
+    // "Hakkede tomater (1 dåse)" -> { base:"Hakkede tomater", qty:1,   unit:"dåse" }
+    // "Løg"                      -> { base:"Løg", qty:null, unit:null }
+    function parseIngredientString(raw){
+      const str = raw.trim();
+      if (!str) return null;
+
+      // match: alt før parentes  / tal (komma el. punktum) / resten som enhed
+      const m = str.match(/^(.+?)\s*\(\s*([\d.,]+)\s*([^)]+?)\s*\)$/);
+      if (!m){
+        return {
+          base: str,
+          qty: null,
+          unit: null
+        };
+      }
+      const base = m[1].trim();
+      // parse tal som float (både "," og ".")
+      const numStr = m[2].trim().replace(",", ".");
+      const qty = parseFloat(numStr);
+      const unit = m[3].trim(); // fx "g", "dl", "dåse", "stk.", "pose"
+      if (isNaN(qty)){
+        // fallback hvis tallet ikke kunne parses
+        return {
+          base: str,
+          qty: null,
+          unit: null
+        };
+      }
+      return { base, qty, unit };
+    }
+
+    // Pluraliser enhed efter dine regler.
+    // qty kan være fx 2, 3, 1000.
+    // "g","ml","dl","kg","l" -> uændret
+    // stk / stk. / styk -> "stk."
+    // andre: "dåse" -> "dåser"; "pose" -> "poser"; "pakke" -> "pakker"
+    function formatUnit(unitRaw, qty){
+      if (qty === null || unitRaw === null) return ""; // ingen enhed
+      const u = unitRaw.toLowerCase().trim();
+
+      // mængdeenheder der ikke bøjes
+      const noPluralSet = new Set(["g","gram","ml","dl","kg","l","liter","l.","cl","pc","pct","procent"]);
+      if (noPluralSet.has(u)) return unitRaw; // behold original
+
+      // stk-varianter
+      const stkSet = new Set(["stk","stk.","styk","stykke","stykker"]);
+      if (stkSet.has(u)){
+        return "stk.";
+      }
+
+      // hvis qty er 1 -> brug ental uændret
+      if (qty === 1) return unitRaw;
+
+      // default plural: tilføj "r" (dåse -> dåser, pakke -> pakker, pose -> poser)
+      // enkel heuristik:
+      if (unitRaw.endsWith("se")) return unitRaw + "r";        // dåse -> dåser, pose -> poser
+      if (unitRaw.endsWith("ke")) return unitRaw + "r";        // pakke -> pakker
+      if (unitRaw.endsWith("e"))  return unitRaw + "r";        // "dåse" dækket ovenfor, men safe
+      return unitRaw + "r";
+    }
+
+    // Opbyg tekst til visning i listen.
+    // - Hvis qty !== null: "Oksekød (1000 g)"
+    // - Hvis qty === null og count > 1: "Løg (x2)"
+    // - Hvis qty === null og count === 1: "Løg"
+    function buildDisplayLine(entry){
+      // entry = {
+      //   baseName: "Oksekød",
+      //   totalQty: 1000 or null,
+      //   unit: "g" or null,
+      //   countNoQty: 2 (kun brugt når totalQty==null),
+      //   recipes: Set([...])
+      // }
+
+      if (entry.totalQty !== null && entry.unit){
+        const shownQty = entry.totalQty % 1 === 0
+          ? String(entry.totalQty)            // 2 -> "2"
+          : String(entry.totalQty).replace(".", ","); // 1.5 -> "1,5"
+        const shownUnit = formatUnit(entry.unit, entry.totalQty);
+        return `${entry.baseName} (${shownQty} ${shownUnit})`;
+      }
+
+      // Ingen mængder angivet -> brug tælling
+      if (entry.countNoQty > 1){
+        return `${entry.baseName} (x${entry.countNoQty})`;
+      }
+      return entry.baseName;
+    }
+
+    // Vi bruger to Maps:
+    // indkoebAgg[key], tjekAgg[key]
+    // key er baseName + '|' + unit (unit kan være null) for at holde fx "Oksekød (500 g)" og "Oksekød (1 pakke)" adskilt.
+    function ensureAgg(map, baseName, unit){
+      const key = baseName.toLowerCase()+"|"+(unit||"");
+      if (!map.has(key)){
+        map.set(key, {
+          baseName,
+          totalQty: null,     // sum af tal for den enhed (hvis der er en)
+          unit: unit,         // "g", "dåse", osv.
+          countNoQty: 0,      // antal gange uden mængde
+          recipes: new Set()
+        });
+      }
+      return map.get(key);
+    }
+
     let lastClipboardText = "";
+
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
     function buildLists(){
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
       const ugeValg = rows.map((row,i) => {
         const navn=(row.dataset.ret || "").trim();
-        return navn ? { dag: WD_PLAN[i], navn } : null;
+        return navn ? { dag: WD_PLAN[i], navn, rowEl: row } : null;
       }).filter(Boolean);
 
-      const brugte = ugeValg.map((v, i) => ({
-        v,
-        rowEl: rows[i],
-        row: allRows.find(r => (getCol(r, COLS.navn)||"").trim()===v.navn)
-      })).filter(x => x.row);
+      // tilknyt også rå data fra allRows (koeb/tjek)
+      const brugte = ugeValg.map((info) => {
+        const r = allRows.find(rr => (getCol(rr, COLS.navn)||"").trim()===info.navn);
+        return r ? { ...info, rowData:r } : null;
+      }).filter(Boolean);
 
-      // TJEK
-      const tjekMap = new Map();
-      const pushTjek = (rawName, recipeName) => {
-        const clean=rawName.trim(); if (!clean) return;
-        const key=clean.toLowerCase();
-        const entry=tjekMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
-        entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
-        tjekMap.set(key, entry);
-      };
-      brugte.forEach(({v, row, rowEl}) => {
-        if (rowEl.dataset.repeat === "1") return;
-        const tjek=(getCol(row, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
-        tjek.forEach(item => pushTjek(item, v.navn));
+      // Agg maps
+      const tjekAgg = new Map();
+      const indkoebAgg = new Map();
+
+      // helper til at tilføje ingrediens til map
+      function pushItemToMap(map, rawItem, recipeName, skip){
+        if (!rawItem) return;
+        if (skip) return; // bruges til at ignorere repeat
+
+        const parsed = parseIngredientString(rawItem);
+        if (!parsed) return;
+        const { base, qty, unit } = parsed;
+
+        // opret/aggreger
+        const agg = ensureAgg(map, capFirst(base), unit ? unit : null);
+
+        if (qty !== null && unit){
+          // mængde-baseret
+          if (agg.totalQty === null){
+            agg.totalQty = qty;
+          } else {
+            agg.totalQty += qty;
+          }
+        } else {
+          // uden mængde
+          agg.countNoQty += 1;
+        }
+
+        if (recipeName){
+          agg.recipes.add(recipeName);
+        }
+      }
+
+      // udfyld tjekAgg og indkoebAgg
+      brugte.forEach(({navn, rowData, rowEl}) => {
+        const isRepeat = rowEl.dataset.repeat === "1";
+
+        // tjek-liste
+        const tjekList = (getCol(rowData, COLS.tjek)||"")
+          .split(",")
+          .map(s=>s.trim())
+          .filter(Boolean);
+        tjekList.forEach(item => {
+          pushItemToMap(tjekAgg, item, navn, isRepeat);
+        });
+
+        // købsliste
+        const koebList = (getCol(rowData, COLS.koeb)||"")
+          .split(",")
+          .map(s=>s.trim())
+          .filter(Boolean);
+        koebList.forEach(item => {
+          pushItemToMap(indkoebAgg, item, navn, isRepeat);
+        });
       });
 
-      // INDKØB
-      const indkoebMap = new Map();
-      const tjekKeySet = new Set(Array.from(tjekMap.keys()));
-      const pushKoeb = (rawName, recipeName) => {
-        const clean=rawName.trim(); if (!clean) return;
-        const key=clean.toLowerCase(); if (tjekKeySet.has(key)) return;
-        const entry=indkoebMap.get(key) || { name: capFirst(clean), count: 0, recipes: new Set() };
-        entry.count += 1; if (recipeName) entry.recipes.add(recipeName);
-        indkoebMap.set(key, entry);
-      };
-      brugte.forEach(({v, row, rowEl}) => {
-        if (rowEl.dataset.repeat === "1") return;
-        const koeb=(getCol(row, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
-        koeb.forEach(item => pushKoeb(item, v.navn));
-      });
+      // Når vi laver indkøbslisten, skal varer der allerede ligger i "tjek" ikke gentages i "køb"
+      // (den logik havde du allerede). Vi bruger nu den aggregerede struktur.
+      // Vi fjerner entries fra indkoebAgg som også findes i tjekAgg med samme baseName+unit key.
+      for (const [key,_val] of tjekAgg.entries()){
+        if (indkoebAgg.has(key)){
+          indkoebAgg.delete(key);
+        }
+      }
 
-      const indkoebArr = Array.from(indkoebMap.values()).sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
-      const tjekArr = Array.from(tjekMap.values()).sort((a,b)=>a.name.localeCompare(b.name, "da", {sensitivity:"base"}));
+      // Sorter alfabetisk efter varenavn (case-insensitiv dansk)
+      function sortAgg(map){
+        return Array.from(map.values()).sort((a,b)=>{
+          return a.baseName.localeCompare(b.baseName, "da", {sensitivity:"base"});
+        });
+      }
+
+      const indkoebArr = sortAgg(indkoebAgg);
+      const tjekArr    = sortAgg(tjekAgg);
+
+      // Lav ugeLinjer til "1. Ugens madretter:"
       const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
 
+      // Byg visningselementer (med tooltip "Til: ...")
+      function aggToLineObj(agg){
+        const text = buildDisplayLine(agg);
+        const who = agg.recipes.size ? "Til: " + Array.from(agg.recipes).join(", ") : "";
+        return { text, title: (who || null) };
+      }
+
+      const indkoebVis = indkoebArr.map(aggToLineObj);
+      const tjekVis    = tjekArr.map(aggToLineObj);
+
+      // --- Render HTML ---
       const container=document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
       function section(title, lines){
-        const titleDiv=document.createElement("div"); titleDiv.className="section-title"; titleDiv.textContent=title; container.appendChild(titleDiv);
+        const titleDiv=document.createElement("div");
+        titleDiv.className = "section-title";
+        titleDiv.textContent = title;
+        container.appendChild(titleDiv);
+
         const ul=document.createElement("ul");
-        if (!lines || !lines.length){ const li=document.createElement("li"); li.textContent="-"; ul.appendChild(li); }
-        else{
+        if (!lines || !lines.length){
+          const li=document.createElement("li"); li.textContent="-";
+          ul.appendChild(li);
+        } else {
           lines.forEach(obj => {
             const li=document.createElement("li");
-            if (typeof obj === "string"){ li.textContent=obj; }
-            else{
-              const span=document.createElement("span"); span.textContent=obj.text || "";
-              if (obj.title){ span.className="ing-item"; span.title=obj.title; }
+            if (typeof obj === "string"){
+              li.textContent = obj;
+            } else {
+              const span=document.createElement("span");
+              span.textContent = obj.text || "";
+              if (obj.title){
+                span.className = "ing-item";
+                span.title = obj.title;
+              }
               li.appendChild(span);
             }
             ul.appendChild(li);
@@ -680,38 +974,63 @@
         container.appendChild(ul);
       }
 
-      const asLineObj = (it) => {
-        const qty = it.count > 1 ? ` (${it.count === 2 ? "x2" : "x" + it.count})` : "";
-        const who = it.recipes.size ? "Til: " + Array.from(it.recipes).join(", ") : "";
-        return { text: `${it.name}${qty}`, title: (who || null) };
-      };
-
       section("1. Ugens madretter:", ugeLinjer);
-      section("2. Indkøbsliste:", indkoebArr.map(asLineObj));
-      section("3. Tjek om vi har:", tjekArr.map(asLineObj));
+      section("2. Indkøbsliste:", indkoebVis);
+      section("3. Tjek om vi har:", tjekVis);
 
-      // Tekst til copy
-      const lines=[];
+      // --- Tekst til clipboard ---
+      const lines = [];
       lines.push("1. Ugens madretter:");
-      if (ugeLinjer.length){ ugeLinjer.forEach(l => lines.push("• " + l)); } else { lines.push("• -"); }
+      if (ugeLinjer.length){
+        ugeLinjer.forEach(l => lines.push("• " + l));
+      } else {
+        lines.push("• -");
+      }
       lines.push("");
+
       lines.push("2. Indkøbsliste:");
-      if (indkoebArr.length){ indkoebArr.forEach(it => { const qty=it.count>1 ? ` (${it.count===2 ? "x2" : "x"+it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
+      if (indkoebVis.length){
+        indkoebVis.forEach(it => {
+          lines.push("• " + (it.text || ""));
+        });
+      } else {
+        lines.push("• -");
+      }
       lines.push("");
+
       lines.push("3. Tjek om vi har:");
-      if (tjekArr.length){ tjekArr.forEach(it => { const qty=it.count>1 ? ` (${it.count===2 ? "x2" : "x"+it.count})` : ""; lines.push("• " + it.name + qty); }); } else { lines.push("• -"); }
+      if (tjekVis.length){
+        tjekVis.forEach(it => {
+          lines.push("• " + (it.text || ""));
+        });
+      } else {
+        lines.push("• -");
+      }
+
       lastClipboardText = lines.join("\n");
     }
 
     async function copyList(){
       const txt = lastClipboardText || document.getElementById("indkoebsliste-result").innerText || "";
-      try{ await navigator.clipboard.writeText(txt); alert("Indkøbsliste kopieret ✅"); }
-      catch{
-        const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
-        try{ document.execCommand("copy"); alert("Indkøbsliste kopieret ✅"); }finally{ document.body.removeChild(ta); }
+      try{
+        await navigator.clipboard.writeText(txt);
+        alert("Indkøbsliste kopieret ✅");
+      }catch{
+        const ta=document.createElement("textarea");
+        ta.value=txt;
+        document.body.appendChild(ta);
+        ta.select();
+        try{
+          document.execCommand("copy");
+          alert("Indkøbsliste kopieret ✅");
+        }finally{
+          document.body.removeChild(ta);
+        }
       }
     }
-    function printList(){ window.print(); }
+    function printList(){
+      window.print();
+    }
 
     /* ========= Init ========= */
     document.addEventListener("DOMContentLoaded", async () => {
@@ -722,14 +1041,26 @@
 
       document.getElementById("view-prev").addEventListener("click", () => {
         const maxBack = 3;
-        if (viewIdx < maxBack){ viewIdx++; renderWeekPanel(); }
+        if (viewIdx < maxBack){
+          viewIdx++;
+          renderWeekPanel();
+        }
       });
+
       document.getElementById("view-next").addEventListener("click", () => {
         if (!MOBILE_VIEWER){
-          if (viewIdx > 0){ viewIdx--; renderWeekPanel(); }
+          if (viewIdx > 0){
+            viewIdx--;
+            renderWeekPanel();
+          }
         } else {
-          if (viewIdx > 1){ viewIdx--; renderWeekPanel(); }
-          else if (viewIdx === 1 && hasPlansNextWeek()){ viewIdx = 0; renderWeekPanel(); }
+          if (viewIdx > 1){
+            viewIdx--;
+            renderWeekPanel();
+          } else if (viewIdx === 1 && hasPlansNextWeek()){
+            viewIdx = 0;
+            renderWeekPanel();
+          }
         }
       });
 
@@ -743,13 +1074,17 @@
     fetch(MADPLAN_CSV_URL).then(r=>r.text()).then(csv=>{
       const result=Papa.parse(csv, { header:true });
       allRows=(result.data||[]).filter(r => ((getCol(r, COLS.navn)||"").trim().length>0));
+
+      // navn -> URL map
       nameToUrl=new Map();
       allRows.forEach(r => {
         const n=(getCol(r, COLS.navn) || "").trim();
         const u=(getCol(r, COLS.url) || "").trim();
         if (n && u) nameToUrl.set(n.toLowerCase(), u);
       });
+
       allRows.sort((a,b)=>(getCol(a, COLS.navn)||"").localeCompare(getCol(b, COLS.navn)||"","da",{sensitivity:"base"}));
+
       visFiltreredeRetter();
 
       document.querySelectorAll('.tri-grid input[type="radio"]').forEach(r => r.addEventListener("change", visFiltreredeRetter));
@@ -757,22 +1092,29 @@
     });
 
     async function doPrimaryAction(){
-      const status=statusEl(); status.textContent="";
+      const status=statusEl();
+      status.textContent = "";
       if (viewIdx === 0){
+        // Indkøbsliste for planlægning af næste uge
         buildLists();
+
         const dates=nextWeekDatesFriThu();
         const items=Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i)=>({
-          date: dates[i], ret: (row.dataset.ret || "").trim()
+          date: dates[i],
+          ret: (row.dataset.ret || "").trim()
         }));
+
         status.textContent=`— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
         await postToWebApp({ secret: WEBAPP_SECRET, action:"snapshot_plan", items });
         status.textContent=`✓ Plan sendt (${rangeLabel(dates[0], dates[6])})`;
       } else {
+        // Gem hvad der faktisk blev spist
         const dates=backWeekDates(viewIdx);
         const items=dates.map((ds, i) => {
           const inp=document.querySelectorAll("#week-rows .spist-input")[i];
           return { date: ds, ret: (inp?.value||"").trim() };
         });
+
         status.textContent="Gemmer…";
         await postToWebApp({ secret: WEBAPP_SECRET, action:"save_spist", items });
         items.forEach(it => updateSpistLocal(it.date, it.ret));
