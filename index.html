@@ -79,13 +79,14 @@
     .ret-chip .name-link{ color:#1b5e8a; text-decoration:none; }
     .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
 
-    /* Repeat: ikon i stedet for tekstlabel */
-    .repeat-wrap{ display:flex; align-items:center; flex:0 0 auto; }
-    .repeat-wrap input{ width:16px; height:16px; }
-    .repeat-label{ display:none; }
-    .repeat-wrap::after{
-      content:"↻";
-      font-size:1rem; line-height:1; margin-left:.1rem; opacity:.85;
+    /* Frost/Rest: ikon i stedet for gentag */
+    .frost-wrap{ display:flex; align-items:center; flex:0 0 auto; }
+    .frost-wrap input{ width:16px; height:16px; }
+    .frost-label{ display:none; }
+    .frost-wrap::after{
+      content:"❄";
+      font-size:1rem; line-height:1; margin-left:.12rem; opacity:.9;
+      title:"Frost/Rest – tæller ikke indkøb";
     }
 
     .clear{
@@ -167,7 +168,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.7</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.8</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -432,7 +433,7 @@
           row.className="drop-row";
           row.dataset.date=ds;
           row.dataset.type="plan";
-          row.dataset.repeat="0";
+          row.dataset.frost="0";
 
           const label=document.createElement("div");
           label.className="label";
@@ -442,36 +443,34 @@
           chip.className="ret-chip";
           chip.appendChild(makeNameNode(""));
 
-          const repeatWrap=document.createElement("label");
-          repeatWrap.className="repeat-wrap";
-          const repeatCb=document.createElement("input");
-          repeatCb.type="checkbox";
-          repeatCb.className="repeat-cb";
-          repeatCb.title="Gentag forrige ret (tæller ikke indkøb)";
-          repeatCb.addEventListener("change", () => {
-            row.dataset.repeat = repeatCb.checked ? "1" : "0";
-            syncRepeatRows();
+          const frostWrap=document.createElement("label");
+          frostWrap.className="frost-wrap";
+          const frostCb=document.createElement("input");
+          frostCb.type="checkbox";
+          frostCb.className="frost-cb";
+          frostCb.title="Frost/Rest – tæller ikke indkøb";
+          frostCb.addEventListener("change", () => {
+            row.dataset.frost = frostCb.checked ? "1" : "0";
           });
-          const repeatLbl=document.createElement("span");
-          repeatLbl.className="repeat-label";
-          repeatLbl.textContent="Gentag";
-          repeatWrap.appendChild(repeatCb);
-          repeatWrap.appendChild(repeatLbl);
+          const frostLbl=document.createElement("span");
+          frostLbl.className="frost-label";
+          frostLbl.textContent="Frost/Rest";
+          frostWrap.appendChild(frostCb);
+          frostWrap.appendChild(frostLbl);
 
           const clear=document.createElement("button");
           clear.className="clear";
           clear.textContent="×";
           clear.addEventListener("click", () => {
             setPlanValue(row,"");
-            row.dataset.repeat="0";
-            const cb=row.querySelector('.repeat-cb');
+            row.dataset.frost="0";
+            const cb=row.querySelector('.frost-cb');
             if(cb) cb.checked=false;
-            syncRepeatRows();
           });
 
           row.appendChild(label);
           row.appendChild(chip);
-          row.appendChild(repeatWrap);
+          row.appendChild(frostWrap);
           row.appendChild(clear);
 
           setupDnDRow(row);
@@ -481,8 +480,6 @@
           const v=h && (h.plan_nu||"").trim();
           if (v) setPlanValue(row, v);
         });
-
-        syncRepeatRows();
 
       } else {
         hintEl().textContent = "Tilbageblik · Ret hvad der blev spist";
@@ -527,32 +524,6 @@
       }
     }
 
-    /* ========= Repeat sync ========= */
-    function syncRepeatRows(){
-      const rows = Array.from(document.querySelectorAll('#week-rows .drop-row[data-type="plan"]'));
-      rows.forEach((row, i) => {
-        const cb=row.querySelector('.repeat-cb');
-        if (!cb) return;
-        const prev=rows[i-1];
-        const prevName=i>0 ? ((prev?.dataset.ret)||"").trim() : "";
-        const hasPrev=!!prevName;
-
-        cb.disabled = !hasPrev;
-        if (!hasPrev){
-          cb.checked=false;
-          row.dataset.repeat="0";
-        }
-
-        if (cb.checked && hasPrev){
-          if ((row.dataset.ret||"") !== prevName){
-            setPlanValue(row, prevName);
-          } else {
-            renderChipName(row, prevName);
-          }
-        }
-      });
-    }
-
     /* ========= DnD ========= */
     let dragSource = null;
     function setupDnDRow(rowEl, inputEl){
@@ -569,9 +540,7 @@
 
         if (rowEl.dataset.type === "plan"){
           setPlanValue(rowEl, navn);
-          rowEl.dataset.repeat="0";
-          const cb=rowEl.querySelector('.repeat-cb');
-          if(cb){ cb.checked=false; }
+          // bevar frost-flag som det er
         } else {
           if (inputEl) inputEl.value = navn;
           updateSpistLocal(rowEl.dataset.date, navn);
@@ -581,8 +550,9 @@
           const srcType=dragSource.dataset.type;
           if (srcType === "plan"){
             setPlanValue(dragSource, "");
-            dragSource.dataset.repeat="0";
-            const cb=dragSource.querySelector('.repeat-cb');
+            // nulstil frost på kilden
+            dragSource.dataset.frost="0";
+            const cb=dragSource.querySelector('.frost-cb');
             if(cb){ cb.checked=false; }
           } else {
             const inp=dragSource.querySelector(".spist-input");
@@ -593,7 +563,6 @@
           }
         }
         dragSource = null;
-        syncRepeatRows();
       });
 
       rowEl.setAttribute("draggable","true");
@@ -625,7 +594,6 @@
       rec.plan_nu = navn || "";
       historikMap.set(ds, rec);
       recomputeLastEaten();
-      if (rowEl.dataset.type === "plan") syncRepeatRows();
     }
 
     function updateSpistLocal(ds, navn){
@@ -727,108 +695,58 @@
     /* ========= Indkøbsliste ========= */
 
     // Hjælp: parse "Navn (tal enhed)" -> {base, qty, unit}
-    // Eksempler:
-    // "Oksekød (500 g)"          -> { base:"Oksekød", qty:500, unit:"g" }
-    // "Hakkede tomater (1 dåse)" -> { base:"Hakkede tomater", qty:1,   unit:"dåse" }
-    // "Løg"                      -> { base:"Løg", qty:null, unit:null }
     function parseIngredientString(raw){
       const str = raw.trim();
       if (!str) return null;
-
-      // match: alt før parentes  / tal (komma el. punktum) / resten som enhed
       const m = str.match(/^(.+?)\s*\(\s*([\d.,]+)\s*([^)]+?)\s*\)$/);
       if (!m){
-        return {
-          base: str,
-          qty: null,
-          unit: null
-        };
+        return { base: str, qty: null, unit: null };
       }
       const base = m[1].trim();
-      // parse tal som float (både "," og ".")
       const numStr = m[2].trim().replace(",", ".");
       const qty = parseFloat(numStr);
-      const unit = m[3].trim(); // fx "g", "dl", "dåse", "stk.", "pose"
+      const unit = m[3].trim();
       if (isNaN(qty)){
-        // fallback hvis tallet ikke kunne parses
-        return {
-          base: str,
-          qty: null,
-          unit: null
-        };
+        return { base: str, qty: null, unit: null };
       }
       return { base, qty, unit };
     }
 
-    // Pluraliser enhed efter dine regler.
-    // qty kan være fx 2, 3, 1000.
-    // "g","ml","dl","kg","l" -> uændret
-    // stk / stk. / styk -> "stk."
-    // andre: "dåse" -> "dåser"; "pose" -> "poser"; "pakke" -> "pakker"
     function formatUnit(unitRaw, qty){
-      if (qty === null || unitRaw === null) return ""; // ingen enhed
+      if (qty === null || unitRaw === null) return "";
       const u = unitRaw.toLowerCase().trim();
-
-      // mængdeenheder der ikke bøjes
       const noPluralSet = new Set(["g","gram","ml","dl","kg","l","liter","l.","cl","pc","pct","procent"]);
-      if (noPluralSet.has(u)) return unitRaw; // behold original
-
-      // stk-varianter
+      if (noPluralSet.has(u)) return unitRaw;
       const stkSet = new Set(["stk","stk.","styk","stykke","stykker"]);
-      if (stkSet.has(u)){
-        return "stk.";
-      }
-
-      // hvis qty er 1 -> brug ental uændret
+      if (stkSet.has(u)){ return "stk."; }
       if (qty === 1) return unitRaw;
-
-      // default plural: tilføj "r" (dåse -> dåser, pakke -> pakker, pose -> poser)
-      // enkel heuristik:
-      if (unitRaw.endsWith("se")) return unitRaw + "r";        // dåse -> dåser, pose -> poser
-      if (unitRaw.endsWith("ke")) return unitRaw + "r";        // pakke -> pakker
-      if (unitRaw.endsWith("e"))  return unitRaw + "r";        // "dåse" dækket ovenfor, men safe
+      if (unitRaw.endsWith("se")) return unitRaw + "r";
+      if (unitRaw.endsWith("ke")) return unitRaw + "r";
+      if (unitRaw.endsWith("e"))  return unitRaw + "r";
       return unitRaw + "r";
     }
 
-    // Opbyg tekst til visning i listen.
-    // - Hvis qty !== null: "Oksekød (1000 g)"
-    // - Hvis qty === null og count > 1: "Løg (x2)"
-    // - Hvis qty === null og count === 1: "Løg"
     function buildDisplayLine(entry){
-      // entry = {
-      //   baseName: "Oksekød",
-      //   totalQty: 1000 or null,
-      //   unit: "g" or null,
-      //   countNoQty: 2 (kun brugt når totalQty==null),
-      //   recipes: Set([...])
-      // }
-
       if (entry.totalQty !== null && entry.unit){
-        const shownQty = entry.totalQty % 1 === 0
-          ? String(entry.totalQty)            // 2 -> "2"
-          : String(entry.totalQty).replace(".", ","); // 1.5 -> "1,5"
+        const shownQty = entry.totalQty % 1 === 0 ? String(entry.totalQty)
+                          : String(entry.totalQty).replace(".", ",");
         const shownUnit = formatUnit(entry.unit, entry.totalQty);
         return `${entry.baseName} (${shownQty} ${shownUnit})`;
       }
-
-      // Ingen mængder angivet -> brug tælling
       if (entry.countNoQty > 1){
         return `${entry.baseName} (x${entry.countNoQty})`;
       }
       return entry.baseName;
     }
 
-    // Vi bruger to Maps:
-    // indkoebAgg[key], tjekAgg[key]
-    // key er baseName + '|' + unit (unit kan være null) for at holde fx "Oksekød (500 g)" og "Oksekød (1 pakke)" adskilt.
     function ensureAgg(map, baseName, unit){
       const key = baseName.toLowerCase()+"|"+(unit||"");
       if (!map.has(key)){
         map.set(key, {
           baseName,
-          totalQty: null,     // sum af tal for den enhed (hvis der er en)
-          unit: unit,         // "g", "dåse", osv.
-          countNoQty: 0,      // antal gange uden mængde
+          totalQty: null,
+          unit: unit,
+          countNoQty: 0,
           recipes: new Set()
         });
       }
@@ -836,18 +754,19 @@
     }
 
     let lastClipboardText = "";
-
     function capFirst(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
     function buildLists(){
       const rows = Array.from(document.querySelectorAll("#week-rows .drop-row"));
       const ugeValg = rows.map((row,i) => {
         const navn=(row.dataset.ret || "").trim();
-        return navn ? { dag: WD_PLAN[i], navn, rowEl: row } : null;
+        const frost = row.dataset.frost === "1";
+        if (!navn) return null;
+        return { dag: WD_PLAN[i], navn, frost, rowEl: row };
       }).filter(Boolean);
 
-      // tilknyt også rå data fra allRows (koeb/tjek)
-      const brugte = ugeValg.map((info) => {
+      // Tilknyt ark-rækker
+      const brugte = ugeValg.map(info => {
         const r = allRows.find(rr => (getCol(rr, COLS.navn)||"").trim()===info.navn);
         return r ? { ...info, rowData:r } : null;
       }).filter(Boolean);
@@ -856,81 +775,48 @@
       const tjekAgg = new Map();
       const indkoebAgg = new Map();
 
-      // helper til at tilføje ingrediens til map
       function pushItemToMap(map, rawItem, recipeName, skip){
-        if (!rawItem) return;
-        if (skip) return; // bruges til at ignorere repeat
-
+        if (!rawItem || skip) return;
         const parsed = parseIngredientString(rawItem);
         if (!parsed) return;
         const { base, qty, unit } = parsed;
-
-        // opret/aggreger
         const agg = ensureAgg(map, capFirst(base), unit ? unit : null);
-
         if (qty !== null && unit){
-          // mængde-baseret
-          if (agg.totalQty === null){
-            agg.totalQty = qty;
-          } else {
-            agg.totalQty += qty;
-          }
+          agg.totalQty = (agg.totalQty===null) ? qty : (agg.totalQty + qty);
         } else {
-          // uden mængde
           agg.countNoQty += 1;
         }
-
-        if (recipeName){
-          agg.recipes.add(recipeName);
-        }
+        if (recipeName){ agg.recipes.add(recipeName); }
       }
 
-      // udfyld tjekAgg og indkoebAgg
-      brugte.forEach(({navn, rowData, rowEl}) => {
-        const isRepeat = rowEl.dataset.repeat === "1";
+      // Udfyld aggregeringer (skip = frost)
+      brugte.forEach(({navn, rowData, frost}) => {
+        const tjekList = (getCol(rowData, COLS.tjek)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        tjekList.forEach(item => pushItemToMap(tjekAgg, item, navn, frost));
 
-        // tjek-liste
-        const tjekList = (getCol(rowData, COLS.tjek)||"")
-          .split(",")
-          .map(s=>s.trim())
-          .filter(Boolean);
-        tjekList.forEach(item => {
-          pushItemToMap(tjekAgg, item, navn, isRepeat);
-        });
-
-        // købsliste
-        const koebList = (getCol(rowData, COLS.koeb)||"")
-          .split(",")
-          .map(s=>s.trim())
-          .filter(Boolean);
-        koebList.forEach(item => {
-          pushItemToMap(indkoebAgg, item, navn, isRepeat);
-        });
+        const koebList = (getCol(rowData, COLS.koeb)||"").split(",").map(s=>s.trim()).filter(Boolean);
+        koebList.forEach(item => pushItemToMap(indkoebAgg, item, navn, frost));
       });
 
-      // Når vi laver indkøbslisten, skal varer der allerede ligger i "tjek" ikke gentages i "køb"
-      // (den logik havde du allerede). Vi bruger nu den aggregerede struktur.
-      // Vi fjerner entries fra indkoebAgg som også findes i tjekAgg med samme baseName+unit key.
+      // Behold "tjek" separat; køb viser kun varer der ikke også står 100% identisk i 'tjek'
       for (const [key,_val] of tjekAgg.entries()){
         if (indkoebAgg.has(key)){
           indkoebAgg.delete(key);
         }
       }
 
-      // Sorter alfabetisk efter varenavn (case-insensitiv dansk)
       function sortAgg(map){
-        return Array.from(map.values()).sort((a,b)=>{
-          return a.baseName.localeCompare(b.baseName, "da", {sensitivity:"base"});
-        });
+        return Array.from(map.values()).sort((a,b)=>a.baseName.localeCompare(b.baseName,"da",{sensitivity:"base"}));
       }
-
       const indkoebArr = sortAgg(indkoebAgg);
       const tjekArr    = sortAgg(tjekAgg);
 
-      // Lav ugeLinjer til "1. Ugens madretter:"
-      const ugeLinjer = ugeValg.map(v => capFirst(v.dag) + ": " + v.navn);
+      // Ugens madretter (med frost/rest markering)
+      const ugeLinjer = ugeValg.map(v => {
+        const label = capFirst(v.dag) + ": " + v.navn + (v.frost ? " (frost/rest)" : "");
+        return label;
+      });
 
-      // Byg visningselementer (med tooltip "Til: ...")
       function aggToLineObj(agg){
         const text = buildDisplayLine(agg);
         const who = agg.recipes.size ? "Til: " + Array.from(agg.recipes).join(", ") : "";
@@ -940,7 +826,7 @@
       const indkoebVis = indkoebArr.map(aggToLineObj);
       const tjekVis    = tjekArr.map(aggToLineObj);
 
-      // --- Render HTML ---
+      // Render HTML
       const container=document.getElementById("indkoebsliste-result");
       container.innerHTML = "";
 
@@ -978,7 +864,7 @@
       section("2. Indkøbsliste:", indkoebVis);
       section("3. Tjek om vi har:", tjekVis);
 
-      // --- Tekst til clipboard ---
+      // Tekst til clipboard
       const lines = [];
       lines.push("1. Ugens madretter:");
       if (ugeLinjer.length){
@@ -990,9 +876,7 @@
 
       lines.push("2. Indkøbsliste:");
       if (indkoebVis.length){
-        indkoebVis.forEach(it => {
-          lines.push("• " + (it.text || ""));
-        });
+        indkoebVis.forEach(it => { lines.push("• " + (it.text || "")); });
       } else {
         lines.push("• -");
       }
@@ -1000,9 +884,7 @@
 
       lines.push("3. Tjek om vi har:");
       if (tjekVis.length){
-        tjekVis.forEach(it => {
-          lines.push("• " + (it.text || ""));
-        });
+        tjekVis.forEach(it => { lines.push("• " + (it.text || "")); });
       } else {
         lines.push("• -");
       }
@@ -1028,9 +910,7 @@
         }
       }
     }
-    function printList(){
-      window.print();
-    }
+    function printList(){ window.print(); }
 
     /* ========= Init ========= */
     document.addEventListener("DOMContentLoaded", async () => {
@@ -1092,7 +972,7 @@
     });
 
     async function doPrimaryAction(){
-      const status=statusEl();
+      const status=document.getElementById("primary-status");
       status.textContent = "";
       if (viewIdx === 0){
         // Indkøbsliste for planlægning af næste uge
@@ -1102,6 +982,7 @@
         const items=Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i)=>({
           date: dates[i],
           ret: (row.dataset.ret || "").trim()
+          // Frost/Rest er kun klient-flag; sendes ikke til arket
         }));
 
         status.textContent=`— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
