@@ -79,7 +79,7 @@
     .ret-chip .name-link{ color:#1b5e8a; text-decoration:none; }
     .ret-chip .name-link:hover, .ret-chip .name-link:focus{ text-decoration:underline; }
 
-    /* Frost/Rest: ikon i stedet for gentag */
+    /* Frost/Rest: ikon i stedet for gentag (plan-visning) */
     .frost-wrap{ display:flex; align-items:center; flex:0 0 auto; }
     .frost-wrap input{ width:16px; height:16px; }
     .frost-label{ display:none; }
@@ -87,6 +87,12 @@
       content:"❄";
       font-size:1rem; line-height:1; margin-left:.12rem; opacity:.9;
       title:"Frost/Rest – tæller ikke indkøb";
+    }
+
+    /* Frost badge (spist-visning / tidligere uger) */
+    .frost-badge{
+      font-size:1rem; line-height:1; opacity:.9;
+      flex:0 0 auto;
     }
 
     .clear{
@@ -168,7 +174,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.9</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.10</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -511,10 +517,24 @@
           label.className="label";
           setRowLabel(label, ds, i);
 
+          // NYT: vis ❄-badge i tidligere uger (uden at forurene inputværdien)
+          const h=historikMap.get(ds) || {};
+          const vSpist=(h.spist||"").trim();
+          const vPlan =(h.plan_nu||"").trim();
+          const hadFrost = hasFrostMarker(vSpist || vPlan);
+          if (hadFrost){
+            const frostBadge=document.createElement("span");
+            frostBadge.className="frost-badge";
+            frostBadge.title="Frost/Rest i planen";
+            frostBadge.textContent="❄";
+            row.appendChild(frostBadge);
+          }
+
           const input=document.createElement("input");
           input.type="text";
           input.className="spist-input";
           input.placeholder="Ret-navn";
+          input.value = normalizeName(vSpist || vPlan || ""); // vis rent navn
 
           const clear=document.createElement("button");
           clear.className="clear";
@@ -530,11 +550,6 @@
 
           setupDnDRow(row, input);
           rows.appendChild(row);
-
-          const h=historikMap.get(ds);
-          const vSpist=h && (h.spist||"").trim();
-          const vPlan =h && (h.plan_nu||"").trim();
-          input.value = normalizeName(vSpist || vPlan || ""); // vis rent navn
         });
       }
     }
@@ -606,7 +621,7 @@
       rowEl.dataset.ret = navn || "";
       const ds=rowEl.dataset.date;
       const rec=historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
-      rec.plan_nu = navn || ""; // lokalt – det er visningsværdien, ❄ tilføjes ved snapshot
+      rec.plan_nu = navn || ""; // lokalt – ❄ tilføjes ved snapshot
       historikMap.set(ds, rec);
       recomputeLastEaten();
     }
