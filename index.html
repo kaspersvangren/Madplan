@@ -168,7 +168,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.8</small></h1>
+    <h1>Madplan <small style="font-size:.6em; color:#8b6f61;">version 2.9.9</small></h1>
     <div class="layout">
       <div class="sidebar">
         <!-- Ugeboks -->
@@ -262,6 +262,14 @@
     const HISTORIK_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historik`;
     const MADPLAN_CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Madplan`;
 
+    /* ========= Hjælpere: frost-markør ========= */
+    function normalizeName(s){
+      return (s||"").replace(/\s*(?:❄|\(frost\/rest\))\s*$/i, "").trim();
+    }
+    function hasFrostMarker(s){
+      return /\s*(?:❄|\(frost\/rest\))\s*$/i.test(s||"");
+    }
+
     /* ========= Dato-format (DK) ========= */
     const WD_PLAN  = ["fredag","lørdag","søndag","mandag","tirsdag","onsdag","torsdag"];
     function isoLocal(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
@@ -341,8 +349,8 @@
         if(!cur || date>cur) lastEatenByName.set(key,date);
       };
       historikMap.forEach((rec, ds) => {
-        const consumed=(rec.spist||"").trim();
-        const planned =(rec.plan_nu||"").trim();
+        const consumed=normalizeName((rec.spist||"").trim());
+        const planned =normalizeName((rec.plan_nu||"").trim());
         const name = consumed || planned;
         if (name) setIfNewer(name, ds);
       });
@@ -357,7 +365,7 @@
     let nameToUrl = new Map();
     function urlForName(name){
       if (!name) return "";
-      return nameToUrl.get(String(name).trim().toLowerCase()) || "";
+      return nameToUrl.get(normalizeName(String(name)).toLowerCase()) || "";
     }
 
     /* ========= Ugepanel ========= */
@@ -476,9 +484,16 @@
           setupDnDRow(row);
           rows.appendChild(row);
 
+          // Forudfyld fra historik – genkend ❄, sæt checkbox, vis rent navn
           const h=historikMap.get(ds);
           const v=h && (h.plan_nu||"").trim();
-          if (v) setPlanValue(row, v);
+          if (v){
+            const frostMarked = hasFrostMarker(v);
+            row.dataset.frost = frostMarked ? "1" : "0";
+            const cb=row.querySelector('.frost-cb');
+            if (cb) cb.checked = frostMarked;
+            setPlanValue(row, normalizeName(v)); // chippen viser uden markør
+          }
         });
 
       } else {
@@ -519,7 +534,7 @@
           const h=historikMap.get(ds);
           const vSpist=h && (h.spist||"").trim();
           const vPlan =h && (h.plan_nu||"").trim();
-          input.value = vSpist || vPlan || "";
+          input.value = normalizeName(vSpist || vPlan || ""); // vis rent navn
         });
       }
     }
@@ -591,7 +606,7 @@
       rowEl.dataset.ret = navn || "";
       const ds=rowEl.dataset.date;
       const rec=historikMap.get(ds) || { ugedag:"", plan_nu:"", spist:"" };
-      rec.plan_nu = navn || "";
+      rec.plan_nu = navn || ""; // lokalt – det er visningsværdien, ❄ tilføjes ved snapshot
       historikMap.set(ds, rec);
       recomputeLastEaten();
     }
@@ -811,7 +826,7 @@
       const indkoebArr = sortAgg(indkoebAgg);
       const tjekArr    = sortAgg(tjekAgg);
 
-      // Ugens madretter (med frost/rest markering)
+      // Ugens madretter (med frost/rest markering i desktop-listen)
       const ugeLinjer = ugeValg.map(v => {
         const label = capFirst(v.dag) + ": " + v.navn + (v.frost ? " (frost/rest)" : "");
         return label;
@@ -979,11 +994,13 @@
         buildLists();
 
         const dates=nextWeekDatesFriThu();
-        const items=Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i)=>({
-          date: dates[i],
-          ret: (row.dataset.ret || "").trim()
-          // Frost/Rest er kun klient-flag; sendes ikke til arket
-        }));
+        const items=Array.from(document.querySelectorAll("#week-rows .drop-row")).map((row,i)=>{
+          const base = (row.dataset.ret || "").trim();
+          const frost = row.dataset.frost === "1";
+          // Gem ❄ i plan_nu, så mobil/app viser ikonet – og vi kan genaktivere checkbox ved load
+          const ret   = frost ? (base + " ❄") : base;
+          return { date: dates[i], ret };
+        });
 
         status.textContent=`— Sender planen til arket (${rangeLabel(dates[0], dates[6])}) …`;
         await postToWebApp({ secret: WEBAPP_SECRET, action:"snapshot_plan", items });
