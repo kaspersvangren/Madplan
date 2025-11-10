@@ -170,6 +170,20 @@
       #print-panel{ border:none; box-shadow:none; }
       #indkoebsliste-result{ white-space:pre-wrap; font-size:12pt; }
     }
+.frost-info-mobile {
+  display: none;
+  text-align: center;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--c-muted);
+}
+
+@media (max-width: 800px) {
+  .frost-info-mobile {
+    display: block;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -193,6 +207,7 @@
             <button id="primary-btn" class="btn">Indkøbsliste</button>
           </div>
         </div>
+<div class="frost-info-mobile">❄ = Frost / rest</div>
 
         <!-- Filtre -->
         <fieldset>
