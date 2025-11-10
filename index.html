@@ -154,13 +154,14 @@
     #indkoebsliste-result li{ margin:.15rem 0; }
     #indkoebsliste-result .ing-item{ cursor:help; }
 
-    /* Mobil: vis kun ugeboksen (read-only) */
-    @media (max-width: 800px){
-      .layout{ display:block; }
-      .layout > *:not(.sidebar){ display:none !important; }
-      .sidebar > *:not(.ugeboks){ display:none !important; }
-      .ugeboks .actions{ display:none !important; }
-    }
+	/* Mobil: vis kun ugeboksen (read-only) */
+	@media (max-width: 800px){
+	  .layout{ display:block; }
+	  .layout > *:not(.sidebar){ display:none !important; }
+	  .sidebar > *:not(.ugeboks):not(.frost-info-mobile){ display:none !important; }
+	  .ugeboks .actions{ display:none !important; }
+	}
+
 
     /* Print */
     @media print{
