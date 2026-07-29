@@ -1,4 +1,4 @@
-// Familiekalender — service worker
+// Vores Hverdag — service worker
 //
 // Der caches med vilje ingenting. Den findes udelukkende for at appen
 // kan installeres på hjemmeskærmen. Ville vi cache selve siden, kunne

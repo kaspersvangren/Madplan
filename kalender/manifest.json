@@ -1,7 +1,7 @@
 {
-  "id": "familiekalender",
-  "name": "Familiekalender",
-  "short_name": "Familiekalender",
+  "id": "vores-hverdag",
+  "name": "Vores Hverdag",
+  "short_name": "Vores Hverdag",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
