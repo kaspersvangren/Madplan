@@ -19,17 +19,9 @@
   --line-strong:#1B1D1C;
   --chip:#F2F1ED;
   --holiday:#B0503A;
-
-  --p-mor:#E0BE6A;
-  --p-far:#77A3D1;
-  --p-sigurd:#AE93D4;
-  --p-freddy:#84C295;
-  --p-agnes:#EA9FB8;
-  --p-familie:#A5A099;
-
   --rail:#CFCCC4;
   --radius:14px;
-  --tap:48px;
+  --tap:44px;
   --font-display:"Bricolage Grotesque","Inter",system-ui,sans-serif;
   --font-body:"Inter",system-ui,-apple-system,sans-serif;
 }
@@ -44,13 +36,6 @@ html[data-theme="dark"]{
   --line-strong:#ECEBE5;
   --chip:#252821;
   --holiday:#E08A70;
-
-  --p-mor:#D9B255;
-  --p-far:#6E9ED4;
-  --p-sigurd:#A98BD6;
-  --p-freddy:#6FBF87;
-  --p-agnes:#E58EAC;
-  --p-familie:#8C8880;
   --rail:#3A3E36;
 }
 
@@ -69,21 +54,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--line-strong);outline-offset:2px;border-radius:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-.app{
-  max-width:560px;margin:0 auto;min-height:100dvh;
-  display:flex;flex-direction:column;
-}
+.app{max-width:560px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
 
 /* ---------- Topbjælke ---------- */
-.topbar{
-  display:flex;align-items:center;gap:8px;
-  padding:14px 14px 10px;position:relative;
-}
-.segment{
-  display:flex;flex:1;background:var(--chip);border-radius:999px;padding:3px;min-width:0;
-}
+.topbar{display:flex;align-items:center;gap:6px;padding:14px 12px 10px;position:relative}
+.segment{display:flex;flex:1;background:var(--chip);border-radius:999px;padding:3px;min-width:0}
 .segment button{
-  flex:1;height:40px;border-radius:999px;font-size:15px;font-weight:500;
+  flex:1;height:38px;border-radius:999px;font-size:14px;font-weight:500;
   color:var(--muted);transition:background .15s,color .15s;
   display:flex;align-items:center;justify-content:center;gap:3px;white-space:nowrap;
 }
@@ -91,24 +68,23 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   background:var(--surface);color:var(--ink);font-weight:600;
   box-shadow:0 1px 2px rgba(0,0,0,.08);
 }
-.chev{display:none;font-size:11px;line-height:1;opacity:.6}
+.chev{display:none;font-size:10px;line-height:1;opacity:.6}
 .segment button[aria-pressed="true"] .chev{display:inline}
 .today-pill{
-  height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);
-  font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;flex:none;
+  height:38px;padding:0 12px;border-radius:999px;border:1px solid var(--line);
+  font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;flex:none;
 }
 .today-pill:hover{border-color:var(--line-strong);color:var(--ink)}
+.icon-btn{width:var(--tap);height:38px;border-radius:999px;display:grid;place-items:center;color:var(--muted);flex:none}
+.icon-btn:hover{background:var(--chip);color:var(--ink)}
 
 .dropdown{
-  position:absolute;top:100%;left:14px;right:14px;z-index:30;
+  position:absolute;top:100%;left:12px;right:12px;z-index:30;
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   box-shadow:0 12px 30px rgba(0,0,0,.18);overflow:hidden;
 }
 .dropdown[hidden]{display:none}
-.dd-year{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:8px 10px;border-bottom:1px solid var(--line);
-}
+.dd-year{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)}
 .dd-year span{font-family:var(--font-display);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums}
 .dd-year button{width:38px;height:38px;border-radius:999px;display:grid;place-items:center;color:var(--muted)}
 .dd-year button:hover{background:var(--chip);color:var(--ink)}
@@ -116,92 +92,60 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .dd-months{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .dd-months button{height:44px;border-radius:10px;font-size:14px;border:1px solid transparent}
 .dd-months button:hover{background:var(--chip)}
-.dd-weeks button{
-  display:flex;width:100%;align-items:baseline;gap:10px;
-  padding:11px 10px;border-radius:10px;font-size:15px;text-align:left;
-}
+.dd-weeks button{display:flex;width:100%;align-items:baseline;gap:10px;padding:11px 10px;border-radius:10px;font-size:15px;text-align:left}
 .dd-weeks button:hover{background:var(--chip)}
 .dd-weeks .w{font-weight:600;font-variant-numeric:tabular-nums;width:62px;flex:none}
 .dd-weeks .r{font-size:13px;color:var(--muted)}
 .dd-body [aria-selected="true"]{background:var(--chip);border-color:var(--line-strong);font-weight:700}
-.icon-btn{
-  width:var(--tap);height:var(--tap);border-radius:999px;
-  display:grid;place-items:center;color:var(--muted);
-}
-.icon-btn:hover{background:var(--chip);color:var(--ink)}
 
 /* ---------- Datohoved ---------- */
-.datehead{
-  display:flex;align-items:center;gap:6px;padding:2px 8px 12px;
-}
+.datehead{display:flex;align-items:center;gap:6px;padding:2px 8px 12px}
 .datehead .nav{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:var(--muted)}
 .datehead .nav:hover{background:var(--chip);color:var(--ink)}
 .datehead .center{flex:1;text-align:center;min-width:0}
-.datehead h1{
-  font-family:var(--font-display);
-  font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.datehead .sub{
-  font-size:13px;color:var(--muted);margin-top:2px;
-  display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;
-}
+.datehead h1{font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.datehead .sub{font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
 
 /* ---------- Fælles ---------- */
 .scroll{flex:1;overflow-y:auto;padding:0 14px 96px}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-grid;place-items:center;
-  font-size:9px;font-weight:700;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);
-  letter-spacing:-.02em}
+  font-size:9px;font-weight:700;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);letter-spacing:-.02em}
 .dot.lg{width:26px;height:26px;font-size:13px}
 .dot.sm{width:7px;height:7px;font-size:0}
 .dots{display:flex;gap:4px;align-items:center;flex:none}
 .holiday-tag{color:var(--holiday);font-weight:600}
 
+.banner{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  background:var(--holiday);color:#fff;font-size:14px;padding:10px 14px;
+  display:flex;gap:10px;align-items:center;justify-content:center;text-align:center;
+}
+.banner[hidden]{display:none}
+.banner button{text-decoration:underline;font-size:13px}
+
 /* ---------- Dagsvisning ---------- */
 .daycard{background:var(--day-here);border-radius:var(--radius);border:1px solid var(--line);overflow:hidden}
 .daycard.away{background:var(--day-away)}
-.strip{
-  display:flex;align-items:center;gap:10px;padding:13px 15px;
-  border-bottom:1px solid var(--line);font-size:15px;
-}
+.strip{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);font-size:15px}
 .strip .label{color:var(--muted);font-size:13px}
-.strip.presence button{
-  margin-left:auto;font-size:13px;font-weight:600;
-  border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--muted);
-}
+.strip.presence button{margin-left:auto;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--muted)}
 .strip.presence button:hover{border-color:var(--line-strong);color:var(--ink)}
 
 .rail{position:relative;padding:8px 0 14px}
-.rail::before{
-  content:"";position:absolute;left:74px;top:0;bottom:14px;width:1px;background:var(--rail);
-}
-.slot{display:flex;gap:0;align-items:flex-start;padding:7px 15px 7px 0;position:relative}
-.slot .time{
-  width:74px;flex:none;text-align:right;padding-right:14px;
-  font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;color:var(--ink);
-}
+.rail::before{content:"";position:absolute;left:74px;top:0;bottom:14px;width:1px;background:var(--rail)}
+.slot{display:flex;align-items:flex-start;padding:7px 15px 7px 0;position:relative}
+.slot .time{width:74px;flex:none;text-align:right;padding-right:14px;font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;color:var(--ink)}
 .slot .time small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
-.slot .stem{
-  position:absolute;left:74px;top:16px;width:12px;height:1px;background:var(--rail);
-}
+.slot .stem{position:absolute;left:74px;top:16px;width:12px;height:1px;background:var(--rail)}
 .slot .body{flex:1;margin-left:20px;min-width:0}
-.ev{
-  width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
-  border-left:4px solid var(--p-familie);
-  border-radius:10px;padding:10px 12px;display:block;
-}
+.ev{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;display:block}
 .ev:hover{border-color:var(--line-strong)}
 .ev .t{font-weight:600;font-size:16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-.ev .d{font-size:13px;color:var(--muted);margin-top:3px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ev .d{font-size:13px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:15px}
 
 /* ---------- Ugevisning ---------- */
-.weekrow{
-  display:flex;gap:12px;align-items:flex-start;
-  background:var(--day-here);border:1px solid var(--line);border-radius:var(--radius);
-  padding:11px 13px;margin-bottom:8px;width:100%;text-align:left;
-}
+.weekrow{display:flex;gap:12px;align-items:flex-start;background:var(--day-here);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin-bottom:8px;width:100%;text-align:left}
 .weekrow.away{background:var(--day-away)}
 .weekrow.today{border-color:var(--line-strong);border-width:2px;padding:10px 12px}
 .weekrow .wd{width:56px;flex:none}
@@ -218,25 +162,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 /* ---------- Månedsvisning ---------- */
 .month{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .mgrid{display:grid;grid-template-columns:30px repeat(7,1fr)}
-.mhead{
-  font-size:11px;color:var(--muted);text-align:center;padding:9px 0;
-  text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line);
-}
-.wknum{
-  font-size:11px;color:var(--muted);display:grid;place-items:center;
-  border-right:1px solid var(--line);border-bottom:1px solid var(--line);
-  font-variant-numeric:tabular-nums;
-}
+.mhead{font-size:11px;color:var(--muted);text-align:center;padding:9px 0;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line)}
+.wknum{font-size:11px;color:var(--muted);display:grid;place-items:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .wknum:hover{background:var(--chip);color:var(--ink)}
-.mcell{
-  position:relative;min-height:62px;padding:5px 3px 9px;
-  border-bottom:1px solid var(--line);border-right:1px solid var(--line);
-  background:var(--day-here);display:flex;flex-direction:column;align-items:center;gap:4px;
-}
+.mcell{position:relative;min-height:62px;padding:5px 3px 9px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--day-here);display:flex;flex-direction:column;align-items:center;gap:4px}
 .mcell.away{background:var(--day-away)}
 .mcell.other{opacity:.4}
-.mcell .num{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.6;
-  width:26px;height:26px;display:grid;place-items:center;border-radius:999px}
+.mcell .num{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.6;width:26px;height:26px;display:grid;place-items:center;border-radius:999px}
 .mcell.today .num{border:2px solid var(--line-strong);font-weight:700}
 .mcell.holiday .num{color:var(--holiday);font-weight:600}
 .mcell .mdots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:100%}
@@ -244,49 +176,27 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .legend span{display:flex;align-items:center;gap:5px}
 
 /* ---------- Flydende knap ---------- */
-.fab{
-  position:fixed;left:50%;transform:translateX(-50%);bottom:22px;
-  height:52px;padding:0 24px;border-radius:999px;
-  background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;
-  display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22);
-}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22)}
 
 /* ---------- Dialoger ---------- */
-.backdrop{
-  position:fixed;inset:0;background:rgba(20,22,20,.45);
-  display:none;align-items:flex-end;justify-content:center;z-index:40;
-}
+.backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .backdrop.open{display:flex}
-.sheet{
-  background:var(--surface);width:100%;max-width:560px;
-  border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
-  max-height:92dvh;overflow-y:auto;
-}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92dvh;overflow-y:auto}
 .sheet h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 4px}
 .sheet .meta{font-size:13px;color:var(--muted);margin-bottom:14px}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
-.field input[type="text"],.field input[type="date"],.field input[type="time"],.field textarea{
-  width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
-  background:var(--bg);color:var(--ink);font:inherit;
-}
+.field input,.field textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
 .field textarea{min-height:72px;resize:vertical}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 .people{display:flex;flex-wrap:wrap;gap:7px}
-.pchip{
-  display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;
-  border:1px solid var(--line);font-size:14px;background:var(--bg);
-}
+.pchip{display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;border:1px solid var(--line);font-size:14px;background:var(--bg)}
 .pchip[aria-pressed="true"]{border-color:var(--line-strong);background:var(--chip);font-weight:600}
 .check{display:flex;align-items:center;gap:9px;font-size:15px;padding:6px 0}
 .check input{width:20px;height:20px;accent-color:var(--ink)}
 .actions{display:flex;gap:9px;margin-top:16px}
-.btn{
-  flex:1;height:48px;border-radius:12px;font-weight:600;font-size:15px;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  border:1px solid var(--line);
-}
+.btn{flex:1;height:48px;border-radius:12px;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line)}
 .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .btn.danger{color:var(--holiday);border-color:var(--line)}
 .detail-desc{font-size:15px;white-space:pre-wrap;margin:10px 0 4px}
@@ -294,12 +204,23 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .detail-people .pchip{pointer-events:none}
 .err{color:var(--holiday);font-size:13px;margin-top:6px;display:none}
 .err.show{display:block}
+.menu-row{display:flex;width:100%;align-items:center;gap:11px;padding:14px 4px;font-size:15px;border-bottom:1px solid var(--line);text-align:left}
+.menu-row:last-of-type{border-bottom:none}
 svg{display:block}
+
+/* ---------- Login ---------- */
+.gate{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;align-items:center;justify-content:center;padding:22px}
+.gate.open{display:flex}
+.gate .box{width:100%;max-width:380px}
+.gate h1{font-family:var(--font-display);font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.gate p.intro{color:var(--muted);font-size:14px;margin:0 0 22px}
 </style>
 </head>
 <body>
-<div class="app">
 
+<div class="banner" id="banner" hidden><span id="banner-text"></span><button id="banner-close">Skjul</button></div>
+
+<div class="app">
   <div class="topbar">
     <div class="segment" role="group" aria-label="Vælg visning">
       <button id="v-day"   aria-pressed="true">Dag</button>
@@ -308,34 +229,26 @@ svg{display:block}
     </div>
     <button class="today-pill" id="today-btn">I dag</button>
     <button class="icon-btn" id="theme-btn" aria-label="Skift mellem lys og mørk">
-      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <button class="icon-btn" id="menu-btn" aria-label="Indstillinger">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="6" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18" r="1.4"/></svg>
     </button>
 
     <div class="dropdown" id="dropdown" hidden>
       <div class="dd-year">
-        <button id="dd-prev" aria-label="Forrige år">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
+        <button id="dd-prev" aria-label="Forrige år"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="dd-year-label">—</span>
-        <button id="dd-next" aria-label="Næste år">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
+        <button id="dd-next" aria-label="Næste år"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
       <div class="dd-body" id="dd-body" role="listbox"></div>
     </div>
   </div>
 
   <div class="datehead">
-    <button class="nav" id="prev" aria-label="Forrige">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="center">
-      <h1 id="head-title">—</h1>
-      <div class="sub" id="head-sub"></div>
-    </div>
-    <button class="nav" id="next" aria-label="Næste">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
+    <button class="nav" id="prev" aria-label="Forrige"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="center"><h1 id="head-title">—</h1><div class="sub" id="head-sub"></div></div>
+    <button class="nav" id="next" aria-label="Næste"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   </div>
 
   <div class="scroll" id="stage"></div>
@@ -346,6 +259,39 @@ svg{display:block}
   Ny aftale
 </button>
 
+<!-- Login -->
+<div class="gate" id="gate">
+  <div class="box">
+    <h1>Familiekalender</h1>
+    <p class="intro">Log ind for at se og rette aftaler.</p>
+    <div class="field"><label for="g-mail">E-mail</label><input type="email" id="g-mail" autocomplete="username"></div>
+    <div class="field"><label for="g-pass">Kodeord</label><input type="password" id="g-pass" autocomplete="current-password"></div>
+    <div class="err" id="g-err"></div>
+    <div class="actions"><button class="btn primary" id="g-login">Log ind</button></div>
+  </div>
+</div>
+
+<!-- Menu -->
+<div class="backdrop" id="menu-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Indstillinger</h2>
+    <div class="meta" id="menu-mail">—</div>
+    <button class="menu-row" id="menu-export">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+      Gem en kopi af alle data
+    </button>
+    <button class="menu-row" id="menu-reload">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>
+      Hent data forfra
+    </button>
+    <button class="menu-row" id="menu-logout">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      Log ud
+    </button>
+    <div class="actions"><button class="btn" id="menu-close">Luk</button></div>
+  </div>
+</div>
+
 <!-- Detaljer -->
 <div class="backdrop" id="detail-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
@@ -354,18 +300,9 @@ svg{display:block}
     <div class="detail-desc" id="detail-desc"></div>
     <div class="detail-people" id="detail-people"></div>
     <div class="actions">
-      <button class="btn" id="detail-close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        Luk
-      </button>
-      <button class="btn" id="detail-edit">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-        Rediger
-      </button>
-      <button class="btn danger" id="detail-delete">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-        Slet
-      </button>
+      <button class="btn" id="detail-close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Luk</button>
+      <button class="btn" id="detail-edit"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Rediger</button>
+      <button class="btn danger" id="detail-delete"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Slet</button>
     </div>
   </div>
 </div>
@@ -387,37 +324,27 @@ svg{display:block}
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title">
     <h2 id="edit-title">Ny aftale</h2>
     <div class="meta">Titel og hvem det gælder er nok — resten er frivilligt.</div>
-
     <div class="field">
       <label for="f-title">Titel</label>
       <input type="text" id="f-title" autocomplete="off" placeholder="Fx tandlæge">
       <div class="err" id="f-title-err">Skriv en titel.</div>
     </div>
-
     <div class="field">
       <label for="f-desc">Beskrivelse</label>
       <textarea id="f-desc" placeholder="Adresse, hvad der skal huskes, hvem der kører …"></textarea>
     </div>
-
     <div class="field">
       <label>Hvem gælder det?</label>
       <div class="people" id="f-people"></div>
       <div class="err" id="f-people-err">Vælg mindst én.</div>
     </div>
-
-    <div class="field">
-      <label for="f-date">Dato</label>
-      <input type="date" id="f-date">
-    </div>
-
+    <div class="field"><label for="f-date">Dato</label><input type="date" id="f-date"></div>
     <label class="check"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
     <label class="check"><input type="checkbox" id="f-yearly"> Gentages hvert år</label>
-
     <div class="row2" id="f-times">
       <div class="field"><label for="f-start">Start</label><input type="time" id="f-start"></div>
       <div class="field"><label for="f-end">Slut</label><input type="time" id="f-end"></div>
     </div>
-
     <div class="actions">
       <button class="btn" id="edit-cancel">Fortryd</button>
       <button class="btn primary" id="edit-save">Gem</button>
@@ -425,25 +352,33 @@ svg{display:block}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 "use strict";
 
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const IDLE_MS   = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
-const SHEET_ID  = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
+const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
+const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
+const SHEET_ID     = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
 const HISTORIK_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=Historik";
 
-const PEOPLE = [
-  { id:"mor",     navn:"Mor",     kort:"M", farve:"var(--p-mor)" },
-  { id:"far",     navn:"Far",     kort:"F", farve:"var(--p-far)" },
-  { id:"sigurd",  navn:"Sigurd",  kort:"S", farve:"var(--p-sigurd)" },
-  { id:"freddy",  navn:"Freddy",  kort:"Fr",farve:"var(--p-freddy)" },
-  { id:"agnes",   navn:"Agnes",   kort:"A", farve:"var(--p-agnes)" },
-  { id:"familie", navn:"Familie", kort:"•", farve:"var(--p-familie)" }
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* Bruges indtil personer er hentet fra databasen */
+let PEOPLE = [
+  { id:"mor",     navn:"Mor",     kort:"M",  lys:"#E0BE6A", moerk:"#D9B255" },
+  { id:"far",     navn:"Far",     kort:"F",  lys:"#77A3D1", moerk:"#6E9ED4" },
+  { id:"sigurd",  navn:"Sigurd",  kort:"S",  lys:"#AE93D4", moerk:"#A98BD6" },
+  { id:"freddy",  navn:"Freddy",  kort:"Fr", lys:"#84C295", moerk:"#6FBF87" },
+  { id:"agnes",   navn:"Agnes",   kort:"A",  lys:"#EA9FB8", moerk:"#E58EAC" },
+  { id:"familie", navn:"Familie", kort:"•",  lys:"#A5A099", moerk:"#8C8880" }
 ];
 const personById = id => PEOPLE.find(p => p.id === id);
+const erMoerk = () => document.documentElement.getAttribute("data-theme") === "dark";
+const farveFor = p => erMoerk() ? p.moerk : p.lys;
 
 /* =======================================================================
    Datohjælpere — ISO-uger, mandag først
@@ -460,24 +395,24 @@ const MAANEDER     = ["januar","februar","marts","april","maj","juni","juli","au
 
 function mondayOf(d){
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const wd = (x.getDay() + 6) % 7;          // 0 = mandag
-  return addDays(x, -wd);
+  return addDays(x, -((x.getDay() + 6) % 7));
 }
 function isoWeek(d){
   const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
   const week1 = new Date(t.getFullYear(), 0, 4);
-  const diff = (t - week1) / 86400000;
-  return 1 + Math.round((diff - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return 1 + Math.round((((t - week1) / 86400000) - 3 + ((week1.getDay() + 6) % 7)) / 7);
 }
 function isoWeekYear(d){
   const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
   return t.getFullYear();
 }
+function weeksInIsoYear(y){ return isoWeek(new Date(y,11,28)); }
+function mondayOfIsoWeek(y,w){ return addDays(mondayOf(new Date(y,0,4)), (w-1)*7); }
 
-/* Danske helligdage — regnes ud fra påskedagen, så der er ingen ekstern kilde.
-   Store bededag er ikke med: den er afskaffet fra og med 2024. */
+/* Danske helligdage regnes ud fra påskedagen — ingen ekstern kilde.
+   Store bededag er ikke med: afskaffet fra og med 2024. */
 function easterSunday(year){
   const a=year%19, b=Math.floor(year/100), c=year%100;
   const d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
@@ -489,8 +424,7 @@ function easterSunday(year){
 const holidayCache = new Map();
 function holidaysFor(year){
   if(holidayCache.has(year)) return holidayCache.get(year);
-  const p = easterSunday(year);
-  const m = new Map();
+  const p = easterSunday(year), m = new Map();
   const put = (date,navn) => m.set(iso(date), navn);
   put(new Date(year,0,1), "Nytårsdag");
   put(addDays(p,-3), "Skærtorsdag");
@@ -508,10 +442,12 @@ function holidaysFor(year){
 const holidayName = ds => holidaysFor(Number(ds.slice(0,4))).get(ds) || null;
 
 /* =======================================================================
-   Agnes — standardregel plus de dage I selv har vendt om
-   Lige uger: onsdag og torsdag.  Ulige uger: alle andre dage.
+   Data
    ======================================================================= */
-const agnesOverrides = new Map();   // "2026-08-05" -> true/false
+let events = [];                          // aftaler fra databasen
+const agnesOverrides = new Map();         // "2026-08-05" -> true/false
+const dinners = new Map();                // dato -> ret fra madplanen
+let mealStatus = "henter", mealError = "";
 
 function agnesDefault(d){
   const lige = isoWeek(d) % 2 === 0;
@@ -524,76 +460,6 @@ function agnesHere(d){
 }
 const agnesChanged = d => agnesOverrides.has(iso(d)) && agnesOverrides.get(iso(d)) !== agnesDefault(d);
 
-/* =======================================================================
-   Aftaler — kun i hukommelsen i denne prototype
-   ======================================================================= */
-let nextId = 1;
-const events = [];
-function seed(dateStr, o){ events.push(Object.assign({id:nextId++, date:dateStr}, o)); }
-
-(function demodata(){
-  const t = new Date();
-  const D = n => iso(addDays(t,n));
-  const y = t.getFullYear();
-
-  /* ---- Bagud ---- */
-  seed(D(-31), {title:"Tandlæge",          desc:"Kontrol", people:["freddy"], allDay:false, start:"10:00", end:"10:45", yearly:false});
-  seed(D(-28), {title:"Forældremøde",      desc:"", people:["mor"], allDay:false, start:"17:00", end:"19:00", yearly:false});
-  seed(D(-24), {title:"Sommerfest i gaden",desc:"Vi tager en kagemand med", people:["familie"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(-19), {title:"Far på arbejde i weekenden", desc:"", people:["far"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(-15), {title:"Agnes til tandlæge",desc:"", people:["agnes"], allDay:false, start:"09:00", end:"09:30", yearly:false});
-  seed(D(-12), {title:"Loppemarked",       desc:"Vi sælger det gamle legetøj", people:["familie"], allDay:false, start:"10:00", end:"14:00", yearly:false});
-  seed(D(-9),  {title:"Sigurd på lejrtur", desc:"Afgang fra skolen", people:["sigurd"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(-5),  {title:"Bilen til service", desc:"", people:["far"], allDay:false, start:"08:00", end:"", yearly:false});
-  seed(D(-3),  {title:"Fødselsdag hos naboen", desc:"", people:["freddy"], allDay:false, start:"14:00", end:"17:00", yearly:false});
-  seed(D(-1),  {title:"Bogklub",           desc:"", people:["mor"], allDay:false, start:"19:30", end:"", yearly:false});
-
-  /* ---- I dag ---- */
-  seed(D(0),  {title:"Tandlæge",           desc:"Husk sundhedskortet. Klinikken på Stationsvej.", people:["sigurd"], allDay:false, start:"09:15", end:"10:00", yearly:false});
-  seed(D(0),  {title:"Fodbold",            desc:"Medbring drikkedunk", people:["freddy"], allDay:false, start:"16:30", end:"18:00", yearly:false});
-  seed(D(0),  {title:"Løbetur",            desc:"", people:["mor"], allDay:false, start:"19:00", end:"20:00", yearly:false});
-
-  /* ---- Den travle dag: alt falder oven i hinanden ---- */
-  seed(D(2),  {title:"Skraldespanden ud",  desc:"Rullebeholder skal ud aftenen før", people:["familie"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(2),  {title:"Håndværker kommer",  desc:"Et sted mellem 8 og 12, så nogen skal være hjemme", people:["familie"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(2),  {title:"Morgenmøde",         desc:"Videomøde hjemmefra", people:["far"], allDay:false, start:"08:00", end:"08:45", yearly:false});
-  seed(D(2),  {title:"Aflevering i vuggestuen", desc:"", people:["freddy"], allDay:false, start:"08:15", end:"", yearly:false});
-  seed(D(2),  {title:"Lægen",              desc:"Årskontrol", people:["mor"], allDay:false, start:"10:30", end:"11:15", yearly:false});
-  seed(D(2),  {title:"Frokost med farmor", desc:"Hun kommer forbi med kage", people:["familie"], allDay:false, start:"12:00", end:"13:30", yearly:false});
-  seed(D(2),  {title:"Svømning",           desc:"Husk håndklæde og badetøj", people:["agnes"], allDay:false, start:"13:00", end:"14:00", yearly:false});
-  seed(D(2),  {title:"Klaverundervisning", desc:"", people:["sigurd"], allDay:false, start:"13:30", end:"14:15", yearly:false});
-  seed(D(2),  {title:"Afhentning i vuggestuen", desc:"", people:["freddy"], allDay:false, start:"15:45", end:"", yearly:false});
-  seed(D(2),  {title:"Fodboldtræning",     desc:"", people:["sigurd"], allDay:false, start:"16:30", end:"18:00", yearly:false});
-  seed(D(2),  {title:"Spejder",            desc:"Møde ved hytten, tag regntøj med", people:["agnes"], allDay:false, start:"17:00", end:"19:00", yearly:false});
-  seed(D(2),  {title:"Fællesspisning",     desc:"I forsamlingshuset, husk service", people:["familie"], allDay:false, start:"18:00", end:"20:30", yearly:false});
-  seed(D(2),  {title:"Generalforsamling",  desc:"Grundejerforeningen", people:["far"], allDay:false, start:"19:30", end:"21:30", yearly:false});
-
-  /* ---- Fremad ---- */
-  seed(D(1),  {title:"Forældremøde",       desc:"I skolens aula", people:["mor","far"], allDay:false, start:"17:00", end:"19:00", yearly:false});
-  seed(D(3),  {title:"Agnes til svømning", desc:"Afhentning kl. 15", people:["agnes"], allDay:false, start:"14:00", end:"15:00", yearly:false});
-  seed(D(4),  {title:"Far på kursus",      desc:"Hele dagen ude af huset", people:["far"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(5),  {title:"Storvask og havedag",desc:"", people:["familie"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(6),  {title:"Farmors fødselsdag", desc:"Husk gave", people:["familie"], allDay:true, start:"", end:"", yearly:true});
-  seed(D(8),  {title:"Legeaftale",         desc:"Hos Emil", people:["freddy"], allDay:false, start:"13:00", end:"16:00", yearly:false});
-  seed(D(10), {title:"Bilen til syn",      desc:"", people:["far"], allDay:false, start:"08:00", end:"", yearly:false});
-  seed(D(11), {title:"Klipning",           desc:"Begge drenge samme dag", people:["sigurd","freddy"], allDay:false, start:"15:00", end:"16:00", yearly:false});
-  seed(D(13), {title:"Biograftur",         desc:"", people:["familie"], allDay:false, start:"19:00", end:"21:00", yearly:false});
-  seed(D(16), {title:"Skolefotografering", desc:"Pænt tøj", people:["sigurd"], allDay:false, start:"09:00", end:"", yearly:false});
-  seed(D(18), {title:"Mor til frisør",     desc:"", people:["mor"], allDay:false, start:"11:00", end:"12:30", yearly:false});
-  seed(D(20), {title:"Weekend hos mormor", desc:"Vi kører fredag eftermiddag", people:["familie"], allDay:true, start:"", end:"", yearly:false});
-  seed(D(23), {title:"Forældrekaffe",      desc:"", people:["far"], allDay:false, start:"14:30", end:"16:00", yearly:false});
-  seed(D(26), {title:"Cykeleftersyn",      desc:"Inden vinteren", people:["sigurd"], allDay:false, start:"16:00", end:"", yearly:false});
-  seed(D(29), {title:"Fastelavnsfest",     desc:"Tønden slås ved klubhuset", people:["familie"], allDay:false, start:"10:00", end:"13:00", yearly:false});
-  seed(D(33), {title:"Tandlæge",           desc:"Kontrol", people:["agnes"], allDay:false, start:"11:30", end:"12:00", yearly:false});
-  seed(D(37), {title:"Arbejdsweekend",     desc:"", people:["far"], allDay:true, start:"", end:"", yearly:false});
-
-  /* ---- Omkring julen, så helligdagsmarkeringen kan ses ---- */
-  seed(y+"-12-23", {title:"Julebag",       desc:"Vi laver klejner", people:["familie"], allDay:false, start:"14:00", end:"17:00", yearly:false});
-  seed(y+"-12-24", {title:"Juleaften",     desc:"Hos os i år", people:["familie"], allDay:true, start:"", end:"", yearly:true});
-  seed(y+"-12-25", {title:"Julefrokost",   desc:"Hos farmor og farfar", people:["familie"], allDay:false, start:"12:00", end:"18:00", yearly:false});
-  seed(y+"-12-31", {title:"Nytårsaften",   desc:"", people:["familie"], allDay:true, start:"", end:"", yearly:true});
-})();
-
 function eventsOn(ds){
   const md = ds.slice(5);
   return events
@@ -605,13 +471,62 @@ function eventsOn(ds){
     });
 }
 
-/* =======================================================================
-   Aftensmad fra madplanen (Historik-fanen, kolonnen plan_nu)
-   ======================================================================= */
-const dinners = new Map();
-let mealStatus = "henter";      // henter | ok | fejl
-let mealError  = "";
+/* ---------- Oversættelse mellem database og app ---------- */
+const hhmm = t => t ? String(t).slice(0,5) : "";
+const fraRaekke = r => ({
+  id: r.id, date: r.dato, allDay: r.heldags,
+  start: hhmm(r.start_tid), end: hhmm(r.slut_tid),
+  title: r.titel, desc: r.beskrivelse || "",
+  yearly: r.aarlig, people: r.personer || []
+});
+const tilRaekke = e => ({
+  dato: e.date, heldags: e.allDay,
+  start_tid: e.allDay ? null : (e.start || null),
+  slut_tid: (e.allDay || !e.end) ? null : e.end,
+  titel: e.title, beskrivelse: e.desc || "",
+  aarlig: e.yearly, personer: e.people
+});
 
+/* =======================================================================
+   Fejlbesked — ingen tavse fejl
+   ======================================================================= */
+function vis(besked){
+  document.getElementById("banner-text").textContent = besked;
+  document.getElementById("banner").hidden = false;
+}
+function skjulBesked(){ document.getElementById("banner").hidden = true; }
+document.getElementById("banner-close").onclick = skjulBesked;
+
+/* =======================================================================
+   Hent alt fra databasen
+   ======================================================================= */
+async function hentAlt(){
+  skjulBesked();
+  const [pRes, aRes, uRes] = await Promise.all([
+    sb.from("personer").select("*").order("raekkefoelge"),
+    sb.from("aftaler").select("*").order("dato"),
+    sb.from("delebarn_undtagelser").select("*")
+  ]);
+
+  if(pRes.error || aRes.error || uRes.error){
+    vis("Kunne ikke hente data: " + (pRes.error || aRes.error || uRes.error).message);
+    return;
+  }
+
+  if(pRes.data && pRes.data.length){
+    PEOPLE = pRes.data.map(p => ({
+      id:p.id, navn:p.navn, kort:p.kort, lys:p.farve_lys, moerk:p.farve_moerk
+    }));
+  }
+  events = aRes.data.map(fraRaekke);
+  agnesOverrides.clear();
+  uRes.data.forEach(r => agnesOverrides.set(r.dato, r.er_her));
+  render();
+}
+
+/* =======================================================================
+   Aftensmad fra madplanen (Historik-fanen)
+   ======================================================================= */
 function parseCsv(text){
   const rows=[]; let row=[], cell="", q=false;
   for(let i=0;i<text.length;i++){
@@ -627,20 +542,16 @@ function parseCsv(text){
   if(cell.length||row.length){ row.push(cell); rows.push(row); }
   return rows;
 }
-
-/* Arket kan skrive datoen på flere måder afhængigt af celleformatet.
-   Alt bliver oversat til ÅÅÅÅ-MM-DD, ellers rammer opslaget aldrig. */
 function normalizeDato(raw){
   const s = String(raw||"").trim();
   if(!s) return "";
   let m;
-  if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))      return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);
+  if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))         return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);
   if((m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/))) return m[3]+"-"+pad(m[2])+"-"+pad(m[1]);
   if((m = s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/))) return m[1]+"-"+pad(Number(m[2])+1)+"-"+pad(m[3]);
   const d = new Date(s);
   return isNaN(d) ? "" : iso(d);
 }
-
 async function loadDinners(){
   try{
     const res = await fetch(HISTORIK_CSV, {cache:"no-store"});
@@ -648,14 +559,16 @@ async function loadDinners(){
     const rows = parseCsv(await res.text());
     if(rows.length < 2) throw new Error("Historik-fanen kom tom retur");
     const head = rows[0].map(h => h.trim().toLowerCase());
-    const iDato = head.indexOf("dato"), iPlan = head.indexOf("plan_nu");
+    const iDato = head.indexOf("dato"), iPlan = head.indexOf("plan_nu"), iSpist = head.indexOf("spist");
     if(iDato < 0 || iPlan < 0) throw new Error("Fandt ikke kolonnerne dato og plan_nu");
+    dinners.clear();
     rows.slice(1).forEach(r => {
-      const d = normalizeDato(r[iDato]), p = (r[iPlan]||"").trim();
+      const d = normalizeDato(r[iDato]);
+      // Retten flytter fra plan_nu til spist når dagen er gået, så vi tager den der er udfyldt
+      const p = (r[iPlan]||"").trim() || (iSpist > -1 ? (r[iSpist]||"").trim() : "");
       if(d && p) dinners.set(d, p);
     });
     mealStatus = "ok";
-    console.info("Madplan: hentede " + dinners.size + " dage fra Historik-fanen.");
   }catch(err){
     mealStatus = "fejl";
     mealError = err.message || String(err);
@@ -667,8 +580,8 @@ async function loadDinners(){
 /* =======================================================================
    Tilstand
    ======================================================================= */
-let view = "day";                 // day | week | month
-let cursor = new Date();          // hvilken dag/uge/måned vi kigger på
+let view = "day";
+let cursor = new Date();
 
 /* =======================================================================
    Små byggeklodser
@@ -676,15 +589,11 @@ let cursor = new Date();          // hvilken dag/uge/måned vi kigger på
 function dotEl(pid, size){
   const p = personById(pid); if(!p) return "";
   const cls = size ? "dot " + size : "dot";
-  return '<span class="'+cls+'" style="background:'+p.farve+'" title="'+p.navn+'">'+(size==="sm"?"":p.kort)+'</span>';
+  return '<span class="'+cls+'" style="background:'+farveFor(p)+'" title="'+p.navn+'">'+(size==="sm"?"":p.kort)+'</span>';
 }
 const dotsEl = (ids, size) => '<span class="dots">' + ids.map(id => dotEl(id, size)).join("") + '</span>';
 const esc = s => String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-
-function timeLabel(e){
-  if(e.allDay) return "Hele dagen";
-  return e.end ? e.start + "–" + e.end : e.start;
-}
+const timeLabel = e => e.allDay ? "Hele dagen" : (e.end ? e.start + "–" + e.end : e.start);
 
 /* =======================================================================
    Dagsvisning
@@ -711,14 +620,12 @@ function renderDay(){
 
   h += '<div class="strip">'
      +   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
-     +   '<span class="label">Aftensmad</span>'
-     +   '<span>'+mealText+'</span>'
+     +   '<span class="label">Aftensmad</span><span>'+mealText+'</span>'
      + '</div>';
 
   if(mealStatus === "fejl"){
     h += '<div class="strip"><span class="label">Årsag</span><span class="label">'+esc(mealError)+'</span></div>';
   }
-
   if(hol){
     h += '<div class="strip"><span class="label">Helligdag</span><span class="holiday-tag">'+esc(hol)+'</span></div>';
   }
@@ -733,7 +640,7 @@ function renderDay(){
          +   '<div class="time">'+(e.allDay ? '<small>hele<br>dagen</small>' : esc(e.start) + (e.end ? '<small>'+esc(e.end)+'</small>' : ''))+'</div>'
          +   '<span class="stem"></span>'
          +   '<div class="body">'
-         +     '<button class="ev" data-ev="'+e.id+'" style="border-left-color:'+(p0?p0.farve:"var(--p-familie)")+'">'
+         +     '<button class="ev" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
          +       '<span class="t"><span>'+esc(e.title)+(e.yearly?' <span aria-label="gentages hvert år">↻</span>':'')+'</span>'+dotsEl(e.people,"lg")+'</span>'
          +       (e.desc ? '<span class="d">'+esc(e.desc)+'</span>' : '')
          +     '</button>'
@@ -742,39 +649,30 @@ function renderDay(){
     });
     h += '</div>';
   }
-
-  h += '</div>';
-  return h;
+  return h + '</div>';
 }
 
 /* =======================================================================
-   Ugevisning — 7 dage under hinanden
+   Ugevisning
    ======================================================================= */
 function renderWeek(){
-  const start = mondayOf(cursor);
-  const today = new Date();
+  const start = mondayOf(cursor), today = new Date();
   let h = "";
   for(let i=0;i<7;i++){
     const d = addDays(start,i), ds = iso(d);
     const list = eventsOn(ds), hol = holidayName(ds), meal = dinners.get(ds);
     const cls = "weekrow" + (agnesHere(d)?"":" away") + (sameDay(d,today)?" today":"");
     h += '<button class="'+cls+'" data-goto="'+ds+'">'
-       +   '<span class="wd"><span class="n">'+d.getDate()+'</span>'
-       +     '<span class="m">'+UGEDAGE_KORT[i]+'</span></span>'
+       +   '<span class="wd"><span class="n">'+d.getDate()+'</span><span class="m">'+UGEDAGE_KORT[i]+'</span></span>'
        +   '<span class="items">';
     if(hol) h += '<span class="witem"><span class="wn holiday-tag">'+esc(hol)+'</span></span>';
     if(!list.length && !hol) h += '<span class="none">—</span>';
     list.forEach(e => {
-      h += '<span class="witem">'
-         +   '<span class="wt">'+(e.allDay ? "—" : esc(e.start))+'</span>'
-         +   dotsEl(e.people)
-         +   '<span class="wn">'+esc(e.title)+'</span>'
-         + '</span>';
+      h += '<span class="witem"><span class="wt">'+(e.allDay ? "—" : esc(e.start))+'</span>'
+         +   dotsEl(e.people)+'<span class="wn">'+esc(e.title)+'</span></span>';
     });
     if(meal){
-      h += '<span class="meal">'
-         +  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
-         +  esc(meal) + '</span>';
+      h += '<span class="meal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'+esc(meal)+'</span>';
     }
     h += '</span></button>';
   }
@@ -782,12 +680,11 @@ function renderWeek(){
 }
 
 /* =======================================================================
-   Månedsvisning — uger under hinanden, ugenummer i venstre kolonne
+   Månedsvisning
    ======================================================================= */
 function renderMonth(){
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  const start = mondayOf(first);
-  const today = new Date();
+  const start = mondayOf(first), today = new Date();
   const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
   const offset = (first.getDay()+6)%7;
   const weeks = Math.ceil((offset + daysInMonth) / 7);
@@ -800,8 +697,7 @@ function renderMonth(){
     h += '<button class="wknum" data-week="'+iso(wStart)+'" aria-label="Vis uge '+isoWeek(wStart)+'">'+isoWeek(wStart)+'</button>';
     for(let i=0;i<7;i++){
       const d = addDays(wStart,i), ds = iso(d);
-      const list = eventsOn(ds);
-      const ids = [...new Set(list.flatMap(e => e.people))].slice(0,7);
+      const ids = [...new Set(eventsOn(ds).flatMap(e => e.people))].slice(0,7);
       const cls = "mcell"
         + (agnesHere(d)?"":" away")
         + (d.getMonth()!==cursor.getMonth()?" other":"")
@@ -814,10 +710,7 @@ function renderMonth(){
     }
   }
   h += '</div></div>';
-
-  h += '<div class="legend">'
-     + PEOPLE.map(p => '<span>'+dotEl(p.id)+p.navn+'</span>').join("")
-     + '</div>';
+  h += '<div class="legend">' + PEOPLE.map(p => '<span>'+dotEl(p.id)+p.navn+'</span>').join("") + '</div>';
   return h;
 }
 
@@ -831,25 +724,21 @@ function render(){
 
   const title = document.getElementById("head-title");
   const sub   = document.getElementById("head-sub");
-  const today = new Date();
   let subParts = [];
 
   if(view === "day"){
     const wd = UGEDAGE[(cursor.getDay()+6)%7];
     title.textContent = wd.charAt(0).toUpperCase()+wd.slice(1) + " " + cursor.getDate() + ". " + MAANEDER[cursor.getMonth()];
-    subParts.push("Uge " + isoWeek(cursor));
-    subParts.push(cursor.getFullYear());
+    subParts.push("Uge " + isoWeek(cursor), String(cursor.getFullYear()));
     if(agnesChanged(cursor)) subParts.push("Agnes-dagen er ændret manuelt");
   } else if(view === "week"){
     const s = mondayOf(cursor), e = addDays(s,6);
     title.textContent = "Uge " + isoWeek(s);
-    subParts.push(s.getDate()+". "+MAANEDER[s.getMonth()]+" – "+e.getDate()+". "+MAANEDER[e.getMonth()]);
-    subParts.push(String(isoWeekYear(s)));
+    subParts.push(s.getDate()+". "+MAANEDER[s.getMonth()]+" – "+e.getDate()+". "+MAANEDER[e.getMonth()], String(isoWeekYear(s)));
   } else {
     title.textContent = MAANEDER[cursor.getMonth()].charAt(0).toUpperCase()+MAANEDER[cursor.getMonth()].slice(1);
     subParts.push(String(cursor.getFullYear()));
   }
-
   sub.textContent = subParts.join(" · ");
 
   const stage = document.getElementById("stage");
@@ -858,17 +747,19 @@ function render(){
 }
 
 /* =======================================================================
-   Handlinger
+   Navigation
    ======================================================================= */
 function setView(v){ view = v; closeDropdown(); render(); }
+function step(dir){
+  closeDropdown();
+  if(view==="day")       cursor = addDays(cursor, dir);
+  else if(view==="week") cursor = addDays(cursor, dir*7);
+  else                   cursor = new Date(cursor.getFullYear(), cursor.getMonth()+dir, 1);
+  render();
+}
+function goHome(){ cursor = new Date(); view = "day"; closeDropdown(); render(); }
 
-/* ---------- Hop til en anden uge eller måned ---------- */
-function weeksInIsoYear(y){ return isoWeek(new Date(y,11,28)); }
-function mondayOfIsoWeek(y,w){ return addDays(mondayOf(new Date(y,0,4)), (w-1)*7); }
-
-let ddMode = null;      // "week" | "month" | null
-let ddYear = null;
-
+let ddMode = null, ddYear = null;
 function closeDropdown(){
   ddMode = null;
   document.getElementById("dropdown").hidden = true;
@@ -885,13 +776,10 @@ function openDropdown(mode){
 function drawDropdown(){
   document.getElementById("dd-year-label").textContent = ddYear;
   const body = document.getElementById("dd-body");
-
   if(ddMode === "month"){
     const cur = cursor.getFullYear() === ddYear ? cursor.getMonth() : -1;
-    body.className = "dd-body";
     body.innerHTML = '<div class="dd-months">' + MAANEDER.map((m,i) =>
-      '<button role="option" data-month="'+i+'" aria-selected="'+(i===cur)+'">'
-      + m.slice(0,3) + '</button>').join("") + '</div>';
+      '<button role="option" data-month="'+i+'" aria-selected="'+(i===cur)+'">'+m.slice(0,3)+'</button>').join("") + '</div>';
   } else {
     const curWeek = isoWeekYear(mondayOf(cursor)) === ddYear ? isoWeek(cursor) : -1;
     const n = weeksInIsoYear(ddYear);
@@ -900,8 +788,7 @@ function drawDropdown(){
       const s = mondayOfIsoWeek(ddYear,w), e = addDays(s,6);
       h += '<button role="option" data-week-nr="'+w+'" aria-selected="'+(w===curWeek)+'">'
          +   '<span class="w">Uge '+w+'</span>'
-         +   '<span class="r">'+s.getDate()+'. '+MAANEDER[s.getMonth()].slice(0,3)
-         +   ' – '+e.getDate()+'. '+MAANEDER[e.getMonth()].slice(0,3)+'</span>'
+         +   '<span class="r">'+s.getDate()+'. '+MAANEDER[s.getMonth()].slice(0,3)+' – '+e.getDate()+'. '+MAANEDER[e.getMonth()].slice(0,3)+'</span>'
          + '</button>';
     }
     body.innerHTML = h + '</div>';
@@ -909,22 +796,22 @@ function drawDropdown(){
   const sel = body.querySelector('[aria-selected="true"]');
   if(sel) sel.scrollIntoView({block:"center"});
 }
-
 function segmentClick(v){
   if(view !== v){ setView(v); return; }
-  if(v === "day"){ return; }                 // dagsknappen har ingen dropdown
+  if(v === "day") return;
   if(ddMode === v) closeDropdown(); else openDropdown(v);
 }
+
 document.getElementById("v-day").onclick   = () => segmentClick("day");
 document.getElementById("v-week").onclick  = () => segmentClick("week");
 document.getElementById("v-month").onclick = () => segmentClick("month");
 document.getElementById("today-btn").onclick = goHome;
-
+document.getElementById("prev").onclick = () => step(-1);
+document.getElementById("next").onclick = () => step(1);
 document.getElementById("dd-prev").onclick = () => { ddYear--; drawDropdown(); };
 document.getElementById("dd-next").onclick = () => { ddYear++; drawDropdown(); };
 document.getElementById("dd-body").addEventListener("click", ev => {
-  const m = ev.target.closest("[data-month]");
-  const w = ev.target.closest("[data-week-nr]");
+  const m = ev.target.closest("[data-month]"), w = ev.target.closest("[data-week-nr]");
   if(m){ cursor = new Date(ddYear, Number(m.dataset.month), 1); closeDropdown(); render(); }
   if(w){ cursor = mondayOfIsoWeek(ddYear, Number(w.dataset.weekNr)); closeDropdown(); render(); }
 });
@@ -933,51 +820,58 @@ document.addEventListener("click", ev => {
   if(ev.target.closest("#dropdown") || ev.target.closest(".segment")) return;
   closeDropdown();
 });
-function step(dir){
-  closeDropdown();
-  if(view==="day")   cursor = addDays(cursor, dir);
-  else if(view==="week") cursor = addDays(cursor, dir*7);
-  else cursor = new Date(cursor.getFullYear(), cursor.getMonth()+dir, 1);
+
+/* ---------- Lyst og mørkt ---------- */
+function saetTema(t){
+  document.documentElement.setAttribute("data-theme", t);
+  try{ localStorage.setItem("kalender-tema", t); }catch(e){}
   render();
 }
-function goHome(){ cursor = new Date(); view = "day"; closeDropdown(); render(); }
+document.getElementById("theme-btn").onclick = () => saetTema(erMoerk() ? "light" : "dark");
 
-document.getElementById("prev").onclick = () => step(-1);
-document.getElementById("next").onclick = () => step(1);
-
-document.getElementById("theme-btn").onclick = () => {
-  const dark = document.documentElement.getAttribute("data-theme") === "dark";
-  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
-};
-
-document.getElementById("stage").addEventListener("click", ev => {
+/* =======================================================================
+   Handlinger i visningen
+   ======================================================================= */
+document.getElementById("stage").addEventListener("click", async ev => {
   const goto = ev.target.closest("[data-goto]");
   const week = ev.target.closest("[data-week]");
   const evb  = ev.target.closest("[data-ev]");
   const agn  = ev.target.closest("#agnes-btn");
-  if(agn){
-    const ds = iso(cursor);
-    const now = agnesHere(cursor);
-    if(agnesDefault(cursor) === !now) agnesOverrides.delete(ds); else agnesOverrides.set(ds, !now);
-    render(); return;
-  }
-  if(evb){ openDetail(Number(evb.dataset.ev)); return; }
+
+  if(agn){ await vendAgnesDag(); return; }
+  if(evb){ openDetail(evb.dataset.ev); return; }
   if(week){ cursor = fromIso(week.dataset.week); setView("week"); return; }
   if(goto){ cursor = fromIso(goto.dataset.goto); setView("day"); return; }
 });
 
+async function vendAgnesDag(){
+  const ds = iso(cursor);
+  const ny = !agnesHere(cursor);
+  const foer = new Map(agnesOverrides);
+
+  if(agnesDefault(cursor) === ny){
+    agnesOverrides.delete(ds);
+    render();
+    const { error } = await sb.from("delebarn_undtagelser").delete().eq("dato", ds);
+    if(error){ agnesOverrides.clear(); foer.forEach((v,k)=>agnesOverrides.set(k,v)); render(); vis("Kunne ikke gemme: " + error.message); }
+  } else {
+    agnesOverrides.set(ds, ny);
+    render();
+    const { error } = await sb.from("delebarn_undtagelser").upsert({ dato: ds, er_her: ny });
+    if(error){ agnesOverrides.clear(); foer.forEach((v,k)=>agnesOverrides.set(k,v)); render(); vis("Kunne ikke gemme: " + error.message); }
+  }
+}
+
 /* ---------- Detaljer ---------- */
 let openEventId = null;
-const back = id => document.getElementById(id);
-const show = id => back(id).classList.add("open");
-const hide = id => back(id).classList.remove("open");
+const show = id => document.getElementById(id).classList.add("open");
+const hide = id => document.getElementById(id).classList.remove("open");
 
 function openDetail(id){
   const e = events.find(x => x.id === id); if(!e) return;
   openEventId = id;
   document.getElementById("detail-title").textContent = e.title;
-  const d = fromIso(e.date);
-  const wd = UGEDAGE[(d.getDay()+6)%7];
+  const d = fromIso(e.date), wd = UGEDAGE[(d.getDay()+6)%7];
   document.getElementById("detail-meta").textContent =
     timeLabel(e) + " · " + wd + " " + d.getDate() + ". " + MAANEDER[d.getMonth()] + (e.yearly ? " · gentages hvert år" : "");
   const dd = document.getElementById("detail-desc");
@@ -996,13 +890,15 @@ document.getElementById("detail-delete").onclick = () => {
   show("confirm-back");
 };
 document.getElementById("confirm-no").onclick = () => hide("confirm-back");
-document.getElementById("confirm-yes").onclick = () => {
-  const i = events.findIndex(x => x.id === openEventId);
-  if(i > -1) events.splice(i,1);
+document.getElementById("confirm-yes").onclick = async () => {
+  const id = openEventId;
+  const { error } = await sb.from("aftaler").delete().eq("id", id);
+  if(error){ vis("Kunne ikke slette: " + error.message); return; }
+  events = events.filter(x => x.id !== id);
   hide("confirm-back"); hide("detail-back"); render();
 };
 
-/* ---------- Opret / rediger ---------- */
+/* ---------- Opret og rediger ---------- */
 let editingId = null;
 let chosen = new Set();
 
@@ -1018,15 +914,13 @@ document.getElementById("f-people").addEventListener("click", ev => {
   else { chosen.delete("familie"); chosen.has(id) ? chosen.delete(id) : chosen.add(id); }
   drawPeopleChips();
 });
-
 function syncTimeFields(){
-  document.getElementById("f-times").style.display =
-    document.getElementById("f-allday").checked ? "none" : "flex";
+  document.getElementById("f-times").style.display = document.getElementById("f-allday").checked ? "none" : "flex";
 }
 document.getElementById("f-allday").onchange = syncTimeFields;
 
 function openEditor(id){
-  editingId = id ?? null;
+  editingId = id || null;
   const e = id ? events.find(x => x.id === id) : null;
   document.getElementById("edit-title").textContent = e ? "Rediger aftale" : "Ny aftale";
   document.getElementById("f-title").value = e ? e.title : "";
@@ -1043,13 +937,12 @@ function openEditor(id){
   document.getElementById("f-people-err").classList.remove("show");
   show("edit-back");
 }
-document.getElementById("add-btn").onclick    = () => openEditor(null);
+document.getElementById("add-btn").onclick     = () => openEditor(null);
 document.getElementById("edit-cancel").onclick = () => hide("edit-back");
 
-document.getElementById("edit-save").onclick = () => {
+document.getElementById("edit-save").onclick = async () => {
   const title = document.getElementById("f-title").value.trim();
-  const okTitle = title.length > 0;
-  const okPeople = chosen.size > 0;
+  const okTitle = title.length > 0, okPeople = chosen.size > 0;
   document.getElementById("f-title-err").classList.toggle("show", !okTitle);
   document.getElementById("f-people-err").classList.toggle("show", !okPeople);
   if(!okTitle || !okPeople) return;
@@ -1065,10 +958,21 @@ document.getElementById("edit-save").onclick = () => {
     yearly: document.getElementById("f-yearly").checked,
     people: [...chosen]
   };
+
+  const knap = document.getElementById("edit-save");
+  knap.disabled = true; knap.textContent = "Gemmer …";
+
   if(editingId){
-    Object.assign(events.find(x => x.id === editingId), data);
+    const { data: rows, error } = await sb.from("aftaler").update(tilRaekke(data)).eq("id", editingId).select();
+    knap.disabled = false; knap.textContent = "Gem";
+    if(error){ vis("Kunne ikke gemme: " + error.message); return; }
+    const i = events.findIndex(x => x.id === editingId);
+    if(i > -1 && rows && rows[0]) events[i] = fraRaekke(rows[0]);
   } else {
-    events.push(Object.assign({id: nextId++}, data));
+    const { data: rows, error } = await sb.from("aftaler").insert(tilRaekke(data)).select();
+    knap.disabled = false; knap.textContent = "Gem";
+    if(error){ vis("Kunne ikke gemme: " + error.message); return; }
+    if(rows && rows[0]) events.push(fraRaekke(rows[0]));
     cursor = fromIso(data.date);
   }
   hide("edit-back");
@@ -1085,23 +989,97 @@ document.addEventListener("keydown", ev => {
   }
 });
 
-/* ---------- Går hjem til i dag når skærmen har stået urørt ---------- */
+/* =======================================================================
+   Menu
+   ======================================================================= */
+document.getElementById("menu-btn").onclick = async () => {
+  const { data } = await sb.auth.getUser();
+  document.getElementById("menu-mail").textContent = data && data.user ? "Logget ind som " + data.user.email : "";
+  show("menu-back");
+};
+document.getElementById("menu-close").onclick = () => hide("menu-back");
+document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); await loadDinners(); };
+document.getElementById("menu-logout").onclick = async () => {
+  hide("menu-back");
+  await sb.auth.signOut();
+  events = []; agnesOverrides.clear();
+  document.getElementById("gate").classList.add("open");
+};
+document.getElementById("menu-export").onclick = () => {
+  const kopi = {
+    gemt: new Date().toISOString(),
+    personer: PEOPLE,
+    aftaler: events,
+    delebarn_undtagelser: [...agnesOverrides.entries()].map(([dato,er_her]) => ({dato, er_her}))
+  };
+  const blob = new Blob([JSON.stringify(kopi, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "familiekalender-" + iso(new Date()) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  hide("menu-back");
+};
+
+/* =======================================================================
+   Går hjem til i dag når skærmen har stået urørt
+   ======================================================================= */
 let idleTimer = null;
 function resetIdle(){
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    if(document.querySelector(".backdrop.open")) { resetIdle(); return; }
+    if(document.querySelector(".backdrop.open") || document.getElementById("gate").classList.contains("open")){ resetIdle(); return; }
     goHome();
   }, IDLE_MS);
 }
-["pointerdown","keydown","wheel","touchstart"].forEach(t =>
-  document.addEventListener(t, resetIdle, {passive:true}));
+["pointerdown","keydown","wheel","touchstart"].forEach(t => document.addEventListener(t, resetIdle, {passive:true}));
 
-/* ---------- Start ---------- */
-render();
-resetIdle();
-loadDinners();
+/* =======================================================================
+   Login
+   ======================================================================= */
+const gate = document.getElementById("gate");
+async function logInd(){
+  const mail = document.getElementById("g-mail").value.trim();
+  const kode = document.getElementById("g-pass").value;
+  const fejl = document.getElementById("g-err");
+  const knap = document.getElementById("g-login");
+  fejl.classList.remove("show");
+  if(!mail || !kode){ fejl.textContent = "Udfyld både e-mail og kodeord."; fejl.classList.add("show"); return; }
+
+  knap.disabled = true; knap.textContent = "Logger ind …";
+  const { error } = await sb.auth.signInWithPassword({ email: mail, password: kode });
+  knap.disabled = false; knap.textContent = "Log ind";
+
+  if(error){
+    fejl.textContent = error.message === "Invalid login credentials"
+      ? "E-mail eller kodeord passer ikke."
+      : error.message;
+    fejl.classList.add("show");
+    return;
+  }
+  document.getElementById("g-pass").value = "";
+  gate.classList.remove("open");
+  await start();
+}
+document.getElementById("g-login").onclick = logInd;
+document.getElementById("g-pass").addEventListener("keydown", ev => { if(ev.key === "Enter") logInd(); });
+
+/* =======================================================================
+   Opstart
+   ======================================================================= */
+async function start(){
+  await hentAlt();
+  loadDinners();
+  resetIdle();
+}
+
+(async function(){
+  try{ const t = localStorage.getItem("kalender-tema"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+  render();
+  const { data } = await sb.auth.getSession();
+  if(data && data.session){ await start(); }
+  else { gate.classList.add("open"); }
+})();
 </script>
 </body>
 </html>
-
