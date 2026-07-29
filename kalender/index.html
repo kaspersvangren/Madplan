@@ -500,7 +500,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
 /* =======================================================================
    Hent alt fra databasen
    ======================================================================= */
-async function hentAlt(){
+async function hentAlt(forsoeg){
   skjulBesked();
   const [pRes, aRes, uRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
@@ -508,8 +508,15 @@ async function hentAlt(){
     sb.from("delebarn_undtagelser").select("*")
   ]);
 
-  if(pRes.error || aRes.error || uRes.error){
-    vis("Kunne ikke hente data: " + (pRes.error || aRes.error || uRes.error).message);
+  const fejl = pRes.error || aRes.error || uRes.error;
+  if(fejl){
+    // Uret på enheden og på serveren kan være et par sekunder ude af trit
+    // lige efter login. Prøv igen én gang, før vi råber op.
+    if(!forsoeg){
+      await new Promise(r => setTimeout(r, 2500));
+      return hentAlt(1);
+    }
+    vis("Kunne ikke hente data: " + fejl.message);
     return;
   }
 
@@ -523,6 +530,49 @@ async function hentAlt(){
   uRes.data.forEach(r => agnesOverrides.set(r.dato, r.er_her));
   render();
 }
+
+/* =======================================================================
+   Realtid — ændringer fra andre skærme kommer af sig selv
+   ======================================================================= */
+let kanal = null;
+
+function lytPaaAendringer(){
+  if(kanal) return;
+  kanal = sb.channel("familiekalender")
+    .on("postgres_changes", { event:"*", schema:"public", table:"aftaler" }, p => {
+      if(p.eventType === "DELETE"){
+        events = events.filter(x => x.id !== (p.old && p.old.id));
+      } else {
+        const ny = fraRaekke(p.new);
+        const i = events.findIndex(x => x.id === ny.id);
+        if(i > -1) events[i] = ny; else events.push(ny);
+      }
+      render();
+    })
+    .on("postgres_changes", { event:"*", schema:"public", table:"delebarn_undtagelser" }, p => {
+      if(p.eventType === "DELETE"){
+        if(p.old && p.old.dato) agnesOverrides.delete(p.old.dato);
+      } else {
+        agnesOverrides.set(p.new.dato, p.new.er_her);
+      }
+      render();
+    })
+    .on("postgres_changes", { event:"*", schema:"public", table:"personer" }, () => hentAlt())
+    .subscribe(status => console.info("Realtid:", status));
+}
+
+function stopLytning(){
+  if(kanal){ sb.removeChannel(kanal); kanal = null; }
+}
+
+/* Sikkerhedsnet: har forbindelsen været nede, hentes alt forfra
+   når appen kommer frem igen. */
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState !== "visible") return;
+  if(document.getElementById("gate").classList.contains("open")) return;
+  hentAlt();
+  loadDinners();
+});
 
 /* =======================================================================
    Aftensmad fra madplanen (Historik-fanen)
@@ -1001,6 +1051,7 @@ document.getElementById("menu-close").onclick = () => hide("menu-back");
 document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); await loadDinners(); };
 document.getElementById("menu-logout").onclick = async () => {
   hide("menu-back");
+  stopLytning();
   await sb.auth.signOut();
   events = []; agnesOverrides.clear();
   document.getElementById("gate").classList.add("open");
@@ -1069,6 +1120,7 @@ document.getElementById("g-pass").addEventListener("keydown", ev => { if(ev.key 
    ======================================================================= */
 async function start(){
   await hentAlt();
+  lytPaaAendringer();
   loadDinners();
   resetIdle();
 }
