@@ -1,6 +1,7 @@
 {
+  "id": "familiekalender",
   "name": "Familiekalender",
-  "short_name": "Kalender",
+  "short_name": "Familiekalender",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
