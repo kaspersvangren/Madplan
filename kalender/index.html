@@ -107,7 +107,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .datehead .sub{font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
 
 /* ---------- Fælles ---------- */
-.scroll{flex:1;overflow-y:auto;padding:0 14px 96px}
+.stage-wrap{flex:1;min-height:0;display:flex;overflow:hidden}
+.scroll{flex:1;overflow-y:auto;padding:0 14px 96px;will-change:transform}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-grid;place-items:center;
   font-size:9px;font-weight:700;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);letter-spacing:-.02em}
 .dot.lg{width:26px;height:26px;font-size:13px}
@@ -256,7 +257,7 @@ svg{display:block}
     <button class="nav" id="next" aria-label="Næste"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   </div>
 
-  <div class="scroll" id="stage"></div>
+  <div class="stage-wrap"><div class="scroll" id="stage"></div></div>
 </div>
 
 <button class="fab" id="add-btn">
@@ -367,7 +368,7 @@ svg{display:block}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "1.1.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "1.2.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -818,6 +819,32 @@ function step(dir){
 }
 function goHome(){ cursor = new Date(); view = "day"; closeDropdown(); render(); }
 
+/* Den gamle visning glider ud til den ene side, den nye ind fra den anden. */
+const mindreBevaegelse = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let animerer = false;
+
+function skiftMedGlid(dir){
+  const el = document.getElementById("stage");
+  if(animerer || mindreBevaegelse()){ el.style.cssText = ""; step(dir); return; }
+  animerer = true;
+
+  el.style.transition = "transform .16s ease-in, opacity .16s ease-in";
+  el.style.transform  = "translateX(" + (dir > 0 ? -110 : 110) + "%)";
+  el.style.opacity    = "0";
+
+  setTimeout(() => {
+    step(dir);                                   // henter det nye indhold
+    el.style.transition = "none";
+    el.style.transform  = "translateX(" + (dir > 0 ? 110 : -110) + "%)";
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transition = "transform .22s cubic-bezier(.2,.7,.3,1), opacity .22s ease-out";
+      el.style.transform  = "";
+      el.style.opacity    = "1";
+      setTimeout(() => { el.style.transition = ""; el.style.willChange = ""; animerer = false; }, 240);
+    }));
+  }, 160);
+}
+
 let ddMode = null, ddYear = null;
 function closeDropdown(){
   ddMode = null;
@@ -865,8 +892,8 @@ document.getElementById("v-day").onclick   = () => segmentClick("day");
 document.getElementById("v-week").onclick  = () => segmentClick("week");
 document.getElementById("v-month").onclick = () => segmentClick("month");
 document.getElementById("today-btn").onclick = goHome;
-document.getElementById("prev").onclick = () => step(-1);
-document.getElementById("next").onclick = () => step(1);
+document.getElementById("prev").onclick = () => skiftMedGlid(-1);
+document.getElementById("next").onclick = () => skiftMedGlid(1);
 document.getElementById("dd-prev").onclick = () => { ddYear--; drawDropdown(); };
 document.getElementById("dd-next").onclick = () => { ddYear++; drawDropdown(); };
 document.getElementById("dd-body").addEventListener("click", ev => {
@@ -1146,8 +1173,13 @@ document.getElementById("menu-export").onclick = () => {
     if(!aktiv) return;
     const dx = e.changedTouches[0].clientX - sx;
     const skift = retning === "vandret" && Math.abs(dx) > 60;
-    nulstil();
-    if(skift) step(dx < 0 ? 1 : -1);
+    aktiv = false; retning = null;
+    if(skift){
+      skiftMedGlid(dx < 0 ? 1 : -1);     // fortsætter fra fingerens position
+    } else {
+      el.style.transition = "transform .18s ease";
+      el.style.transform  = "";
+    }
   });
 
   el.addEventListener("touchcancel", nulstil);
