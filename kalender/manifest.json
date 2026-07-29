@@ -1,7 +1,7 @@
 {
   "id": "vores-hverdag",
   "name": "Vores Hverdag",
-  "short_name": "Vores Hverdag",
+  "short_name": "Hverdag",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",

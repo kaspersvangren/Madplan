@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#121412" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Vores Hverdag">
+<meta name="apple-mobile-web-app-title" content="Hverdag">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,6 +56,17 @@ body{
   line-height:1.35;
   -webkit-font-smoothing:antialiased;
   overscroll-behavior:none;
+}
+body::before{
+  content:"";
+  position:fixed;inset:0;z-index:-1;
+  background:url("baggrund.jpg") center bottom / cover no-repeat;
+  opacity:.13;
+  pointer-events:none;
+}
+html[data-theme="dark"] body::before{
+  filter:invert(1);
+  opacity:.10;
 }
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--line-strong);outline-offset:2px;border-radius:6px}
@@ -224,7 +235,11 @@ svg{display:block}
   font-size:11px;color:var(--muted);opacity:.55;
   font-variant-numeric:tabular-nums;pointer-events:none;
 }
-.gate{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;align-items:center;justify-content:center;padding:22px}
+.gate{position:fixed;inset:0;z-index:70;background:transparent;display:none;align-items:center;justify-content:center;padding:22px}
+.gate::before{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:var(--bg);opacity:.72;
+}
 .gate.open{display:flex}
 .gate .box{width:100%;max-width:380px}
 .gate h1{font-family:var(--font-display);font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
@@ -377,7 +392,7 @@ svg{display:block}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "1.4.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "1.5.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
