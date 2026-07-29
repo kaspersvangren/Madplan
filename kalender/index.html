@@ -352,6 +352,7 @@ svg{display:block}
       <div class="field"><label for="f-start">Start</label><input type="time" id="f-start"></div>
       <div class="field"><label for="f-end">Slut</label><input type="time" id="f-end"></div>
     </div>
+    <div class="err" id="f-time-err"></div>
     <div class="actions">
       <button class="btn" id="edit-cancel">Fortryd</button>
       <button class="btn primary" id="edit-save">Gem</button>
@@ -366,7 +367,7 @@ svg{display:block}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "1.0.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "1.1.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -993,26 +994,48 @@ function openEditor(id){
   syncTimeFields();
   document.getElementById("f-title-err").classList.remove("show");
   document.getElementById("f-people-err").classList.remove("show");
+  document.getElementById("f-time-err").classList.remove("show");
   show("edit-back");
 }
 document.getElementById("add-btn").onclick     = () => openEditor(null);
 document.getElementById("edit-cancel").onclick = () => hide("edit-back");
 
 document.getElementById("edit-save").onclick = async () => {
-  const title = document.getElementById("f-title").value.trim();
-  const okTitle = title.length > 0, okPeople = chosen.size > 0;
+  const title  = document.getElementById("f-title").value.trim();
+  const allDay = document.getElementById("f-allday").checked;
+  const start  = document.getElementById("f-start").value;
+  const slut   = document.getElementById("f-end").value;
+  const tidFejl = document.getElementById("f-time-err");
+
+  const okTitle  = title.length > 0;
+  const okPeople = chosen.size > 0;
+
+  // Et tidsfelt med kun timetal læses som tomt af browseren.
+  // Vi gætter ikke på minutterne — vi siger det.
+  let okTid = true, tidBesked = "";
+  if(!allDay){
+    if(!start){
+      okTid = false;
+      tidBesked = "Skriv et helt starttidspunkt med både timer og minutter, eller sæt flueben i hele dagen.";
+    } else if(slut && slut < start){
+      okTid = false;
+      tidBesked = "Sluttidspunktet ligger før starttidspunktet.";
+    }
+  }
+
   document.getElementById("f-title-err").classList.toggle("show", !okTitle);
   document.getElementById("f-people-err").classList.toggle("show", !okPeople);
-  if(!okTitle || !okPeople) return;
+  tidFejl.textContent = tidBesked;
+  tidFejl.classList.toggle("show", !okTid);
+  if(!okTitle || !okPeople || !okTid) return;
 
-  const allDay = document.getElementById("f-allday").checked;
   const data = {
     title,
     desc:   document.getElementById("f-desc").value.trim(),
     date:   document.getElementById("f-date").value || iso(cursor),
     allDay,
-    start:  allDay ? "" : (document.getElementById("f-start").value || "00:00"),
-    end:    allDay ? "" : document.getElementById("f-end").value,
+    start:  allDay ? "" : start,
+    end:    allDay ? "" : slut,
     yearly: document.getElementById("f-yearly").checked,
     people: [...chosen]
   };
@@ -1080,6 +1103,55 @@ document.getElementById("menu-export").onclick = () => {
   URL.revokeObjectURL(a.href);
   hide("menu-back");
 };
+
+/* =======================================================================
+   Stryg til siden for at bladre
+   Vandret bevægelse skal tydeligt overgå den lodrette, ellers er det
+   en rulning og ikke et strøg.
+   ======================================================================= */
+(function(){
+  const el = document.getElementById("stage");
+  let sx = 0, sy = 0, aktiv = false, retning = null;
+
+  const nulstil = () => {
+    el.style.transition = "transform .18s ease";
+    el.style.transform  = "";
+    aktiv = false; retning = null;
+  };
+
+  el.addEventListener("touchstart", e => {
+    if(e.touches.length !== 1) return;
+    if(document.querySelector(".backdrop.open")) return;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    aktiv = true; retning = null;
+    el.style.transition = "none";
+  }, {passive:true});
+
+  el.addEventListener("touchmove", e => {
+    if(!aktiv || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - sx;
+    const dy = e.touches[0].clientY - sy;
+    if(retning === null){
+      if(Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      retning = Math.abs(dx) > Math.abs(dy) * 1.4 ? "vandret" : "lodret";
+    }
+    if(retning === "vandret"){
+      const traek = Math.sign(dx) * Math.min(Math.abs(dx) * 0.45, 70);
+      el.style.transform = "translateX(" + traek + "px)";
+    }
+  }, {passive:true});
+
+  el.addEventListener("touchend", e => {
+    if(!aktiv) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const skift = retning === "vandret" && Math.abs(dx) > 60;
+    nulstil();
+    if(skift) step(dx < 0 ? 1 : -1);
+  });
+
+  el.addEventListener("touchcancel", nulstil);
+})();
 
 /* =======================================================================
    Går hjem til i dag når skærmen har stået urørt
