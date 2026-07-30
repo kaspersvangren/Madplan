@@ -182,6 +182,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   font-size:12px;color:var(--muted);white-space:nowrap;
 }
 .retkort:hover{border-color:var(--line-strong)}
+.retkort.valgt{border-color:var(--line-strong);background:var(--chip)}
 .retkort .navn{font-weight:600;font-size:16px}
 .retkort .under{font-size:13px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
 .mark{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:600}
@@ -682,7 +683,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.4.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.5.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -1225,12 +1226,11 @@ async function gemDag(ds, felter){
   const nu = madplanFor(ds) || {};
   const raekke = Object.assign({
     dato: ds,
-    ret_id:         nu.ret_id         || null,
-    ret_navn:       nu.ret_navn       || "",
-    tilbehoer_id:   nu.tilbehoer_id   || null,
-    tilbehoer_navn: nu.tilbehoer_navn || "",
-    portioner:      nu.portioner      || 1,
-    frost:          nu.frost          || false
+    ret_id:    nu.ret_id   || null,
+    ret_navn:  nu.ret_navn || "",
+    tilbehoer: Array.isArray(nu.tilbehoer) ? nu.tilbehoer : [],
+    portioner: nu.portioner || 1,
+    frost:     nu.frost     || false
   }, felter);
 
   const { data, error } = await sb.from("madplan").upsert(raekke, {onConflict:"dato"}).select();
@@ -1261,7 +1261,7 @@ function renderMadplan(){
 
     if(m){
       if(m.ret_navn) hoved = '<span class="r">' + esc(m.ret_navn) + '</span>';
-      if(m.tilbehoer_navn) under.push(esc(m.tilbehoer_navn));
+      (m.tilbehoer || []).forEach(t => under.push(esc(t.navn)));
       if(m.portioner > 1)  under.push("×" + m.portioner);
       if(m.frost)          under.push("❄ frost eller rest");
     }
@@ -1285,18 +1285,18 @@ let aabenDag = null;
 let dagKladde = null;
 
 const tomKladde = () => ({
-  ret_id:null,       ret_navn:"",
-  tilbehoer_id:null, tilbehoer_navn:"",
-  portioner:1,       frost:false
+  ret_id:null, ret_navn:"",
+  tilbehoer:[],                    // [{id, navn}] — id er tomt for noget tastet i hånden
+  portioner:1, frost:false
 });
 
 function aabnDag(ds){
   aabenDag = ds;
   const m = madplanFor(ds);
   dagKladde = m ? {
-    ret_id:        m.ret_id,        ret_navn:       m.ret_navn || "",
-    tilbehoer_id:  m.tilbehoer_id,  tilbehoer_navn: m.tilbehoer_navn || "",
-    portioner:     m.portioner || 1, frost:         !!m.frost
+    ret_id:    m.ret_id, ret_navn: m.ret_navn || "",
+    tilbehoer: Array.isArray(m.tilbehoer) ? m.tilbehoer.slice() : [],
+    portioner: m.portioner || 1, frost: !!m.frost
   } : tomKladde();
 
   tegnDagArk();
@@ -1313,12 +1313,12 @@ function tegnDagArk(){
   document.getElementById("dag-meta").textContent = "";
 
   document.getElementById("dag-ret").textContent       = k.ret_navn || "—";
-  document.getElementById("dag-tilbehoer").textContent = k.tilbehoer_navn || "—";
+  document.getElementById("dag-tilbehoer").textContent = k.tilbehoer.length ? k.tilbehoer.map(t => t.navn).join(", ") : "—";
   document.getElementById("dag-portioner").textContent = k.portioner;
   document.getElementById("dag-frost").checked         = k.frost;
 
   document.getElementById("dag-opskrift").hidden = !k.ret_id;
-  document.getElementById("dag-ryd").hidden      = !k.ret_navn && !k.tilbehoer_navn;
+  document.getElementById("dag-ryd").hidden      = !k.ret_navn && !k.tilbehoer.length;
 }
 
 document.getElementById("dag-fortryd").onclick = () => hide("dag-back");
@@ -1329,7 +1329,7 @@ document.getElementById("dag-ryd").onclick     = () => { dagKladde = tomKladde()
 
 document.getElementById("dag-gem").onclick = async () => {
   const k = dagKladde;
-  const tom = !k.ret_navn && !k.tilbehoer_navn && !k.frost && k.portioner === 1;
+  const tom = !k.ret_navn && !k.tilbehoer.length && !k.frost && k.portioner === 1;
   const knap = document.getElementById("dag-gem");
   knap.disabled = true; knap.textContent = "Gemmer …";
   if(tom) await rydDag(aabenDag); else await gemDag(aabenDag, k);
@@ -1359,6 +1359,8 @@ function aabnVaelger(tilstand){
   document.getElementById("vaelg-soeg").value = "";
   document.getElementById("vaelg-titel").textContent =
     tilstand === "tilbehoer" ? "Vælg tilbehør" : "Vælg ret";
+  document.getElementById("vaelg-fortryd").textContent =
+    tilstand === "tilbehoer" ? "Færdig" : "Fortryd";
   document.getElementById("vaelg-filtre").hidden = tilstand === "tilbehoer";
   tegnVaelgFiltre();
   tegnVaelgListe();
@@ -1420,10 +1422,11 @@ function tegnVaelgListe(){
       : "Aldrig spist";
     const marker = [r.vegetar && "vegetar", r.nem && "nem", r.agnes_kan_lide && "Agnes"]
       .filter(Boolean).map(t => '<span class="mark">'+t+'</span>').join(" ");
-    return '<button class="retkort" data-vaelg="'+r.id+'"><span style="flex:1;min-width:0">'
-         +   '<span class="navn">'+esc(r.navn)+'</span>'
+    const valgt = tilbehoer && dagKladde.tilbehoer.some(t => t.id === r.id);
+    return '<button class="retkort'+(valgt?" valgt":"")+'" data-vaelg="'+r.id+'"><span style="flex:1;min-width:0">'
+         +   '<span class="navn">'+(valgt?"✓ ":"")+esc(r.navn)+'</span>'
          +   (marker ? '<span class="under">'+marker+'</span>' : '')
-         + '</span><span class="naar">'+naar+'</span></button>';
+         + '</span><span class="naar">'+(tilbehoer?"":naar)+'</span></button>';
   }).join("");
 }
 
@@ -1435,12 +1438,22 @@ document.getElementById("vaelg-liste").addEventListener("click", async ev => {
   const valgt = fri ? { id:null, navn:vaelgSoegRaa } : retter.find(x => x.id === b.dataset.vaelg);
   if(!valgt) return;
 
-  const felter = vaelgTilstand === "tilbehoer"
-    ? { tilbehoer_id:valgt.id, tilbehoer_navn:valgt.navn }
-    : { ret_id:valgt.id, ret_navn:valgt.navn };
+  if(vaelgTilstand === "tilbehoer"){
+    // Flervalg: tryk slår til og fra, og arket bliver stående
+    const i = dagKladde.tilbehoer.findIndex(t => t.id && t.id === valgt.id);
+    if(i > -1) dagKladde.tilbehoer.splice(i, 1);
+    else       dagKladde.tilbehoer.push({ id: valgt.id, navn: valgt.navn });
+    if(fri){
+      document.getElementById("vaelg-soeg").value = "";
+      vaelgSoeg = ""; vaelgSoegRaa = "";
+    }
+    tegnVaelgListe();
+    tegnDagArk();
+    return;
+  }
 
   hide("vaelg-back");
-  Object.assign(dagKladde, felter);
+  Object.assign(dagKladde, { ret_id: valgt.id, ret_navn: valgt.navn });
   tegnDagArk();
 });
 
