@@ -175,7 +175,11 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .retliste{display:flex;flex-direction:column;gap:8px}
 .retkort{
   width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
-  border-radius:var(--radius);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;
+  border-radius:var(--radius);padding:12px 14px;display:flex;gap:10px;align-items:stretch;
+}
+.retkort .naar{
+  display:flex;align-items:flex-end;flex:none;
+  font-size:12px;color:var(--muted);white-space:nowrap;
 }
 .retkort:hover{border-color:var(--line-strong)}
 .retkort .navn{font-weight:600;font-size:16px}
@@ -678,7 +682,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.4.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.4.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -978,13 +982,13 @@ function renderKogebog(){
       r.er_tilbehoer && '<span class="mark tilbehoer">tilbehør</span>'
     ].filter(Boolean).join(" ");
     const sidstTekst = sidst
-      ? (dage === 0 ? "spist i dag" : dage === 1 ? "spist i går" : "sidst spist for " + dage + " dage siden")
-      : "aldrig spist";
+      ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
+      : "Aldrig spist";
     return '<button class="retkort" data-ret="'+r.id+'"><span style="flex:1;min-width:0">'
          +   '<span class="navn">'+esc(r.navn)+'</span>'
-         +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span><span>'+sidstTekst+'</span></span>'
+         +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span></span>'
          + '</span>'
-         + (r.opskrift_url || r.fremgangsmaade ? '<span class="mrk" style="color:var(--muted)">📖</span>' : '')
+         + '<span class="naar">'+sidstTekst+'</span>'
          + '</button>';
   }).join("") + '</div>';
 }
@@ -1351,7 +1355,7 @@ document.getElementById("vaelg-fortryd").onclick       = () => hide("vaelg-back"
 
 function aabnVaelger(tilstand){
   vaelgTilstand = tilstand;
-  vaelgSoeg = "";
+  vaelgSoeg = ""; vaelgSoegRaa = "";
   document.getElementById("vaelg-soeg").value = "";
   document.getElementById("vaelg-titel").textContent =
     tilstand === "tilbehoer" ? "Vælg tilbehør" : "Vælg ret";
@@ -1375,8 +1379,10 @@ document.getElementById("vaelg-filtre").addEventListener("click", ev => {
   vaelgFiltre[f.dataset.vfilter] = naeste[vaelgFiltre[f.dataset.vfilter]];
   tegnVaelgFiltre(); tegnVaelgListe();
 });
+let vaelgSoegRaa = "";
 document.getElementById("vaelg-soeg").addEventListener("input", ev => {
-  vaelgSoeg = ev.target.value.trim().toLowerCase();
+  vaelgSoegRaa = ev.target.value.trim();
+  vaelgSoeg = vaelgSoegRaa.toLowerCase();
   tegnVaelgListe();
 });
 
@@ -1395,29 +1401,43 @@ function tegnVaelgListe(){
   }).sort((a,b) => a.navn.localeCompare(b.navn,"da"));
 
   const el = document.getElementById("vaelg-liste");
-  if(!liste.length){ el.innerHTML = '<div class="empty">Ingen retter passer.</div>'; return; }
 
-  el.innerHTML = liste.map(r => {
+  // Noget uden for nummer: brug det indtastede som navn uden at oprette en ret
+  let fri = "";
+  if(vaelgSoegRaa && !retter.some(r => r.navn.toLowerCase() === vaelgSoeg)){
+    fri = '<button class="retkort" data-fritekst="1"><span style="flex:1;min-width:0">'
+        +   '<span class="navn">' + esc(vaelgSoegRaa) + '</span>'
+        +   '<span class="under"><span>Brug som engangsret — gemmes ikke i kogebogen</span></span>'
+        + '</span></button>';
+  }
+  if(!liste.length && !fri){ el.innerHTML = '<div class="empty">Ingen retter passer.</div>'; return; }
+
+  el.innerHTML = fri + liste.map(r => {
     const sidst = sidstSpist(r.id);
     const dage = sidst ? dageSiden(sidst) : null;
     const naar = sidst
-      ? (dage === 0 ? "spist i dag" : dage === 1 ? "spist i går" : dage + " dage siden")
-      : "aldrig spist";
+      ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
+      : "Aldrig spist";
     const marker = [r.vegetar && "vegetar", r.nem && "nem", r.agnes_kan_lide && "Agnes"]
       .filter(Boolean).map(t => '<span class="mark">'+t+'</span>').join(" ");
     return '<button class="retkort" data-vaelg="'+r.id+'"><span style="flex:1;min-width:0">'
          +   '<span class="navn">'+esc(r.navn)+'</span>'
-         +   '<span class="under">'+marker+'<span>'+naar+'</span></span></span></button>';
+         +   (marker ? '<span class="under">'+marker+'</span>' : '')
+         + '</span><span class="naar">'+naar+'</span></button>';
   }).join("");
 }
 
 document.getElementById("vaelg-liste").addEventListener("click", async ev => {
-  const b = ev.target.closest("[data-vaelg]"); if(!b) return;
-  const r = retter.find(x => x.id === b.dataset.vaelg); if(!r) return;
+  const fri = ev.target.closest("[data-fritekst]");
+  const b   = ev.target.closest("[data-vaelg]");
+  if(!fri && !b) return;
+
+  const valgt = fri ? { id:null, navn:vaelgSoegRaa } : retter.find(x => x.id === b.dataset.vaelg);
+  if(!valgt) return;
 
   const felter = vaelgTilstand === "tilbehoer"
-    ? { tilbehoer_id:r.id, tilbehoer_navn:r.navn }
-    : { ret_id:r.id, ret_navn:r.navn };
+    ? { tilbehoer_id:valgt.id, tilbehoer_navn:valgt.navn }
+    : { ret_id:valgt.id, ret_navn:valgt.navn };
 
   hide("vaelg-back");
   Object.assign(dagKladde, felter);
