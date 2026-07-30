@@ -279,8 +279,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .iny input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
 .iny button{padding:0 16px;border:1px solid var(--line);border-radius:10px;font-weight:600;color:var(--muted)}
 .iny button:hover{border-color:var(--line-strong);color:var(--ink)}
-.iretter{font-size:14px;color:var(--muted);padding:0 2px 4px}
-.iretter div{padding:3px 0}
+.iretter{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;padding:6px 15px 10px}
+.iretter .overskrift{font-size:13px;color:var(--muted);font-weight:600;padding:7px 0 6px}
+.iret{display:flex;gap:12px;align-items:baseline;padding:5px 0;font-size:15px}
+.iret .d{width:64px;flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.iret .r{flex:1;min-width:0;font-weight:600}
+.iret .r .ekstra{font-weight:400;color:var(--muted)}
+.iretter .tom{font-size:14px;color:var(--muted);padding:4px 0 6px}
 .kopiknap{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;margin-top:4px;background:var(--surface)}
 .kopiknap:hover{border-color:var(--line-strong)}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
@@ -703,7 +708,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.7.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.7.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -788,6 +793,8 @@ const holidayName = ds => holidaysFor(Number(ds.slice(0,4))).get(ds) || null;
    Data
    ======================================================================= */
 let events = [];                          // aftaler fra databasen
+let sidsteHentning = 0;                   // hvornår vi sidst hentede alt
+let realtidOk = false;                    // står forbindelsen til Supabase åben?
 const agnesOverrides = new Map();         // "2026-08-05" -> true/false
 
 function agnesDefault(d){
@@ -864,6 +871,7 @@ async function hentAlt(forsoeg){
     vis("Kunne ikke hente data: " + fejl.message);
     return;
   }
+  sidsteHentning = Date.now();
   retter       = rRes.data || [];
   ingredienser = iRes.data || [];
   madplanDage  = mRes.data || [];
@@ -905,6 +913,11 @@ function saetFane(f){
 
   const titler = { madplan:"Madplan", indkoeb:"Indkøb", kogebog:"Kogebog" };
   if(!kalender) document.getElementById("tb-titel").textContent = titler[f];
+
+  // Sikkerhedsnet, men kun når det kan gøre en forskel: er realtiden
+  // i orden og data friske, er en hentning ren spildt forespørgsel.
+  if(!document.getElementById("gate").classList.contains("open") &&
+     (!realtidOk || Date.now() - sidsteHentning > 120000)) hentAlt();
 
   const fab = document.getElementById("add-btn");
   fab.hidden = !(kalender || f === "kogebog");
@@ -1578,13 +1591,15 @@ function renderIndkoeb(){
   let h = "";
 
   if(dage.length){
-    h += '<div class="iretter">' + dage.map(d =>
-      '<div><strong>' + d.dag + ' ' + d.dato + '.</strong> ' + esc(d.navn)
+    h += '<div class="iretter"><div class="overskrift">Ugens retter</div>' + dage.map(d =>
+      '<div class="iret"><span class="d">' + d.dag + ' ' + d.dato + '.</span>'
+      + '<span class="r">' + esc(d.navn)
       + (d.portioner > 1 ? " ×" + d.portioner : "")
-      + (d.tilbehoer ? " med " + esc(d.tilbehoer) : "")
-      + (d.frost ? " ❄" : "") + '</div>').join("") + '</div>';
+      + (d.frost ? " ❄" : "")
+      + (d.tilbehoer ? '<span class="ekstra"> med ' + esc(d.tilbehoer) + '</span>' : "")
+      + '</span></div>').join("") + '</div>';
   } else {
-    h += '<div class="iretter">Der er ikke planlagt noget i denne uge.</div>';
+    h += '<div class="iretter"><div class="tom">Der er ikke planlagt noget i denne uge.</div></div>';
   }
 
   h += '<div class="ikort">'
@@ -1689,11 +1704,15 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"ingredienser" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"madplan" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"indkoeb_ekstra" }, () => hentAlt())
-    .subscribe(status => console.info("Realtid:", status));
+    .subscribe(status => {
+      realtidOk = status === "SUBSCRIBED";
+      console.info("Realtid:", status);
+    });
 }
 
 function stopLytning(){
   if(kanal){ sb.removeChannel(kanal); kanal = null; }
+  realtidOk = false;
 }
 
 /* Sikkerhedsnet: har forbindelsen været nede, hentes alt forfra
