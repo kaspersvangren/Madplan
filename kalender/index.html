@@ -59,14 +59,14 @@ body{
 }
 body::before{
   content:"";
-  position:fixed;inset:0;z-index:-1;
-  background:url("baggrund.jpg") center bottom / cover no-repeat;
-  opacity:.13;
+  position:fixed;left:0;right:0;bottom:0;top:0;z-index:-1;
+  background:url("baggrund.webp") center bottom / contain no-repeat;
+  opacity:.34;
   pointer-events:none;
 }
 html[data-theme="dark"] body::before{
   filter:invert(1);
-  opacity:.10;
+  opacity:.26;
 }
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--line-strong);outline-offset:2px;border-radius:6px}
@@ -238,7 +238,7 @@ svg{display:block}
 .gate{position:fixed;inset:0;z-index:70;background:transparent;display:none;align-items:center;justify-content:center;padding:22px}
 .gate::before{
   content:"";position:absolute;inset:0;z-index:-1;
-  background:var(--bg);opacity:.72;
+  background:var(--bg);opacity:.55;
 }
 .gate.open{display:flex}
 .gate .box{width:100%;max-width:380px}
@@ -392,7 +392,7 @@ svg{display:block}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "1.5.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "1.6.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
