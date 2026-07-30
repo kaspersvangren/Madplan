@@ -681,12 +681,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.5.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.6.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
-const SHEET_ID     = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
-const HISTORIK_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=Historik";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -769,8 +767,6 @@ const holidayName = ds => holidaysFor(Number(ds.slice(0,4))).get(ds) || null;
    ======================================================================= */
 let events = [];                          // aftaler fra databasen
 const agnesOverrides = new Map();         // "2026-08-05" -> true/false
-const dinners = new Map();                // dato -> ret fra madplanen
-let mealStatus = "henter", mealError = "";
 
 function agnesDefault(d){
   const lige = isoWeek(d) % 2 === 0;
@@ -1512,60 +1508,21 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState !== "visible") return;
   if(document.getElementById("gate").classList.contains("open")) return;
   hentAlt();
-  loadDinners();
 });
 
 /* =======================================================================
-   Aftensmad fra madplanen (Historik-fanen)
+   Aftensmad — hentes nu fra madplan-tabellen, ikke længere fra
+   regnearket. Den gamle madplan på nettet påvirker ikke appen.
    ======================================================================= */
-function parseCsv(text){
-  const rows=[]; let row=[], cell="", q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(q){
-      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
-      else cell+=c;
-    } else if(c==='"') q=true;
-    else if(c===','){ row.push(cell); cell=""; }
-    else if(c==="\n"){ row.push(cell); rows.push(row); row=[]; cell=""; }
-    else if(c!=="\r") cell+=c;
-  }
-  if(cell.length||row.length){ row.push(cell); rows.push(row); }
-  return rows;
-}
-function normalizeDato(raw){
-  const s = String(raw||"").trim();
-  if(!s) return "";
-  let m;
-  if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))         return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);
-  if((m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/))) return m[3]+"-"+pad(m[2])+"-"+pad(m[1]);
-  if((m = s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/))) return m[1]+"-"+pad(Number(m[2])+1)+"-"+pad(m[3]);
-  const d = new Date(s);
-  return isNaN(d) ? "" : iso(d);
-}
-async function loadDinners(){
-  try{
-    const res = await fetch(HISTORIK_CSV, {cache:"no-store"});
-    if(!res.ok) throw new Error("Arket svarede med status " + res.status);
-    const rows = parseCsv(await res.text());
-    if(rows.length < 2) throw new Error("Historik-fanen kom tom retur");
-    const head = rows[0].map(h => h.trim().toLowerCase());
-    const iDato = head.indexOf("dato"), iPlan = head.indexOf("plan_nu"), iSpist = head.indexOf("spist");
-    if(iDato < 0 || iPlan < 0) throw new Error("Fandt ikke kolonnerne dato og plan_nu");
-    dinners.clear();
-    rows.slice(1).forEach(r => {
-      const d = normalizeDato(r[iDato]);
-      // Retten flytter fra plan_nu til spist når dagen er gået, så vi tager den der er udfyldt
-      const p = (r[iPlan]||"").trim() || (iSpist > -1 ? (r[iSpist]||"").trim() : "");
-      if(d && p) dinners.set(d, p);
-    });
-    mealStatus = "ok";
-  }catch(err){
-    mealStatus = "fejl";
-    mealError = err.message || String(err);
-    console.warn("Madplan kunne ikke hentes:", err);
-  }
-  render();
+function madFor(ds){
+  const m = madplanFor(ds);
+  if(!m || !m.ret_navn) return null;
+  return {
+    navn: m.ret_navn,
+    tilbehoer: (m.tilbehoer || []).map(t => t.navn).join(", "),
+    frost: !!m.frost,
+    portioner: m.portioner || 1
+  };
 }
 
 /* =======================================================================
@@ -1594,7 +1551,7 @@ function renderDay(){
   const here = agnesHere(d);
   const list = eventsOn(ds);
   const hol = holidayName(ds);
-  const meal = dinners.get(ds);
+  const mad = madFor(ds);
 
   let h = '<div class="daycard'+(here?"":" away")+'">';
 
@@ -1604,19 +1561,16 @@ function renderDay(){
      +   '<button id="agnes-btn">'+(here?"Marker som hos far":"Marker som her")+'</button>'
      + '</div>';
 
-  const mealText =
-    mealStatus === "henter" ? '<span class="label">henter …</span>' :
-    mealStatus === "fejl"   ? '<span class="holiday-tag">Madplanen kunne ikke hentes</span>' :
-    meal ? esc(meal) : '<span class="label">ikke planlagt</span>';
+  const mealText = mad
+    ? esc(mad.navn) + (mad.frost ? " ❄" : "") + (mad.portioner > 1 ? " ×" + mad.portioner : "")
+      + (mad.tilbehoer ? ' <span class="label">med ' + esc(mad.tilbehoer) + '</span>' : "")
+    : '<span class="label">ikke planlagt</span>';
 
   h += '<div class="strip">'
      +   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
      +   '<span class="label">Aftensmad</span><span>'+mealText+'</span>'
      + '</div>';
 
-  if(mealStatus === "fejl"){
-    h += '<div class="strip"><span class="label">Årsag</span><span class="label">'+esc(mealError)+'</span></div>';
-  }
   if(hol){
     h += '<div class="strip"><span class="label">Helligdag</span><span class="holiday-tag">'+esc(hol)+'</span></div>';
   }
@@ -1651,7 +1605,7 @@ function renderWeek(){
   let h = "";
   for(let i=0;i<7;i++){
     const d = addDays(start,i), ds = iso(d);
-    const list = eventsOn(ds), hol = holidayName(ds), meal = dinners.get(ds);
+    const list = eventsOn(ds), hol = holidayName(ds), mad = madFor(ds);
     const cls = "weekrow" + (agnesHere(d)?"":" away") + (sameDay(d,today)?" today":"");
     h += '<button class="'+cls+'" data-goto="'+ds+'">'
        +   '<span class="wd"><span class="n">'+d.getDate()+'</span><span class="m">'+UGEDAGE_KORT[i]+'</span></span>'
@@ -1662,8 +1616,8 @@ function renderWeek(){
       h += '<span class="witem"><span class="wt">'+(e.allDay ? "—" : esc(e.start))+'</span>'
          +   dotsEl(e.people)+'<span class="wn">'+esc(e.title)+'</span></span>';
     });
-    if(meal){
-      h += '<span class="meal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'+esc(meal)+'</span>';
+    if(mad){
+      h += '<span class="meal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'+esc(mad.navn)+(mad.frost ? " ❄" : "")+'</span>';
     }
     h += '</span></button>';
   }
@@ -2068,7 +2022,7 @@ document.getElementById("menu-btn").onclick = async () => {
   show("menu-back");
 };
 document.getElementById("menu-close").onclick = () => hide("menu-back");
-document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); await loadDinners(); };
+document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); };
 document.getElementById("menu-logout").onclick = async () => {
   hide("menu-back");
   stopLytning();
@@ -2265,7 +2219,6 @@ document.getElementById("g-pass").addEventListener("keydown", ev => { if(ev.key 
 async function start(){
   await hentAlt();
   lytPaaAendringer();
-  loadDinners();
   resetIdle();
 }
 
