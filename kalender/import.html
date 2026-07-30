@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Import til Vores Hverdag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F1ED; --surface:#FFFFFF; --ink:#1B1D1C; --muted:#71756F;
+  --line:#D8D5CE; --chip:#F2F1ED; --advarsel:#B0503A; --ok:#3F7A52;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:28px 18px 80px;background:var(--bg);color:var(--ink);
+  font-family:"Inter",system-ui,sans-serif;font-size:15px;line-height:1.45;
+}
+.wrap{max-width:820px;margin:0 auto}
+h1{font-family:"Bricolage Grotesque","Inter",sans-serif;font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+h2{font-family:"Bricolage Grotesque","Inter",sans-serif;font-size:19px;font-weight:800;margin:30px 0 10px}
+p.sub{color:var(--muted);margin:0 0 24px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  border-radius:11px;padding:12px 18px;font-weight:600}
+button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:disabled{opacity:.5;cursor:default}
+input{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%}
+.felt{margin-bottom:12px;max-width:340px}
+.felt label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.kort{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.tal{display:flex;gap:26px;flex-wrap:wrap;margin:6px 0 0}
+.tal div{font-size:13px;color:var(--muted)}
+.tal strong{display:block;font-size:24px;color:var(--ink);font-family:"Bricolage Grotesque",sans-serif;font-weight:800}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:7px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.rul{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.mrk{color:var(--muted)}
+.advarsel{color:var(--advarsel)}
+.ok{color:var(--ok)}
+.log{white-space:pre-wrap;font-size:13px;color:var(--muted);margin-top:10px}
+.skjul{display:none}
+code{background:var(--chip);padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Import til Vores Hverdag</h1>
+  <p class="sub">Henter retter og historik fra regnearket. Der skrives først til databasen når du trykker på knappen nederst.</p>
+
+  <!-- Login -->
+  <div id="login" class="kort skjul">
+    <h2 style="margin-top:0">Log ind</h2>
+    <div class="felt"><label for="mail">E-mail</label><input type="email" id="mail" autocomplete="username"></div>
+    <div class="felt"><label for="kode">Kodeord</label><input type="password" id="kode" autocomplete="current-password"></div>
+    <div class="advarsel skjul" id="login-fejl"></div>
+    <button class="primary" id="login-knap">Log ind</button>
+  </div>
+
+  <!-- Trin 1 -->
+  <div id="trin1" class="skjul">
+    <button class="primary" id="hent-knap">Hent fra regnearket</button>
+    <div class="log" id="hent-log"></div>
+  </div>
+
+  <!-- Trin 2 -->
+  <div id="trin2" class="skjul">
+    <div class="kort">
+      <div class="tal" id="tal"></div>
+    </div>
+
+    <div id="advarsler-blok" class="skjul">
+      <h2 class="advarsel">Linjer jeg ikke forstod</h2>
+      <p class="sub">De bliver oprettet med navnet i behold, men uden mængde. Ret dem i appen bagefter.</p>
+      <div class="rul">
+        <table><thead><tr><th>Ret</th><th>Tekst</th><th>Årsag</th></tr></thead>
+        <tbody id="advarsler"></tbody></table>
+      </div>
+    </div>
+
+    <h2>Retter</h2>
+    <div class="rul">
+      <table><thead><tr><th>Navn</th><th>Egenskaber</th><th>Køb</th><th>Tjek</th></tr></thead>
+      <tbody id="forhaand"></tbody></table>
+    </div>
+
+    <h2>Historik</h2>
+    <div class="log" id="historik-log"></div>
+
+    <h2>Skriv til databasen</h2>
+    <p class="sub">Retter der allerede findes med samme navn springes over, så du roligt kan køre importen igen.</p>
+    <button class="primary" id="skriv-knap">Importér</button>
+    <div class="log" id="skriv-log"></div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+
+const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
+const SHEET_ID     = "1P9R6NsSxydpwJ3eOeYyrKBTrXnlAZd5mR1XQdVW7Lx4";
+const csvUrl = fane => "https://docs.google.com/spreadsheets/d/" + SHEET_ID +
+                       "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(fane);
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+const vis = (id, v) => $(id).classList.toggle("skjul", !v);
+const esc = s => String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- CSV ---------- */
+function parseCsv(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
+      else cell+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){ row.push(cell); cell=""; }
+    else if(c==="\n"){ row.push(cell); rows.push(row); row=[]; cell=""; }
+    else if(c!=="\r") cell+=c;
+  }
+  if(cell.length||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+
+/* ---------- Ingredienser ---------- */
+const ENHEDER = ["g","kg","ml","l","dl","stk","dåse","daase","pakke","bundt","fed"];
+
+// "hakket oksekød (500 g)" -> {navn:"hakket oksekød", maengde:500, enhed:"g"}
+// "gulerødder"             -> {navn:"gulerødder", maengde:null, enhed:null}
+function laesIngrediens(raa, retNavn, advarsler, kategori){
+  const tekst = raa.trim();
+  if(!tekst) return null;
+
+  let navn = tekst, maengde = null, enhed = null;
+
+  const m = tekst.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if(m){
+    const indhold = m[2].trim();
+    const t = indhold.replace(",", ".").match(/^([\d]+(?:\.[\d]+)?)\s*([^\d\s]*)$/);
+    if(t){
+      navn    = m[1].trim();
+      maengde = parseFloat(t[1]);
+      const e = (t[2]||"").trim().toLowerCase();
+      if(e){
+        if(ENHEDER.includes(e)) enhed = (e === "daase") ? "dåse" : e;
+        else { enhed = e; advarsler.push({ret:retNavn, tekst, aarsag:"Ukendt enhed: " + e}); }
+      }
+    } else {
+      // Parentesen er ikke en mængde — behold hele teksten som navn
+      advarsler.push({ret:retNavn, tekst, aarsag:"Parentesen er ikke en mængde"});
+    }
+  }
+
+  navn = navn.trim().replace(/[,;]+$/, "").trim();
+  if(!navn){ advarsler.push({ret:retNavn, tekst:raa, aarsag:"Tom ingrediens"}); return null; }
+  // Ensret store og små bogstaver, så listen kan lægge sammen
+  navn = navn.charAt(0).toLowerCase() + navn.slice(1);
+
+  return { navn, maengde, enhed, kategori };
+}
+
+function laesListe(felt, retNavn, advarsler, kategori){
+  return String(felt||"").split(",")
+    .map(d => laesIngrediens(d, retNavn, advarsler, kategori))
+    .filter(Boolean);
+}
+
+/* ---------- Trin 1: hent ---------- */
+let retter = [], advarsler = [], historik = [];
+
+async function hent(){
+  $("hent-log").textContent = "Henter …";
+  retter = []; advarsler = []; historik = [];
+
+  // --- Retter ---
+  const res = await fetch(csvUrl("Madplan"), {cache:"no-store"});
+  if(!res.ok) throw new Error("Fanen Madplan svarede med status " + res.status);
+  const rk = parseCsv(await res.text());
+  if(rk.length < 2) throw new Error("Fanen Madplan kom tom retur");
+
+  const h = rk[0].map(x => x.trim().toLowerCase());
+  const kol = navn => h.indexOf(navn);
+  const iNavn = kol("navn"), iKoeb = kol("køb"), iTjek = kol("tjek"),
+        iUrl = kol("url"), iVeg = kol("vegetar"), iNem = kol("nem ret"), iAgnes = kol("agnes");
+  if(iNavn < 0) throw new Error("Fandt ikke kolonnen Navn");
+
+  const kryds = v => String(v||"").trim().toLowerCase() === "x";
+
+  rk.slice(1).forEach(r => {
+    const navn = (r[iNavn]||"").trim();
+    if(!navn) return;
+    retter.push({
+      navn,
+      vegetar:        iVeg   > -1 && kryds(r[iVeg]),
+      nem:            iNem   > -1 && kryds(r[iNem]),
+      agnes_kan_lide: iAgnes > -1 && kryds(r[iAgnes]),
+      opskrift_url:   iUrl   > -1 ? (r[iUrl]||"").trim() : "",
+      ingredienser: [
+        ...laesListe(iKoeb > -1 ? r[iKoeb] : "", navn, advarsler, "koeb"),
+        ...laesListe(iTjek > -1 ? r[iTjek] : "", navn, advarsler, "tjek")
+      ]
+    });
+  });
+
+  // --- Historik ---
+  try{
+    const hres = await fetch(csvUrl("Historik"), {cache:"no-store"});
+    const hr = parseCsv(await hres.text());
+    const hh = hr[0].map(x => x.trim().toLowerCase());
+    const iDato = hh.indexOf("dato"), iPlan = hh.indexOf("plan_nu"), iSpist = hh.indexOf("spist");
+    hr.slice(1).forEach(r => {
+      const dato = normaliserDato(r[iDato]);
+      if(!dato) return;
+      const plan  = reng(iPlan  > -1 ? r[iPlan]  : "");
+      const spist = reng(iSpist > -1 ? r[iSpist] : "");
+      if(!plan.navn && !spist.navn) return;
+      historik.push({ dato, plan, spist });
+    });
+  }catch(err){
+    $("historik-log").textContent = "Historikken kunne ikke hentes: " + err.message;
+  }
+
+  tegnForhaandsvisning();
+}
+
+// Fjerner frost-mærket og fortæller om det var der
+function reng(tekst){
+  const t = String(tekst||"").trim();
+  const frost = t.includes("❄");
+  return { navn: t.replace(/❄/g, "").trim(), frost };
+}
+
+function normaliserDato(raa){
+  const s = String(raa||"").trim();
+  if(!s) return "";
+  const p = n => String(n).padStart(2,"0");
+  let m;
+  if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))          return m[1]+"-"+p(m[2])+"-"+p(m[3]);
+  if((m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/)))   return m[3]+"-"+p(m[2])+"-"+p(m[1]);
+  if((m = s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/)))   return m[1]+"-"+p(Number(m[2])+1)+"-"+p(m[3]);
+  return "";
+}
+
+function tegnForhaandsvisning(){
+  const antalIng = retter.reduce((n,r) => n + r.ingredienser.length, 0);
+  const medMaengde = retter.reduce((n,r) => n + r.ingredienser.filter(i => i.maengde != null).length, 0);
+
+  $("tal").innerHTML =
+      blok("Retter", retter.length)
+    + blok("Ingredienser", antalIng)
+    + blok("Med mængde", medMaengde)
+    + blok("Historikdage", historik.length)
+    + blok("Advarsler", advarsler.length);
+
+  vis("advarsler-blok", advarsler.length > 0);
+  $("advarsler").innerHTML = advarsler.map(a =>
+    "<tr><td>"+esc(a.ret)+"</td><td>"+esc(a.tekst)+"</td><td class='advarsel'>"+esc(a.aarsag)+"</td></tr>").join("");
+
+  $("forhaand").innerHTML = retter.map(r => {
+    const egen = [r.vegetar && "vegetar", r.nem && "nem", r.agnes_kan_lide && "Agnes"].filter(Boolean).join(", ");
+    const liste = k => r.ingredienser.filter(i => i.kategori === k)
+      .map(i => esc(i.navn) + (i.maengde != null ? " <span class='mrk'>" + i.maengde + (i.enhed ? " " + esc(i.enhed) : "") + "</span>" : ""))
+      .join("<br>") || "<span class='mrk'>—</span>";
+    return "<tr><td><strong>"+esc(r.navn)+"</strong>"+(r.opskrift_url?" <span class='mrk'>↗</span>":"")+"</td>"
+         + "<td class='mrk'>"+esc(egen||"—")+"</td><td>"+liste("koeb")+"</td><td>"+liste("tjek")+"</td></tr>";
+  }).join("");
+
+  $("historik-log").textContent = historik.length
+    ? historik.length + " dage klar. Retter der ikke findes i basen gemmes med navnet alene, så de stadig tæller med i historikken."
+    : "Ingen historik fundet.";
+
+  vis("trin2", true);
+  $("hent-log").textContent = "Hentet. Gennemgå nedenfor, og tryk Importér når det ser rigtigt ud.";
+}
+
+const blok = (navn, tal) => "<div><strong>"+tal+"</strong>"+navn+"</div>";
+
+/* ---------- Trin 2: skriv ---------- */
+async function skriv(){
+  const knap = $("skriv-knap");
+  knap.disabled = true;
+  const log = besked => { $("skriv-log").textContent += besked + "\n"; };
+  $("skriv-log").textContent = "";
+
+  try{
+    // Hvad findes allerede?
+    const { data: fandtes, error: f1 } = await sb.from("retter").select("id,navn");
+    if(f1) throw f1;
+    const kendt = new Map(fandtes.map(r => [r.navn.trim().toLowerCase(), r.id]));
+
+    const nye = retter.filter(r => !kendt.has(r.navn.toLowerCase()));
+    log("Fandt " + fandtes.length + " retter i basen. " + nye.length + " nye skal oprettes.");
+
+    if(nye.length){
+      const { data: oprettet, error: f2 } = await sb.from("retter").insert(
+        nye.map(r => ({
+          navn: r.navn, vegetar: r.vegetar, nem: r.nem,
+          agnes_kan_lide: r.agnes_kan_lide, opskrift_url: r.opskrift_url
+        }))
+      ).select("id,navn");
+      if(f2) throw f2;
+      oprettet.forEach(r => kendt.set(r.navn.trim().toLowerCase(), r.id));
+      log("Oprettede " + oprettet.length + " retter.");
+
+      const raekker = [];
+      nye.forEach(r => {
+        const id = kendt.get(r.navn.toLowerCase());
+        r.ingredienser.forEach((i, n) => raekker.push({
+          ret_id: id, navn: i.navn, maengde: i.maengde,
+          enhed: i.enhed, kategori: i.kategori, sortering: n
+        }));
+      });
+      for(let i = 0; i < raekker.length; i += 400){
+        const { error: f3 } = await sb.from("ingredienser").insert(raekker.slice(i, i+400));
+        if(f3) throw f3;
+      }
+      log("Oprettede " + raekker.length + " ingredienser.");
+    }
+
+    // Historik
+    if(historik.length){
+      const raekker = historik.map(h => ({
+        dato: h.dato,
+        planlagt_navn: h.plan.navn,
+        planlagt_ret_id: kendt.get(h.plan.navn.toLowerCase()) || null,
+        spist_navn: h.spist.navn,
+        spist_ret_id: kendt.get(h.spist.navn.toLowerCase()) || null,
+        frost: h.plan.frost || h.spist.frost
+      }));
+      for(let i = 0; i < raekker.length; i += 400){
+        const { error: f4 } = await sb.from("madplan").upsert(raekker.slice(i, i+400), {onConflict:"dato"});
+        if(f4) throw f4;
+      }
+      const uden = raekker.filter(r => r.planlagt_navn && !r.planlagt_ret_id).length;
+      log("Skrev " + raekker.length + " historikdage." + (uden ? " " + uden + " af dem peger på en ret der ikke findes i basen." : ""));
+    }
+
+    log("\nFærdig. Du kan lukke siden.");
+  }catch(err){
+    log("\nFEJL: " + (err.message || err) + "\nIntet yderligere blev skrevet.");
+    knap.disabled = false;
+  }
+}
+
+/* ---------- Login og opstart ---------- */
+async function logInd(){
+  const fejl = $("login-fejl");
+  fejl.classList.add("skjul");
+  const { error } = await sb.auth.signInWithPassword({ email: $("mail").value.trim(), password: $("kode").value });
+  if(error){ fejl.textContent = error.message; fejl.classList.remove("skjul"); return; }
+  vis("login", false); vis("trin1", true);
+}
+$("login-knap").onclick = logInd;
+$("kode").addEventListener("keydown", e => { if(e.key === "Enter") logInd(); });
+$("hent-knap").onclick = () => hent().catch(err => { $("hent-log").textContent = "Fejl: " + (err.message || err); });
+$("skriv-knap").onclick = skriv;
+
+(async function(){
+  const { data } = await sb.auth.getSession();
+  if(data && data.session){ vis("trin1", true); } else { vis("login", true); }
+})();
+</script>
+</body>
+</html>
