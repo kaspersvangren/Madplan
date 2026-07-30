@@ -259,6 +259,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 }
 .handling:last-of-type{border-bottom:none}
 .handling.fare{color:var(--holiday)}
+.handling strong{font-weight:700}
 .vaelgliste{display:flex;flex-direction:column;gap:7px;max-height:52dvh;overflow-y:auto;overscroll-behavior:contain;margin-top:10px}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
   font-size:9px;font-weight:700;line-height:1;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);
@@ -543,10 +544,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — udelad fra indkøb</label>
 
     <div style="margin-top:14px">
-      <button class="handling" id="dag-opskrift">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg>
-        Se retten i kogebogen
-      </button>
+      <div id="dag-links"></div>
       <button class="handling fare" id="dag-ryd">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         Ryd dagen
@@ -683,7 +681,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.5.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.5.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -1317,7 +1315,21 @@ function tegnDagArk(){
   document.getElementById("dag-portioner").textContent = k.portioner;
   document.getElementById("dag-frost").checked         = k.frost;
 
-  document.getElementById("dag-opskrift").hidden = !k.ret_id;
+  // Kun ting der findes i kogebogen kan man springe til.
+  // En engangsret tastet i hånden har intet id og får ingen linje.
+  const bogIkon  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg>';
+  const fadIkon  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M2 11h20"/><path d="M12 4v3"/></svg>';
+  const links = [];
+  if(k.ret_id && retter.some(r => r.id === k.ret_id)){
+    links.push({ id:k.ret_id, navn:k.ret_navn, ikon:bogIkon });
+  }
+  k.tilbehoer.forEach(t => {
+    if(t.id && retter.some(r => r.id === t.id)) links.push({ id:t.id, navn:t.navn, ikon:fadIkon });
+  });
+  document.getElementById("dag-links").innerHTML = links.map(l =>
+    '<button class="handling" data-gaatil="'+l.id+'">' + l.ikon
+    + '<span>Se <strong>'+esc(l.navn)+'</strong> i kogebogen</span></button>').join("");
+
   document.getElementById("dag-ryd").hidden      = !k.ret_navn && !k.tilbehoer.length;
 }
 
@@ -1337,12 +1349,12 @@ document.getElementById("dag-gem").onclick = async () => {
   hide("dag-back");
 };
 
-document.getElementById("dag-opskrift").onclick = () => {
-  if(!dagKladde.ret_id) return;
+document.getElementById("dag-links").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-gaatil]"); if(!b) return;
   hide("dag-back");
   saetFane("kogebog");
-  aabnRet(dagKladde.ret_id);
-};
+  aabnRet(b.dataset.gaatil);
+});
 
 /* ---------- Vælgeren ---------- */
 let vaelgTilstand = "ret";     // ret | tilbehoer
