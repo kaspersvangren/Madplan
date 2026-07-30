@@ -117,6 +117,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .dd-body [aria-selected="true"]{background:var(--chip);border-color:var(--line-strong);font-weight:700}
 
 /* ---------- Datohoved ---------- */
+.datehead[hidden]{display:none}
 .datehead{display:flex;align-items:center;gap:6px;padding:2px 8px 12px}
 .datehead .nav{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:var(--muted)}
 .datehead .nav:hover{background:var(--chip);color:var(--ink)}
@@ -126,7 +127,75 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 
 /* ---------- Fælles ---------- */
 .stage-wrap{flex:1;min-height:0;display:flex;overflow:hidden}
-.scroll{flex:1;overflow-y:auto;padding:0 14px 96px;will-change:transform}
+/* ---------- Faner nederst ---------- */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:35;
+  display:flex;justify-content:center;gap:2px;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar .inner{display:flex;width:100%;max-width:560px}
+.tabbar button{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 2px;border-radius:12px;color:var(--muted);font-size:11px;font-weight:500;
+}
+.tabbar button[aria-current="true"]{color:var(--ink);font-weight:600}
+.tabbar button[aria-current="true"] .ikon{background:var(--chip)}
+.ikon{padding:4px 14px;border-radius:999px;display:grid;place-items:center}
+
+.scroll{flex:1;overflow-y:auto;padding:0 14px 176px;will-change:transform}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;height:50px;padding:0 22px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22);z-index:36}
+.fab[hidden]{display:none}
+.version{position:fixed;left:12px;bottom:82px;z-index:20;font-size:11px;color:var(--muted);opacity:.55;font-variant-numeric:tabular-nums;pointer-events:none}
+
+/* ---------- Kogebog ---------- */
+.tb-titel[hidden]{display:none}
+.today-pill[hidden]{display:none}
+#tb-visning[hidden]{display:none}
+.soegerad[hidden]{display:none}
+.tb-titel{flex:1;font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-.02em;padding-left:4px}
+.soegerad{padding:0 14px 10px;display:flex;flex-direction:column;gap:9px}
+.soegefelt{position:relative}
+.soegefelt input{width:100%;padding:11px 12px 11px 38px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit}
+.soegefelt svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.filtre{display:flex;gap:7px;flex-wrap:wrap}
+.fchip{
+  display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
+  border:1px solid var(--line);font-size:13px;color:var(--muted);background:var(--surface);white-space:nowrap;
+}
+.fchip[data-stand="krav"]{border-color:var(--line-strong);color:var(--ink);font-weight:600;background:var(--chip)}
+.fchip[data-stand="uden"]{border-color:var(--holiday);color:var(--holiday);font-weight:600}
+
+.retliste{display:flex;flex-direction:column;gap:8px}
+.retkort{
+  width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;
+}
+.retkort:hover{border-color:var(--line-strong)}
+.retkort .navn{font-weight:600;font-size:16px}
+.retkort .under{font-size:13px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.mark{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:600}
+.mark.tilbehoer{background:transparent;border:1px solid var(--line)}
+
+.ingliste{margin:4px 0 0;padding:0;list-style:none;font-size:15px}
+.ingliste li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.ingliste li:last-child{border-bottom:none}
+.ingliste .m{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.gruppe{font-size:13px;color:var(--muted);margin:14px 0 2px;font-weight:600}
+.opskrifttekst{white-space:pre-wrap;font-size:15px;margin-top:6px}
+.fold{width:100%;display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:13px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+.klaeb{position:sticky;top:0;background:var(--surface);z-index:2}
+
+.ingrad{display:flex;flex-direction:column;gap:6px;padding:9px 0;border-bottom:1px solid var(--line)}
+.ingrad .linje{display:flex;gap:6px;align-items:center}
+.ingrad input[type="text"]{flex:1}
+.ingrad input.tal{width:74px;flex:none;text-align:right}
+.ingrad select{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit}
+.ingrad .fjern{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--muted);border-radius:9px}
+.ingrad .fjern:hover{background:var(--chip);color:var(--holiday)}
+.tilfoej{margin-top:10px;font-size:14px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:7px;padding:8px 0}
+.tilfoej:hover{color:var(--ink)}
+.snart{padding:60px 20px;text-align:center;color:var(--muted)}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
   font-size:9px;font-weight:700;line-height:1;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);
   letter-spacing:0;text-align:center;padding-bottom:.5px}
@@ -197,7 +266,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .legend span{display:flex;align-items:center;gap:5px}
 
 /* ---------- Flydende knap ---------- */
-.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22)}
 
 /* ---------- Dialoger ---------- */
 .backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
@@ -230,11 +298,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 svg{display:block}
 
 /* ---------- Login ---------- */
-.version{
-  position:fixed;left:12px;bottom:10px;z-index:20;
-  font-size:11px;color:var(--muted);opacity:.55;
-  font-variant-numeric:tabular-nums;pointer-events:none;
-}
 .gate{position:fixed;inset:0;z-index:70;background:transparent;display:none;align-items:center;justify-content:center;padding:22px}
 .gate::before{
   content:"";position:absolute;inset:0;z-index:-1;
@@ -252,12 +315,13 @@ svg{display:block}
 
 <div class="app">
   <div class="topbar">
-    <div class="segment" role="group" aria-label="Vælg visning">
+    <div class="segment" id="tb-visning" role="group" aria-label="Vælg visning">
       <button id="v-day"   aria-pressed="true">Dag</button>
       <button id="v-week"  aria-pressed="false" aria-haspopup="listbox" aria-expanded="false">Uge<span class="chev">▾</span></button>
       <button id="v-month" aria-pressed="false" aria-haspopup="listbox" aria-expanded="false">Måned<span class="chev">▾</span></button>
     </div>
     <button class="today-pill" id="today-btn">I dag</button>
+    <div class="tb-titel" id="tb-titel" hidden>Kogebog</div>
     <button class="icon-btn" id="theme-btn" aria-label="Skift mellem lys og mørk">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
     </button>
@@ -281,14 +345,110 @@ svg{display:block}
     <button class="nav" id="next" aria-label="Næste"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   </div>
 
+  <div class="soegerad" id="soegerad" hidden>
+    <div class="soegefelt">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="soeg" placeholder="Søg i retter" autocomplete="off">
+    </div>
+    <div class="filtre" id="filtre"></div>
+  </div>
+
   <div class="stage-wrap"><div class="scroll" id="stage"></div></div>
 </div>
 
 <button class="fab" id="add-btn">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-  Ny aftale
+  <span id="add-tekst">Ny aftale</span>
 </button>
 
+<nav class="tabbar"><div class="inner">
+  <button data-fane="kalender" aria-current="true">
+    <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+    Kalender
+  </button>
+  <button data-fane="madplan" aria-current="false">
+    <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg></span>
+    Madplan
+  </button>
+  <button data-fane="indkoeb" aria-current="false">
+    <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M6 6L5 3H2"/></svg></span>
+    Indkøb
+  </button>
+  <button data-fane="kogebog" aria-current="false">
+    <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg></span>
+    Kogebog
+  </button>
+</div></nav>
+
+<!-- Ret: detaljer -->
+<div class="backdrop" id="ret-back">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ret-titel">
+    <h2 id="ret-titel"></h2>
+    <div class="meta" id="ret-meta"></div>
+    <div id="ret-krop"></div>
+    <div class="actions">
+      <button class="btn" id="ret-luk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Luk</button>
+      <button class="btn" id="ret-rediger"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Rediger</button>
+      <button class="btn danger" id="ret-slet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Slet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ret: bekræft sletning -->
+<div class="backdrop" id="retslet-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Slet retten?</h2>
+    <div class="meta" id="retslet-meta"></div>
+    <div class="actions">
+      <button class="btn" id="retslet-nej">Behold</button>
+      <button class="btn primary" id="retslet-ja">Slet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ret: opret og rediger -->
+<div class="backdrop" id="retred-back">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="retred-titel">
+    <h2 id="retred-titel">Ny ret</h2>
+    <div class="field">
+      <label for="r-navn">Navn</label>
+      <input type="text" id="r-navn" autocomplete="off" placeholder="Fx tacos">
+      <div class="err" id="r-navn-err">Skriv et navn.</div>
+    </div>
+    <label class="check"><input type="checkbox" id="r-vegetar"> Vegetar</label>
+    <label class="check"><input type="checkbox" id="r-nem"> Nem ret</label>
+    <label class="check"><input type="checkbox" id="r-agnes"> Agnes kan lide</label>
+    <label class="check"><input type="checkbox" id="r-tilbehoer"> Det her er tilbehør</label>
+
+    <div class="gruppe">Ingredienser til indkøbslisten</div>
+    <div id="r-ing"></div>
+    <button class="tilfoej" id="r-ing-tilfoej">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Tilføj ingrediens
+    </button>
+
+    <div class="field" style="margin-top:18px">
+      <label for="r-url">Link til opskrift</label>
+      <input type="text" id="r-url" autocomplete="off" placeholder="https://…">
+    </div>
+    <div class="field">
+      <label for="r-opskrift-ing">Opskriftens ingrediensliste</label>
+      <textarea id="r-opskrift-ing" placeholder="1 groft hakket gulerod&#10;2 fed finthakket hvidløg&#10;salt og peber"></textarea>
+    </div>
+    <div class="field">
+      <label for="r-fremgang">Fremgangsmåde</label>
+      <textarea id="r-fremgang" style="min-height:150px" placeholder="Sådan laves den …"></textarea>
+    </div>
+
+    <div class="err" id="r-fejl"></div>
+    <div class="actions">
+      <button class="btn" id="retred-fortryd">Fortryd</button>
+      <button class="btn primary" id="retred-gem">Gem</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="ing-forslag"></datalist>
 <div class="version" id="version"></div>
 
 <!-- Login -->
@@ -392,7 +552,7 @@ svg{display:block}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "1.6.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.0.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -536,13 +696,16 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
-    sb.from("delebarn_undtagelser").select("*")
+    sb.from("delebarn_undtagelser").select("*"),
+    sb.from("retter").select("*"),
+    sb.from("ingredienser").select("*"),
+    sb.from("madplan").select("*")
   ]);
 
-  const fejl = pRes.error || aRes.error || uRes.error;
+  const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error;
   if(fejl){
     // Uret på enheden og på serveren kan være et par sekunder ude af trit
     // lige efter login. Prøv igen én gang, før vi råber op.
@@ -553,6 +716,10 @@ async function hentAlt(forsoeg){
     vis("Kunne ikke hente data: " + fejl.message);
     return;
   }
+  retter       = rRes.data || [];
+  ingredienser = iRes.data || [];
+  madplanDage  = mRes.data || [];
+  tegnFiltre();
 
   if(pRes.data && pRes.data.length){
     PEOPLE = pRes.data.map(p => ({
@@ -564,6 +731,332 @@ async function hentAlt(forsoeg){
   uRes.data.forEach(r => agnesOverrides.set(r.dato, r.er_her));
   render();
 }
+
+
+/* =======================================================================
+   Faner
+   ======================================================================= */
+let fane = "kalender";
+
+function saetFane(f){
+  fane = f;
+  closeDropdown();
+  document.querySelectorAll(".tabbar [data-fane]").forEach(b =>
+    b.setAttribute("aria-current", b.dataset.fane === f));
+
+  const kalender = f === "kalender";
+  document.getElementById("tb-visning").hidden = !kalender;
+  document.getElementById("today-btn").hidden  = !kalender;
+  document.getElementById("tb-titel").hidden   = kalender;
+  document.querySelector(".datehead").hidden   = !kalender;
+  document.getElementById("soegerad").hidden   = f !== "kogebog";
+
+  const titler = { madplan:"Madplan", indkoeb:"Indkøb", kogebog:"Kogebog" };
+  if(!kalender) document.getElementById("tb-titel").textContent = titler[f];
+
+  const fab = document.getElementById("add-btn");
+  fab.hidden = !(kalender || f === "kogebog");
+  document.getElementById("add-tekst").textContent = kalender ? "Ny aftale" : "Ny ret";
+
+  render();
+}
+document.querySelector(".tabbar").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-fane]");
+  if(b) saetFane(b.dataset.fane);
+});
+
+/* =======================================================================
+   Kogebog
+   ======================================================================= */
+const ENHEDER = ["", "g", "kg", "ml", "l", "dl", "stk", "dåse", "pakke", "bundt", "fed"];
+let retter = [], ingredienser = [], madplanDage = [];
+let soegning = "";
+const filtre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };   // fri | krav | uden
+const FILTERNAVNE = { vegetar:"Vegetar", nem:"Nem ret", agnes_kan_lide:"Agnes kan lide" };
+let visTilbehoer = false;
+
+function ingredienserFor(retId){
+  return ingredienser.filter(i => i.ret_id === retId)
+                     .sort((a,b) => a.sortering - b.sortering);
+}
+function sidstSpist(retId){
+  const idag = iso(new Date());
+  const dage = madplanDage
+    .filter(m => m.dato <= idag && (m.spist_ret_id === retId ||
+                (!m.spist_ret_id && m.planlagt_ret_id === retId)))
+    .map(m => m.dato).sort();
+  return dage.length ? dage[dage.length-1] : null;
+}
+function dageSiden(ds){
+  return Math.round((fromIso(iso(new Date())) - fromIso(ds)) / 86400000);
+}
+
+function tegnFiltre(){
+  const naeste = { fri:"krav", krav:"uden", uden:"fri" };
+  const tegn = { fri:"", krav:"✓", uden:"✕" };
+  document.getElementById("filtre").innerHTML =
+    Object.keys(FILTERNAVNE).map(n =>
+      '<button class="fchip" data-filter="'+n+'" data-stand="'+filtre[n]+'">'
+      + (tegn[filtre[n]] ? '<span>'+tegn[filtre[n]]+'</span>' : '')
+      + FILTERNAVNE[n] + '</button>').join("")
+    + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'">Tilbehør</button>';
+  void naeste;
+}
+document.getElementById("filtre").addEventListener("click", ev => {
+  const f = ev.target.closest("[data-filter]");
+  const t = ev.target.closest("[data-tilbehoer]");
+  if(f){
+    const naeste = { fri:"krav", krav:"uden", uden:"fri" };
+    filtre[f.dataset.filter] = naeste[filtre[f.dataset.filter]];
+  } else if(t){
+    visTilbehoer = !visTilbehoer;
+  } else return;
+  tegnFiltre();
+  render();
+});
+document.getElementById("soeg").addEventListener("input", ev => {
+  soegning = ev.target.value.trim().toLowerCase();
+  render();
+});
+
+function filtreredeRetter(){
+  return retter.filter(r => {
+    if(!!r.er_tilbehoer !== visTilbehoer) return false;
+    for(const n of Object.keys(FILTERNAVNE)){
+      if(filtre[n] === "krav" && !r[n]) return false;
+      if(filtre[n] === "uden" &&  r[n]) return false;
+    }
+    if(soegning){
+      const iNavn = r.navn.toLowerCase().includes(soegning);
+      const iIng  = ingredienserFor(r.id).some(i => i.navn.toLowerCase().includes(soegning));
+      if(!iNavn && !iIng) return false;
+    }
+    return true;
+  }).sort((a,b) => a.navn.localeCompare(b.navn, "da"));
+}
+
+function renderKogebog(){
+  const liste = filtreredeRetter();
+  if(!liste.length){
+    return '<div class="empty">Ingen retter passer på det du har valgt.</div>';
+  }
+  return '<div class="retliste">' + liste.map(r => {
+    const ing = ingredienserFor(r.id);
+    const sidst = sidstSpist(r.id);
+    const dage = sidst ? dageSiden(sidst) : null;
+    const marker = [
+      r.vegetar && '<span class="mark">vegetar</span>',
+      r.nem && '<span class="mark">nem</span>',
+      r.agnes_kan_lide && '<span class="mark">Agnes</span>',
+      r.er_tilbehoer && '<span class="mark tilbehoer">tilbehør</span>'
+    ].filter(Boolean).join(" ");
+    const sidstTekst = sidst
+      ? (dage === 0 ? "spist i dag" : dage === 1 ? "spist i går" : "sidst spist for " + dage + " dage siden")
+      : "aldrig spist";
+    return '<button class="retkort" data-ret="'+r.id+'"><span style="flex:1;min-width:0">'
+         +   '<span class="navn">'+esc(r.navn)+'</span>'
+         +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span><span>'+sidstTekst+'</span></span>'
+         + '</span>'
+         + (r.opskrift_url || r.fremgangsmaade ? '<span class="mrk" style="color:var(--muted)">📖</span>' : '')
+         + '</button>';
+  }).join("") + '</div>';
+}
+
+/* ---------- Ret: detaljer ---------- */
+let aabenRetId = null;
+function aabnRet(id){
+  const r = retter.find(x => x.id === id); if(!r) return;
+  aabenRetId = id;
+  const ing = ingredienserFor(id);
+  const sidst = sidstSpist(id);
+
+  document.getElementById("ret-titel").textContent = r.navn;
+  const marker = [r.vegetar && "vegetar", r.nem && "nem ret", r.agnes_kan_lide && "Agnes kan lide",
+                  r.er_tilbehoer && "tilbehør"].filter(Boolean).join(" · ");
+  document.getElementById("ret-meta").textContent =
+    (marker ? marker + " · " : "") + (sidst ? "sidst spist " + sidst : "aldrig spist");
+
+  const gruppe = (titel, k) => {
+    const d = ing.filter(i => i.kategori === k);
+    if(!d.length) return "";
+    return '<div class="gruppe">'+titel+'</div><ul class="ingliste">'
+      + d.map(i => '<li><span>'+esc(i.navn)+'</span><span class="m">'
+        + (i.maengde != null ? i.maengde + (i.enhed ? " " + esc(i.enhed) : "") : "") + '</span></li>').join("")
+      + '</ul>';
+  };
+
+  let h = gruppe("Skal købes", "koeb") + gruppe("Tjek om vi har", "tjek");
+
+  if(r.opskrift_url){
+    h += '<div class="gruppe">Opskrift</div><a href="'+esc(r.opskrift_url)+'" target="_blank" rel="noopener" style="color:var(--ink);font-size:14px;word-break:break-all">'+esc(r.opskrift_url)+'</a>';
+  }
+  if(r.opskrift_ingredienser || r.fremgangsmaade){
+    if(r.opskrift_ingredienser){
+      h += '<div class="klaeb"><button class="fold" id="fold-ing" aria-expanded="true">'
+         +   '<span>Ingredienser til opskriften</span><span id="fold-tegn">▾</span></button></div>'
+         + '<div class="opskrifttekst" id="opskrift-ing">'+esc(r.opskrift_ingredienser)+'</div>';
+    }
+    if(r.fremgangsmaade){
+      h += '<div class="gruppe">Fremgangsmåde</div><div class="opskrifttekst">'+esc(r.fremgangsmaade)+'</div>';
+    }
+  }
+  document.getElementById("ret-krop").innerHTML = h;
+
+  const fold = document.getElementById("fold-ing");
+  if(fold) fold.onclick = () => {
+    const k = document.getElementById("opskrift-ing");
+    const aaben = k.style.display !== "none";
+    k.style.display = aaben ? "none" : "block";
+    fold.setAttribute("aria-expanded", !aaben);
+    document.getElementById("fold-tegn").textContent = aaben ? "▸" : "▾";
+  };
+  show("ret-back");
+}
+document.getElementById("ret-luk").onclick = () => hide("ret-back");
+document.getElementById("ret-slet").onclick = () => {
+  const r = retter.find(x => x.id === aabenRetId);
+  document.getElementById("retslet-meta").textContent = r
+    ? '"'+r.navn+'" og dens ingredienser fjernes. Historikken bevarer navnet.' : "";
+  show("retslet-back");
+};
+document.getElementById("retslet-nej").onclick = () => hide("retslet-back");
+document.getElementById("retslet-ja").onclick = async () => {
+  const { error } = await sb.from("retter").delete().eq("id", aabenRetId);
+  if(error){ vis("Kunne ikke slette: " + error.message); return; }
+  retter = retter.filter(r => r.id !== aabenRetId);
+  ingredienser = ingredienser.filter(i => i.ret_id !== aabenRetId);
+  hide("retslet-back"); hide("ret-back"); render();
+};
+
+/* ---------- Ret: redigering ---------- */
+let redigererRetId = null;
+let kladdeIng = [];
+
+function tegnIngRaekker(){
+  const navne = [...new Set(ingredienser.map(i => i.navn))].sort((a,b)=>a.localeCompare(b,"da"));
+  document.getElementById("ing-forslag").innerHTML =
+    navne.map(n => '<option value="'+esc(n)+'">').join("");
+  document.getElementById("r-ing").innerHTML = kladdeIng.map((i, n) =>
+    '<div class="ingrad" data-n="'+n+'">'
+    + '<div class="linje">'
+    +   '<input type="text" class="i-navn" list="ing-forslag" placeholder="Ingrediens" value="'+esc(i.navn)+'">'
+    +   '<button class="fjern" aria-label="Fjern"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
+    + '</div>'
+    + '<div class="linje">'
+    +   '<input type="text" inputmode="decimal" class="tal i-maengde" placeholder="Mængde" value="'+(i.maengde != null ? i.maengde : "")+'">'
+    +   '<select class="i-enhed">' + ENHEDER.map(e =>
+          '<option value="'+e+'"'+(e === (i.enhed||"") ? " selected" : "")+'>'+(e || "uden enhed")+'</option>').join("") + '</select>'
+    +   '<select class="i-kategori"><option value="koeb"'+(i.kategori==="koeb"?" selected":"")+'>Skal købes</option>'
+    +   '<option value="tjek"'+(i.kategori==="tjek"?" selected":"")+'>Tjek om vi har</option></select>'
+    + '</div>'
+    + '</div>').join("");
+}
+function laesIngRaekker(){
+  kladdeIng = [...document.querySelectorAll("#r-ing .ingrad")].map(rad => {
+    const t = rad.querySelector(".i-maengde").value.trim().replace(",", ".");
+    return {
+      navn: rad.querySelector(".i-navn").value.trim(),
+      maengde: t === "" || isNaN(parseFloat(t)) ? null : parseFloat(t),
+      enhed: rad.querySelector(".i-enhed").value || null,
+      kategori: rad.querySelector(".i-kategori").value
+    };
+  });
+}
+document.getElementById("r-ing").addEventListener("click", ev => {
+  const f = ev.target.closest(".fjern"); if(!f) return;
+  laesIngRaekker();
+  kladdeIng.splice(Number(f.closest(".ingrad").dataset.n), 1);
+  tegnIngRaekker();
+});
+document.getElementById("r-ing-tilfoej").onclick = () => {
+  laesIngRaekker();
+  kladdeIng.push({navn:"", maengde:null, enhed:null, kategori:"koeb"});
+  tegnIngRaekker();
+  const rader = document.querySelectorAll("#r-ing .i-navn");
+  if(rader.length) rader[rader.length-1].focus();
+};
+
+function aabnRetRed(id){
+  redigererRetId = id || null;
+  const r = id ? retter.find(x => x.id === id) : null;
+  document.getElementById("retred-titel").textContent = r ? "Rediger ret" : "Ny ret";
+  document.getElementById("r-navn").value      = r ? r.navn : "";
+  document.getElementById("r-vegetar").checked = r ? !!r.vegetar : false;
+  document.getElementById("r-nem").checked     = r ? !!r.nem : false;
+  document.getElementById("r-agnes").checked   = r ? !!r.agnes_kan_lide : false;
+  document.getElementById("r-tilbehoer").checked = r ? !!r.er_tilbehoer : visTilbehoer;
+  document.getElementById("r-url").value       = r ? (r.opskrift_url||"") : "";
+  document.getElementById("r-opskrift-ing").value = r ? (r.opskrift_ingredienser||"") : "";
+  document.getElementById("r-fremgang").value  = r ? (r.fremgangsmaade||"") : "";
+  kladdeIng = r ? ingredienserFor(id).map(i => ({navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori}))
+                : [{navn:"", maengde:null, enhed:null, kategori:"koeb"}];
+  tegnIngRaekker();
+  document.getElementById("r-navn-err").classList.remove("show");
+  document.getElementById("r-fejl").classList.remove("show");
+  show("retred-back");
+}
+document.getElementById("ret-rediger").onclick = () => { hide("ret-back"); aabnRetRed(aabenRetId); };
+document.getElementById("retred-fortryd").onclick = () => hide("retred-back");
+
+document.getElementById("retred-gem").onclick = async () => {
+  const navn = document.getElementById("r-navn").value.trim();
+  document.getElementById("r-navn-err").classList.toggle("show", !navn);
+  if(!navn) return;
+  laesIngRaekker();
+  const rene = kladdeIng.filter(i => i.navn);
+
+  const data = {
+    navn,
+    vegetar:        document.getElementById("r-vegetar").checked,
+    nem:            document.getElementById("r-nem").checked,
+    agnes_kan_lide: document.getElementById("r-agnes").checked,
+    er_tilbehoer:   document.getElementById("r-tilbehoer").checked,
+    opskrift_url:   document.getElementById("r-url").value.trim(),
+    opskrift_ingredienser: document.getElementById("r-opskrift-ing").value.trim(),
+    fremgangsmaade: document.getElementById("r-fremgang").value.trim()
+  };
+
+  const knap = document.getElementById("retred-gem");
+  const fejlfelt = document.getElementById("r-fejl");
+  knap.disabled = true; knap.textContent = "Gemmer …";
+  const faerdig = besked => {
+    knap.disabled = false; knap.textContent = "Gem";
+    if(besked){
+      fejlfelt.textContent = besked.includes("retter_navn_unik")
+        ? "Der findes allerede en ret med det navn." : besked;
+      fejlfelt.classList.add("show");
+    }
+  };
+
+  let retId = redigererRetId;
+  if(retId){
+    const { error } = await sb.from("retter").update(data).eq("id", retId);
+    if(error){ faerdig(error.message); return; }
+    Object.assign(retter.find(x => x.id === retId), data);
+  } else {
+    const { data: raekker, error } = await sb.from("retter").insert(data).select();
+    if(error){ faerdig(error.message); return; }
+    retId = raekker[0].id;
+    retter.push(raekker[0]);
+  }
+
+  // Ingredienserne skrives forfra — enklere og altid i takt med det du ser
+  const { error: f2 } = await sb.from("ingredienser").delete().eq("ret_id", retId);
+  if(f2){ faerdig(f2.message); return; }
+  ingredienser = ingredienser.filter(i => i.ret_id !== retId);
+
+  if(rene.length){
+    const { data: nye, error: f3 } = await sb.from("ingredienser").insert(
+      rene.map((i, n) => ({ret_id:retId, navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori, sortering:n}))
+    ).select();
+    if(f3){ faerdig(f3.message); return; }
+    ingredienser.push(...nye);
+  }
+
+  faerdig(null);
+  hide("retred-back");
+  render();
+};
 
 /* =======================================================================
    Realtid — ændringer fra andre skærme kommer af sig selv
@@ -592,6 +1085,9 @@ function lytPaaAendringer(){
       render();
     })
     .on("postgres_changes", { event:"*", schema:"public", table:"personer" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"retter" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"ingredienser" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"madplan" }, () => hentAlt())
     .subscribe(status => console.info("Realtid:", status));
 }
 
@@ -802,6 +1298,7 @@ function renderMonth(){
    Tegn det hele
    ======================================================================= */
 function render(){
+  if(fane !== "kalender"){ tegnStage(); return; }
   document.getElementById("v-day").setAttribute("aria-pressed", view==="day");
   document.getElementById("v-week").setAttribute("aria-pressed", view==="week");
   document.getElementById("v-month").setAttribute("aria-pressed", view==="month");
@@ -825,8 +1322,18 @@ function render(){
   }
   sub.textContent = subParts.join(" · ");
 
+  tegnStage();
+}
+
+function tegnStage(){
   const stage = document.getElementById("stage");
-  stage.innerHTML = view==="day" ? renderDay() : view==="week" ? renderWeek() : renderMonth();
+  if(fane === "kalender"){
+    stage.innerHTML = view==="day" ? renderDay() : view==="week" ? renderWeek() : renderMonth();
+  } else if(fane === "kogebog"){
+    stage.innerHTML = renderKogebog();
+  } else {
+    stage.innerHTML = '<div class="snart">Den her fane er ikke bygget endnu.</div>';
+  }
   stage.scrollTop = 0;
 }
 
@@ -841,7 +1348,7 @@ function step(dir){
   else                   cursor = new Date(cursor.getFullYear(), cursor.getMonth()+dir, 1);
   render();
 }
-function goHome(){ cursor = new Date(); view = "day"; closeDropdown(); render(); }
+function goHome(){ cursor = new Date(); view = "day"; closeDropdown(); saetFane("kalender"); }
 
 /* Den gamle visning glider ud til den ene side, den nye ind fra den anden. */
 const mindreBevaegelse = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -948,6 +1455,8 @@ document.getElementById("stage").addEventListener("click", async ev => {
   const evb  = ev.target.closest("[data-ev]");
   const agn  = ev.target.closest("#agnes-btn");
 
+  const retk = ev.target.closest("[data-ret]");
+  if(retk){ aabnRet(retk.dataset.ret); return; }
   if(agn){ await vendAgnesDag(); return; }
   if(evb){ openDetail(evb.dataset.ev); return; }
   if(week){ cursor = fromIso(week.dataset.week); setView("week"); return; }
@@ -1048,7 +1557,7 @@ function openEditor(id){
   document.getElementById("f-time-err").classList.remove("show");
   show("edit-back");
 }
-document.getElementById("add-btn").onclick     = () => openEditor(null);
+document.getElementById("add-btn").onclick     = () => fane === "kogebog" ? aabnRetRed(null) : openEditor(null);
 document.getElementById("edit-cancel").onclick = () => hide("edit-back");
 
 document.getElementById("edit-save").onclick = async () => {
@@ -1172,6 +1681,7 @@ document.getElementById("menu-export").onclick = () => {
 
   el.addEventListener("touchstart", e => {
     if(e.touches.length !== 1) return;
+    if(fane !== "kalender") return;
     if(document.querySelector(".backdrop.open")) return;
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
