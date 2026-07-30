@@ -261,6 +261,28 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .handling.fare{color:var(--holiday)}
 .handling strong{font-weight:700}
 .vaelgliste{display:flex;flex-direction:column;gap:7px;max-height:52dvh;overflow-y:auto;overscroll-behavior:contain;margin-top:10px}
+
+/* ---------- Indkøb ---------- */
+.ikort{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.ihoved{width:100%;display:flex;align-items:center;gap:9px;padding:13px 15px;font-weight:600;font-size:16px;text-align:left}
+.ihoved .antal{margin-left:auto;font-size:13px;color:var(--muted);font-weight:500}
+.ihoved .pil{color:var(--muted);transition:transform .15s}
+.ihoved[aria-expanded="false"] .pil{transform:rotate(-90deg)}
+.ivare{display:flex;gap:10px;align-items:baseline;padding:10px 15px;border-top:1px solid var(--line);font-size:15px}
+.ivare .n{flex:1;min-width:0}
+.ivare .m{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+.ivare .kilder{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.ivare.egen{background:var(--chip)}
+.ivare .fjernvare{width:30px;height:30px;flex:none;display:grid;place-items:center;color:var(--muted);border-radius:8px;margin:-6px 0}
+.ivare .fjernvare:hover{color:var(--holiday);background:var(--surface)}
+.iny{display:flex;gap:8px;padding:11px 15px;border-top:1px solid var(--line)}
+.iny input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.iny button{padding:0 16px;border:1px solid var(--line);border-radius:10px;font-weight:600;color:var(--muted)}
+.iny button:hover{border-color:var(--line-strong);color:var(--ink)}
+.iretter{font-size:14px;color:var(--muted);padding:0 2px 4px}
+.iretter div{padding:3px 0}
+.kopiknap{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;margin-top:4px;background:var(--surface)}
+.kopiknap:hover{border-color:var(--line-strong)}
 .dot{width:16px;height:16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
   font-size:9px;font-weight:700;line-height:1;color:rgba(0,0,0,.68);flex:none;font-family:var(--font-body);
   letter-spacing:0;text-align:center;padding-bottom:.5px}
@@ -681,7 +703,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.6.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.7.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -821,16 +843,17 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
     sb.from("retter").select("*"),
     sb.from("ingredienser").select("*"),
-    sb.from("madplan").select("*")
+    sb.from("madplan").select("*"),
+    sb.from("indkoeb_ekstra").select("*")
   ]);
 
-  const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error;
+  const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error;
   if(fejl){
     // Uret på enheden og på serveren kan være et par sekunder ude af trit
     // lige efter login. Prøv igen én gang, før vi råber op.
@@ -844,6 +867,7 @@ async function hentAlt(forsoeg){
   retter       = rRes.data || [];
   ingredienser = iRes.data || [];
   madplanDage  = mRes.data || [];
+  indkoebEkstra = eRes.data || [];
   tegnFiltre();
 
   if(pRes.data && pRes.data.length){
@@ -870,12 +894,13 @@ function saetFane(f){
     b.setAttribute("aria-current", b.dataset.fane === f));
 
   const kalender = f === "kalender";
-  const medHoved = kalender || f === "madplan";
+  const medHoved = kalender || f === "madplan" || f === "indkoeb";
   document.getElementById("tb-visning").hidden = !kalender;
   document.getElementById("tb-titel").hidden   = kalender;
   document.querySelector(".datehead").hidden   = !medHoved;
   document.getElementById("today-btn").hidden  = !medHoved;
   document.getElementById("today-btn").textContent = kalender ? "I dag" : "Denne uge";
+  ekstraTekst = "";
   document.getElementById("soegerad").hidden   = f !== "kogebog";
 
   const titler = { madplan:"Madplan", indkoeb:"Indkøb", kogebog:"Kogebog" };
@@ -939,6 +964,12 @@ document.getElementById("filtre").addEventListener("click", ev => {
   } else return;
   tegnFiltre();
   render();
+});
+document.getElementById("stage").addEventListener("input", ev => {
+  if(ev.target.id === "ekstra-tekst") ekstraTekst = ev.target.value;
+});
+document.getElementById("stage").addEventListener("keydown", ev => {
+  if(ev.target.id === "ekstra-tekst" && ev.key === "Enter") tilfoejEkstra();
 });
 document.getElementById("soeg").addEventListener("input", ev => {
   soegning = ev.target.value.trim().toLowerCase();
@@ -1465,6 +1496,168 @@ document.getElementById("vaelg-liste").addEventListener("click", async ev => {
   tegnDagArk();
 });
 
+
+/* =======================================================================
+   Indkøb
+   Listen gemmes ikke — den regnes ud fra ugeplanen hver gang, så den
+   altid er i takt. Kun dine egne linjer ligger i databasen.
+   Standarduge er den næste fredag fra og med i dag: torsdag peger på
+   morgendagen, og fra lørdag hopper den videre til ugen efter.
+   ======================================================================= */
+function naesteFredag(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return addDays(x, (5 - x.getDay() + 7) % 7);
+}
+let indkoebUge = naesteFredag(new Date());
+let indkoebEkstra = [];
+let foldKoeb = true, foldTjek = true;
+let ekstraTekst = "";
+
+const tal = n => {
+  if(n == null) return "";
+  const r = Math.round(n * 100) / 100;
+  return String(r).replace(".", ",");
+};
+
+function beregnIndkoeb(fredag){
+  const koeb = new Map(), tjek = new Map(), dage = [];
+
+  for(let i = 0; i < 7; i++){
+    const d = addDays(fredag, i), ds = iso(d);
+    const m = madplanFor(ds);
+    if(!m || !m.ret_navn) continue;
+
+    const tilbehoer = (m.tilbehoer || []).map(t => t.navn).join(", ");
+    dage.push({
+      dag: UGEDAGE_KORT[(d.getDay() + 6) % 7], dato: d.getDate(),
+      navn: m.ret_navn, tilbehoer, frost: !!m.frost, portioner: m.portioner || 1
+    });
+
+    if(m.frost) continue;                       // frost eller rest: skal ikke købes ind til
+
+    const kilder = [m.ret_id, ...(m.tilbehoer || []).map(t => t.id)].filter(Boolean);
+    kilder.forEach(rid => {
+      ingredienserFor(rid).forEach(ing => {
+        const kort = ing.kategori === "tjek" ? tjek : koeb;
+        const noegle = ing.navn.toLowerCase() + "|" + (ing.enhed || "");
+        const post = kort.get(noegle) || { navn: ing.navn, enhed: ing.enhed || "", maengde: null, retter: new Set() };
+        if(ing.maengde != null) post.maengde = (post.maengde || 0) + ing.maengde * (m.portioner || 1);
+        post.retter.add(m.ret_navn);
+        kort.set(noegle, post);
+      });
+    });
+  }
+
+  // Står varen allerede på tjeklisten, skal den ikke også stå på købelisten
+  const paaTjek = new Set([...tjek.values()].map(p => p.navn.toLowerCase()));
+  const sorter = a => a.sort((x, y) => x.navn.localeCompare(y.navn, "da"));
+
+  return {
+    dage,
+    koeb: sorter([...koeb.values()].filter(p => !paaTjek.has(p.navn.toLowerCase()))),
+    tjek: sorter([...tjek.values()])
+  };
+}
+
+function renderIndkoeb(){
+  const ugeStart = iso(indkoebUge);
+  const { dage, koeb, tjek } = beregnIndkoeb(indkoebUge);
+  const egne = indkoebEkstra.filter(e => e.uge_start === ugeStart)
+                            .sort((a, b) => a.sortering - b.sortering);
+
+  const vare = p => '<div class="ivare"><span class="n">' + esc(p.navn)
+    + '<span class="kilder">' + esc([...p.retter].join(", ")) + '</span></span>'
+    + '<span class="m">' + (p.maengde != null ? tal(p.maengde) + (p.enhed ? " " + esc(p.enhed) : "") : "") + '</span></div>';
+
+  const egenVare = e => '<div class="ivare egen"><span class="n">' + esc(e.tekst) + '</span>'
+    + '<button class="fjernvare" data-fjern="' + e.id + '" aria-label="Fjern">'
+    + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>';
+
+  const pil = '<span class="pil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>';
+
+  let h = "";
+
+  if(dage.length){
+    h += '<div class="iretter">' + dage.map(d =>
+      '<div><strong>' + d.dag + ' ' + d.dato + '.</strong> ' + esc(d.navn)
+      + (d.portioner > 1 ? " ×" + d.portioner : "")
+      + (d.tilbehoer ? " med " + esc(d.tilbehoer) : "")
+      + (d.frost ? " ❄" : "") + '</div>').join("") + '</div>';
+  } else {
+    h += '<div class="iretter">Der er ikke planlagt noget i denne uge.</div>';
+  }
+
+  h += '<div class="ikort">'
+    +   '<button class="ihoved" data-fold="koeb" aria-expanded="' + foldKoeb + '">' + pil
+    +     'Skal købes<span class="antal">' + (koeb.length + egne.length) + '</span></button>'
+    +   (foldKoeb
+        ? koeb.map(vare).join("") + egne.map(egenVare).join("")
+          + '<div class="iny"><input type="text" id="ekstra-tekst" placeholder="Tilføj vare" autocomplete="off" value="' + esc(ekstraTekst) + '">'
+          + '<button id="ekstra-tilfoej">Tilføj</button></div>'
+        : "")
+    + '</div>';
+
+  h += '<div class="ikort">'
+    +   '<button class="ihoved" data-fold="tjek" aria-expanded="' + foldTjek + '">' + pil
+    +     'Tjek om vi har<span class="antal">' + tjek.length + '</span></button>'
+    +   (foldTjek ? tjek.map(vare).join("") : "")
+    + '</div>';
+
+  h += '<button class="kopiknap" id="kopi-knap">'
+    +   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+    +   'Kopiér listen</button>';
+
+  return h;
+}
+
+/* ---------- Handlinger ---------- */
+async function tilfoejEkstra(){
+  const felt = document.getElementById("ekstra-tekst");
+  const tekst = felt.value.trim();
+  if(!tekst) return;
+  const ugeStart = iso(indkoebUge);
+  const { data, error } = await sb.from("indkoeb_ekstra")
+    .insert({ uge_start: ugeStart, tekst, sortering: indkoebEkstra.length })
+    .select();
+  if(error){ vis("Kunne ikke tilføje: " + error.message); return; }
+  indkoebEkstra.push(data[0]);
+  ekstraTekst = "";
+  render();
+  const nyt = document.getElementById("ekstra-tekst");
+  if(nyt) nyt.focus();
+}
+
+async function fjernEkstra(id){
+  const { error } = await sb.from("indkoeb_ekstra").delete().eq("id", id);
+  if(error){ vis("Kunne ikke fjerne: " + error.message); return; }
+  indkoebEkstra = indkoebEkstra.filter(e => e.id !== id);
+  render();
+}
+
+function indkoebSomTekst(){
+  const ugeStart = iso(indkoebUge);
+  const { dage, koeb, tjek } = beregnIndkoeb(indkoebUge);
+  const egne = indkoebEkstra.filter(e => e.uge_start === ugeStart);
+  const s0 = indkoebUge, s1 = addDays(indkoebUge, 6);
+
+  const linjer = ["Madplan " + s0.getDate() + ". " + MAANEDER[s0.getMonth()]
+                  + " – " + s1.getDate() + ". " + MAANEDER[s1.getMonth()], ""];
+
+  dage.forEach(d => linjer.push(d.dag + " " + d.dato + ".: " + d.navn
+    + (d.portioner > 1 ? " ×" + d.portioner : "")
+    + (d.tilbehoer ? " med " + d.tilbehoer : "")
+    + (d.frost ? " (frost eller rest)" : "")));
+
+  linjer.push("", "KØB");
+  koeb.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + p.enhed : "") + ")" : "")));
+  egne.forEach(e => linjer.push("- " + e.tekst));
+
+  linjer.push("", "TJEK");
+  tjek.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + p.enhed : "") + ")" : "")));
+
+  return linjer.join("\n");
+}
+
 /* =======================================================================
    Realtid — ændringer fra andre skærme kommer af sig selv
    ======================================================================= */
@@ -1495,6 +1688,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"retter" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"ingredienser" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"madplan" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"indkoeb_ekstra" }, () => hentAlt())
     .subscribe(status => console.info("Realtid:", status));
 }
 
@@ -1663,8 +1857,9 @@ function renderMonth(){
    Tegn det hele
    ======================================================================= */
 function render(){
-  if(fane === "madplan"){
-    const s0 = madplanUge, s1 = addDays(madplanUge, 6);
+  if(fane === "madplan" || fane === "indkoeb"){
+    const start = fane === "madplan" ? madplanUge : indkoebUge;
+    const s0 = start, s1 = addDays(start, 6);
     document.getElementById("head-title").textContent =
       s0.getDate() + ". " + MAANEDER[s0.getMonth()].slice(0,3) + " – " + s1.getDate() + ". " + MAANEDER[s1.getMonth()].slice(0,3);
     document.getElementById("head-sub").textContent =
@@ -1705,6 +1900,8 @@ function tegnStage(){
     stage.innerHTML = view==="day" ? renderDay() : view==="week" ? renderWeek() : renderMonth();
   } else if(fane === "madplan"){
     stage.innerHTML = renderMadplan();
+  } else if(fane === "indkoeb"){
+    stage.innerHTML = renderIndkoeb();
   } else if(fane === "kogebog"){
     stage.innerHTML = renderKogebog();
   } else {
@@ -1720,6 +1917,7 @@ function setView(v){ view = v; closeDropdown(); render(); }
 function step(dir){
   closeDropdown();
   if(fane === "madplan"){ madplanUge = addDays(madplanUge, dir*7); render(); return; }
+  if(fane === "indkoeb"){ indkoebUge = addDays(indkoebUge, dir*7); render(); return; }
   if(view==="day")       cursor = addDays(cursor, dir);
   else if(view==="week") cursor = addDays(cursor, dir*7);
   else                   cursor = new Date(cursor.getFullYear(), cursor.getMonth()+dir, 1);
@@ -1801,6 +1999,7 @@ document.getElementById("v-week").onclick  = () => segmentClick("week");
 document.getElementById("v-month").onclick = () => segmentClick("month");
 document.getElementById("today-btn").onclick = () => {
   if(fane === "madplan"){ madplanUge = fredagFor(new Date()); render(); }
+  else if(fane === "indkoeb"){ indkoebUge = naesteFredag(new Date()); render(); }
   else goHome();
 };
 document.getElementById("prev").onclick = () => skiftMedGlid(-1);
@@ -1835,6 +2034,24 @@ document.getElementById("stage").addEventListener("click", async ev => {
   const evb  = ev.target.closest("[data-ev]");
   const agn  = ev.target.closest("#agnes-btn");
 
+  const fold = ev.target.closest("[data-fold]");
+  if(fold){
+    if(fold.dataset.fold === "koeb") foldKoeb = !foldKoeb; else foldTjek = !foldTjek;
+    render(); return;
+  }
+  const fjern = ev.target.closest("[data-fjern]");
+  if(fjern){ await fjernEkstra(fjern.dataset.fjern); return; }
+  if(ev.target.closest("#ekstra-tilfoej")){ await tilfoejEkstra(); return; }
+  if(ev.target.closest("#kopi-knap")){
+    try{
+      await navigator.clipboard.writeText(indkoebSomTekst());
+      const k = document.getElementById("kopi-knap");
+      const gammel = k.innerHTML;
+      k.innerHTML = "Kopieret";
+      setTimeout(() => { const n = document.getElementById("kopi-knap"); if(n) n.innerHTML = gammel; }, 1600);
+    }catch(err){ vis("Kunne ikke kopiere: " + err.message); }
+    return;
+  }
   const dagk = ev.target.closest("[data-dag]");
   if(dagk){ aabnDag(dagk.dataset.dag); return; }
   const retk = ev.target.closest("[data-ret]");
@@ -2063,7 +2280,7 @@ document.getElementById("menu-export").onclick = () => {
 
   el.addEventListener("touchstart", e => {
     if(e.touches.length !== 1) return;
-    if(fane !== "kalender" && fane !== "madplan") return;
+    if(fane === "kogebog") return;
     if(document.querySelector(".backdrop.open")) return;
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
