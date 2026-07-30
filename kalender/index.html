@@ -47,6 +47,7 @@ html[data-theme="dark"]{
 }
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;padding:0;height:100%;overflow:hidden}
 body{
   background:var(--bg);
@@ -541,17 +542,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg>
         Se retten i kogebogen
       </button>
-      <button class="handling" id="dag-spist">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        <span id="dag-spist-tekst">Vi spiste noget andet</span>
-      </button>
       <button class="handling fare" id="dag-ryd">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         Ryd dagen
       </button>
     </div>
 
-    <div class="actions"><button class="btn" id="dag-luk">Luk</button></div>
+    <div class="actions">
+      <button class="btn" id="dag-fortryd">Fortryd</button>
+      <button class="btn primary" id="dag-gem">Gem</button>
+    </div>
   </div>
 </div>
 
@@ -678,7 +678,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.3.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.4.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -910,8 +910,7 @@ function ingredienserFor(retId){
 function sidstSpist(retId){
   const idag = iso(new Date());
   const dage = madplanDage
-    .filter(m => m.dato <= idag && (m.spist_ret_id === retId ||
-                (!m.spist_ret_id && m.planlagt_ret_id === retId)))
+    .filter(m => m.dato <= idag && m.ret_id === retId)
     .map(m => m.dato).sort();
   return dage.length ? dage[dage.length-1] : null;
 }
@@ -1222,14 +1221,12 @@ async function gemDag(ds, felter){
   const nu = madplanFor(ds) || {};
   const raekke = Object.assign({
     dato: ds,
-    planlagt_ret_id: nu.planlagt_ret_id || null,
-    planlagt_navn:   nu.planlagt_navn   || "",
-    spist_ret_id:    nu.spist_ret_id    || null,
-    spist_navn:      nu.spist_navn      || "",
-    tilbehoer_id:    nu.tilbehoer_id    || null,
-    tilbehoer_navn:  nu.tilbehoer_navn  || "",
-    portioner:       nu.portioner       || 1,
-    frost:           nu.frost           || false
+    ret_id:         nu.ret_id         || null,
+    ret_navn:       nu.ret_navn       || "",
+    tilbehoer_id:   nu.tilbehoer_id   || null,
+    tilbehoer_navn: nu.tilbehoer_navn || "",
+    portioner:      nu.portioner      || 1,
+    frost:          nu.frost          || false
   }, felter);
 
   const { data, error } = await sb.from("madplan").upsert(raekke, {onConflict:"dato"}).select();
@@ -1259,10 +1256,7 @@ function renderMadplan(){
     const under = [];
 
     if(m){
-      const spist = m.spist_navn && m.spist_navn !== m.planlagt_navn;
-      const navn = spist ? m.spist_navn : m.planlagt_navn;
-      if(navn) hoved = '<span class="r">' + esc(navn) + '</span>';
-      if(spist && m.planlagt_navn) under.push("planlagt: " + esc(m.planlagt_navn));
+      if(m.ret_navn) hoved = '<span class="r">' + esc(m.ret_navn) + '</span>';
       if(m.tilbehoer_navn) under.push(esc(m.tilbehoer_navn));
       if(m.portioner > 1)  under.push("×" + m.portioner);
       if(m.frost)          under.push("❄ frost eller rest");
@@ -1280,68 +1274,79 @@ function renderMadplan(){
   return h;
 }
 
-/* ---------- Arket for én dag ---------- */
+/* ---------- Arket for én dag ----------
+   Alt redigeres i en kladde, så Fortryd virkelig fortryder.
+   Der skrives først til databasen når du trykker Gem.          */
 let aabenDag = null;
+let dagKladde = null;
+
+const tomKladde = () => ({
+  ret_id:null,       ret_navn:"",
+  tilbehoer_id:null, tilbehoer_navn:"",
+  portioner:1,       frost:false
+});
 
 function aabnDag(ds){
   aabenDag = ds;
-  const d = fromIso(ds), m = madplanFor(ds) || {};
-  const ugedag = UGEDAGE[(d.getDay() + 6) % 7];
-  const passeret = ds < iso(new Date());
+  const m = madplanFor(ds);
+  dagKladde = m ? {
+    ret_id:        m.ret_id,        ret_navn:       m.ret_navn || "",
+    tilbehoer_id:  m.tilbehoer_id,  tilbehoer_navn: m.tilbehoer_navn || "",
+    portioner:     m.portioner || 1, frost:         !!m.frost
+  } : tomKladde();
 
-  document.getElementById("dag-titel").textContent =
-    ugedag.charAt(0).toUpperCase() + ugedag.slice(1) + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
-  document.getElementById("dag-meta").textContent =
-    m.spist_navn && m.spist_navn !== m.planlagt_navn ? "Der blev spist noget andet end planlagt" : "";
-
-  document.getElementById("dag-ret").textContent       = m.planlagt_navn || "—";
-  document.getElementById("dag-tilbehoer").textContent = m.tilbehoer_navn || "—";
-  document.getElementById("dag-portioner").textContent = m.portioner || 1;
-  document.getElementById("dag-frost").checked         = !!m.frost;
-
-  const retId = m.spist_ret_id || m.planlagt_ret_id;
-  document.getElementById("dag-opskrift").hidden = !retId;
-  document.getElementById("dag-spist").hidden    = !passeret || !m.planlagt_navn;
-  document.getElementById("dag-spist-tekst").textContent =
-    m.spist_navn && m.spist_navn !== m.planlagt_navn ? "Ret hvad vi spiste" : "Vi spiste noget andet";
-  document.getElementById("dag-ryd").hidden      = !m.planlagt_navn && !m.spist_navn;
-
+  tegnDagArk();
   show("dag-back");
 }
 
-document.getElementById("dag-luk").onclick = () => hide("dag-back");
-document.getElementById("dag-frost").onchange = ev => gemDag(aabenDag, { frost: ev.target.checked });
-document.getElementById("dag-minus").onclick = () => {
-  const n = Math.max(1, (madplanFor(aabenDag)?.portioner || 1) - 1);
-  document.getElementById("dag-portioner").textContent = n;
-  gemDag(aabenDag, { portioner: n });
-};
-document.getElementById("dag-plus").onclick = () => {
-  const n = Math.min(12, (madplanFor(aabenDag)?.portioner || 1) + 1);
-  document.getElementById("dag-portioner").textContent = n;
-  gemDag(aabenDag, { portioner: n });
-};
-document.getElementById("dag-ryd").onclick = async () => {
-  await rydDag(aabenDag);
+function tegnDagArk(){
+  const d = fromIso(aabenDag);
+  const ugedag = UGEDAGE[(d.getDay() + 6) % 7];
+  const k = dagKladde;
+
+  document.getElementById("dag-titel").textContent =
+    ugedag.charAt(0).toUpperCase() + ugedag.slice(1) + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
+  document.getElementById("dag-meta").textContent = "";
+
+  document.getElementById("dag-ret").textContent       = k.ret_navn || "—";
+  document.getElementById("dag-tilbehoer").textContent = k.tilbehoer_navn || "—";
+  document.getElementById("dag-portioner").textContent = k.portioner;
+  document.getElementById("dag-frost").checked         = k.frost;
+
+  document.getElementById("dag-opskrift").hidden = !k.ret_id;
+  document.getElementById("dag-ryd").hidden      = !k.ret_navn && !k.tilbehoer_navn;
+}
+
+document.getElementById("dag-fortryd").onclick = () => hide("dag-back");
+document.getElementById("dag-frost").onchange  = ev => { dagKladde.frost = ev.target.checked; };
+document.getElementById("dag-minus").onclick   = () => { dagKladde.portioner = Math.max(1, dagKladde.portioner - 1); tegnDagArk(); };
+document.getElementById("dag-plus").onclick    = () => { dagKladde.portioner = Math.min(12, dagKladde.portioner + 1); tegnDagArk(); };
+document.getElementById("dag-ryd").onclick     = () => { dagKladde = tomKladde(); tegnDagArk(); };
+
+document.getElementById("dag-gem").onclick = async () => {
+  const k = dagKladde;
+  const tom = !k.ret_navn && !k.tilbehoer_navn && !k.frost && k.portioner === 1;
+  const knap = document.getElementById("dag-gem");
+  knap.disabled = true; knap.textContent = "Gemmer …";
+  if(tom) await rydDag(aabenDag); else await gemDag(aabenDag, k);
+  knap.disabled = false; knap.textContent = "Gem";
   hide("dag-back");
 };
+
 document.getElementById("dag-opskrift").onclick = () => {
-  const m = madplanFor(aabenDag) || {};
-  const retId = m.spist_ret_id || m.planlagt_ret_id;
-  if(!retId) return;
+  if(!dagKladde.ret_id) return;
   hide("dag-back");
   saetFane("kogebog");
-  aabnRet(retId);
+  aabnRet(dagKladde.ret_id);
 };
 
 /* ---------- Vælgeren ---------- */
-let vaelgTilstand = "planlagt";     // planlagt | spist | tilbehoer
+let vaelgTilstand = "ret";     // ret | tilbehoer
 let vaelgSoeg = "";
 const vaelgFiltre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };
 
-document.getElementById("dag-vaelg").onclick           = () => aabnVaelger("planlagt");
+document.getElementById("dag-vaelg").onclick           = () => aabnVaelger("ret");
 document.getElementById("dag-vaelg-tilbehoer").onclick = () => aabnVaelger("tilbehoer");
-document.getElementById("dag-spist").onclick           = () => aabnVaelger("spist");
 document.getElementById("vaelg-fortryd").onclick       = () => hide("vaelg-back");
 
 function aabnVaelger(tilstand){
@@ -1349,7 +1354,7 @@ function aabnVaelger(tilstand){
   vaelgSoeg = "";
   document.getElementById("vaelg-soeg").value = "";
   document.getElementById("vaelg-titel").textContent =
-    tilstand === "tilbehoer" ? "Vælg tilbehør" : tilstand === "spist" ? "Hvad spiste I?" : "Vælg ret";
+    tilstand === "tilbehoer" ? "Vælg tilbehør" : "Vælg ret";
   document.getElementById("vaelg-filtre").hidden = tilstand === "tilbehoer";
   tegnVaelgFiltre();
   tegnVaelgListe();
@@ -1410,14 +1415,13 @@ document.getElementById("vaelg-liste").addEventListener("click", async ev => {
   const b = ev.target.closest("[data-vaelg]"); if(!b) return;
   const r = retter.find(x => x.id === b.dataset.vaelg); if(!r) return;
 
-  const felter =
-    vaelgTilstand === "tilbehoer" ? { tilbehoer_id:r.id, tilbehoer_navn:r.navn } :
-    vaelgTilstand === "spist"     ? { spist_ret_id:r.id, spist_navn:r.navn } :
-                                    { planlagt_ret_id:r.id, planlagt_navn:r.navn };
+  const felter = vaelgTilstand === "tilbehoer"
+    ? { tilbehoer_id:r.id, tilbehoer_navn:r.navn }
+    : { ret_id:r.id, ret_navn:r.navn };
 
   hide("vaelg-back");
-  await gemDag(aabenDag, felter);
-  aabnDag(aabenDag);
+  Object.assign(dagKladde, felter);
+  tegnDagArk();
 });
 
 /* =======================================================================
