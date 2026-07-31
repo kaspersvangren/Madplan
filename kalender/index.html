@@ -948,8 +948,8 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <label class="check" id="f-allday-felt"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
     <label class="check" id="f-yearly-felt"><input type="checkbox" id="f-yearly"> Gentages hvert år</label>
     <div class="row2" id="f-times">
-      <div class="field"><label for="f-start">Start</label><input type="time" id="f-start"></div>
-      <div class="field"><label for="f-end">Slut</label><input type="time" id="f-end"></div>
+      <div class="field"><label for="f-start" id="f-start-mrk">Start</label><input type="time" id="f-start"></div>
+      <div class="field"><label for="f-end" id="f-end-mrk">Slut</label><input type="time" id="f-end"></div>
     </div>
     <div class="err" id="f-time-err"></div>
     <div class="actions">
@@ -966,7 +966,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.12.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.12.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1121,7 +1121,24 @@ const ferierPaa = ds => ferier
 
 /* Sidste dag en aftale dækker. Uden slutdato er det dagen selv. */
 const sidsteDag = e => (e.endDate && e.endDate > e.date) ? e.endDate : e.date;
+const flerdags  = e => sidsteDag(e) !== e.date;
 const dageMellem = (a,b) => Math.round((fromIso(b) - fromIso(a)) / 86400000);
+
+/* Klokkeslættene hører til enderne af et spænd, ikke til hver eneste dag.
+   Hentes Agnes fredag 14 og kommer hjem søndag 13, siger fredagen "fra 14",
+   lørdagen ingenting og søndagen "til 13". */
+function tidPaaDag(e, ds){
+  if(e.allDay) return { slags:"heldags" };
+  if(!flerdags(e)) return { slags:"hel", start:e.start, slut:e.end };
+  if(ds === e.date)         return e.start ? { slags:"fra", tid:e.start } : { slags:"heldags" };
+  if(ds === sidsteDag(e))   return e.end   ? { slags:"til", tid:e.end }   : { slags:"heldags" };
+  return { slags:"heldags" };
+}
+/* Det tidspunkt dagen skal sorteres efter. Tom = hører til øverst. */
+function sorterTid(e, ds){
+  const t = tidPaaDag(e, ds);
+  return t.slags === "hel" ? (t.start || "") : (t.tid || "");
+}
 
 function eventsOn(ds){
   const md = ds.slice(5);
@@ -1130,9 +1147,10 @@ function eventsOn(ds){
       ? (e.date.slice(5) === md && e.date <= ds)
       : (ds >= e.date && ds <= sidsteDag(e)))
     .sort((a,b) => {
-      if(a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-      if(a.allDay) return a.title.localeCompare(b.title,"da");
-      return (a.start||"").localeCompare(b.start||"");
+      const ta = sorterTid(a, ds), tb = sorterTid(b, ds);
+      if(!ta !== !tb) return ta ? 1 : -1;          // uden klokkeslæt står øverst
+      if(!ta) return a.title.localeCompare(b.title,"da");
+      return ta.localeCompare(tb);
     });
 }
 
@@ -2504,7 +2522,9 @@ function dotEl(pid, size){
 }
 const dotsEl = (ids, size) => '<span class="dots">' + ids.map(id => dotEl(id, size)).join("") + '</span>';
 const esc = s => String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const timeLabel = e => e.allDay ? "Hele dagen" : (e.end ? e.start + "–" + e.end : e.start);
+const timeLabel = e => e.allDay ? "Hele dagen"
+  : flerdags(e) ? ((e.start ? "fra " + e.start : "") + (e.end ? (e.start ? ", " : "") + "hjem " + e.end : "") || "Hele dagene")
+  : (e.end ? e.start + "–" + e.end : e.start);
 
 /* =======================================================================
    Dagsvisning
@@ -2574,12 +2594,17 @@ function renderDay(){
     h += '<div class="rail">';
     list.forEach(e => {
       const p0 = e.people[0] ? personById(e.people[0]) : null;
-      const flere = sidsteDag(e) !== e.date;
-      const spand = flere
+      const spand = flerdags(e)
         ? '<small class="spand">dag '+(dageMellem(e.date, ds)+1)+'/'+(dageMellem(e.date, sidsteDag(e))+1)+'</small>'
         : "";
+      const t = tidPaaDag(e, ds);
+      const tidHtml =
+          t.slags === "heldags" ? '<small>hele<br>dagen</small>'
+        : t.slags === "fra"     ? '<small>fra</small>' + esc(t.tid)
+        : t.slags === "til"     ? '<small>til</small>' + esc(t.tid)
+        : esc(t.start) + (t.slut ? '<small>'+esc(t.slut)+'</small>' : '');
       h += '<div class="slot">'
-         +   '<div class="time">'+(e.allDay ? '<small>hele<br>dagen</small>' : esc(e.start) + (e.end ? '<small>'+esc(e.end)+'</small>' : ''))+ spand + '</div>'
+         +   '<div class="time">'+ tidHtml + spand + '</div>'
          +   '<span class="stem"></span>'
          +   '<div class="body">'
          +     '<button class="ev" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
@@ -2626,7 +2651,12 @@ function renderWeek(){
     });
     if(!list.length && !hol && !dagensOpg.length) h += '<span class="none">—</span>';
     list.forEach(e => {
-      h += '<span class="witem"><span class="wt">'+(e.allDay ? "—" : esc(e.start))+'</span>'
+      const t = tidPaaDag(e, ds);
+      const wt = t.slags === "heldags" ? "—"
+               : t.slags === "fra"     ? "fra " + esc(t.tid)
+               : t.slags === "til"     ? "til " + esc(t.tid)
+               : esc(t.start);
+      h += '<span class="witem"><span class="wt">'+wt+'</span>'
          +   dotsEl(e.people)+'<span class="wn">'+esc(e.title)+'</span></span>';
     });
     if(mad){
@@ -3015,6 +3045,11 @@ function syncSpand(){
   const start = document.getElementById("f-date").value;
   const slut  = document.getElementById("f-enddate").value;
   const aarlig = document.getElementById("f-yearly");
+  /* Strækker aftalen sig over flere dage, hører klokkeslættene til
+     hver sin ende — det skal etiketterne også sige. */
+  const overFlere = !!(start && slut && slut > start && formSlags === "aftale");
+  document.getElementById("f-start-mrk").textContent = overFlere ? "Første dag fra" : "Start";
+  document.getElementById("f-end-mrk").textContent   = overFlere ? "Sidste dag til" : "Slut";
   if(formSlags === "ferie"){ aarlig.disabled = false; document.getElementById("f-enddate").disabled = false; return; }
   const flerdags = !!(start && slut && slut > start);
   if(flerdags && aarlig.checked) aarlig.checked = false;
@@ -3084,19 +3119,23 @@ document.getElementById("edit-save").onclick = async () => {
 
   // Et tidsfelt med kun timetal læses som tomt af browseren.
   // Vi gætter ikke på minutterne — vi siger det.
+  const startDato = document.getElementById("f-date").value || iso(cursor);
+  const slutDato  = document.getElementById("f-enddate").value;
+  const overFlereDage = !!(slutDato && slutDato > startDato);
+
   let okTid = true, tidBesked = "";
   if(!allDay){
     if(!start){
       okTid = false;
       tidBesked = "Skriv et helt starttidspunkt med både timer og minutter, eller sæt flueben i hele dagen.";
-    } else if(slut && slut < start){
+    } else if(slut && slut < start && !overFlereDage){
+      // Over flere dage er sluttidspunktet på en SENERE dag, så et mindre
+      // klokkeslæt er helt i orden: afsted fredag 14, hjem søndag 13.
       okTid = false;
       tidBesked = "Sluttidspunktet ligger før starttidspunktet.";
     }
   }
 
-  const startDato = document.getElementById("f-date").value || iso(cursor);
-  const slutDato  = document.getElementById("f-enddate").value;
   const datoFejl  = document.getElementById("f-date-err");
   const okDato    = !(slutDato && slutDato < startDato);
   if(!okDato) datoFejl.textContent = "Slutdatoen ligger før datoen.";
