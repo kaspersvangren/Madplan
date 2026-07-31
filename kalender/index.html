@@ -859,7 +859,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.10.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.10.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -1085,16 +1085,19 @@ async function hentAlt(forsoeg){
   agnesOverrides.clear();
   uRes.data.forEach(r => agnesOverrides.set(r.dato, r.er_her));
 
-  /* Skrald hentes for sig. Findes tabellen ikke endnu, kører resten
-     videre uden — så virker en ny fil også mod en gammel database. */
+  /* Skrald. Går det galt, skal det SIGES — ikke skjules i konsollen. */
   skraldedage.clear();
   if(sRes.error){
-    console.info("Skraldedage ikke hentet:", sRes.error.message);
+    vis("Skraldedage kunne ikke hentes: " + sRes.error.message);
   } else {
     (sRes.data || []).forEach(r => {
       if(!skraldedage.has(r.dato)) skraldedage.set(r.dato, []);
       skraldedage.get(r.dato).push(r.fraktion);
     });
+    if(!skraldedage.size){
+      vis("Skraldedage: databasen svarede uden fejl, men sendte 0 rækker. "
+        + "Det peger på adgangsreglerne (RLS) på tabellen skraldedage.");
+    }
   }
   render();
 }
@@ -2909,7 +2912,8 @@ document.addEventListener("keydown", ev => {
 document.getElementById("menu-btn").onclick = async () => {
   const { data } = await sb.auth.getUser();
   document.getElementById("menu-mail").textContent =
-    (data && data.user ? "Logget ind som " + data.user.email + " · " : "") + "Version " + VERSION;
+    (data && data.user ? "Logget ind som " + data.user.email + " · " : "") + "Version " + VERSION
+    + " · " + skraldedage.size + " skralddatoer";
   show("menu-back");
 };
 document.getElementById("menu-close").onclick = () => hide("menu-back");
