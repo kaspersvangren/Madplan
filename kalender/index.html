@@ -28,6 +28,7 @@
   --chip:#F2F1ED;
   --holiday:#B0503A;
   --rail:#CFCCC4;--nat:#2B3450;--sky:#8C9096;
+  --ferie:#E0A03A;
   --radius:14px;
   --tap:44px;
   --font-display:"Bricolage Grotesque","Inter",system-ui,sans-serif;
@@ -46,6 +47,7 @@ html[data-theme="dark"]{
   --chip:#252821;
   --holiday:#E08A70;
   --rail:#3A3E36;--nat:#3D4870;
+  --ferie:#D9A24A;
 }
 
 *{box-sizing:border-box}
@@ -420,7 +422,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .prikker i.paa{background:var(--ink)}
 
 /* ---------- Ugevisning ---------- */
-.weekrow{display:flex;gap:12px;align-items:flex-start;background:var(--day-here);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin-bottom:8px;width:100%;text-align:left}
+.weekrow{position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;background:var(--day-here);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;margin-bottom:8px;width:100%;text-align:left}
 .weekrow.away{background:var(--day-away)}
 .weekrow.today{border-color:var(--line-strong);border-width:2px;padding:10px 12px}
 .weekrow .wd{width:56px;flex:none}
@@ -481,6 +483,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .err.show{display:block}
 .menu-row{display:flex;width:100%;align-items:center;gap:11px;padding:14px 4px;font-size:15px;border-bottom:1px solid var(--line);text-align:left}
 .menu-row:last-of-type{border-bottom:none}
+
+/* ---------- Ferie ---------- */
+.feriestribe{height:5px;background:var(--ferie);flex:none}
+.feriestribe.kant{position:absolute;left:0;right:0;top:0;height:4px;pointer-events:none}
+.mcell .feriestribe.kant{right:-1px;height:3px}
+.mcell.other .feriestribe.kant{opacity:.45}
+.strip.ferie .fnavn{color:var(--ink);padding:2px 0;border-bottom:1px dashed var(--ferie);border-radius:0;font-size:15px;text-align:left}
+.strip.ferie .fnavn:active{opacity:.55}
+.strip.ferie .prik{width:10px;height:10px;border-radius:3px;background:var(--ferie);flex:none}
+.witem .fmark{width:9px;height:9px;border-radius:3px;background:var(--ferie);flex:none}
+.slot .time small.spand{display:block;color:var(--muted);font-size:11px;margin-top:2px}
 
 /* ---------- Import af skraldedatoer ---------- */
 .sk-hjaelp{font-size:12px;color:var(--muted);line-height:1.6;margin:-4px 0 13px}
@@ -850,6 +863,31 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   </div>
 </div>
 
+<!-- Ferie -->
+<div class="backdrop" id="ferie-back">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ferie-titel">
+    <h2 id="ferie-titel">Ferie</h2>
+    <div class="meta" id="ferie-meta"></div>
+    <div class="detail-desc" id="ferie-desc"></div>
+    <div class="actions">
+      <button class="btn" id="ferie-luk">Luk</button>
+      <button class="btn" id="ferie-rediger">Rediger</button>
+      <button class="btn danger" id="ferie-slet">Slet</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="ferieslet-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Slet ferien?</h2>
+    <div class="meta" id="ferieslet-meta"></div>
+    <div class="actions">
+      <button class="btn" id="ferieslet-nej">Fortryd</button>
+      <button class="btn danger" id="ferieslet-ja">Slet</button>
+    </div>
+  </div>
+</div>
+
 <!-- Detaljer -->
 <div class="backdrop" id="detail-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
@@ -881,7 +919,13 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <div class="backdrop" id="edit-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title">
     <h2 id="edit-title">Ny aftale</h2>
-    <div class="meta">Titel og hvem det gælder er nok — resten er frivilligt.</div>
+    <div class="meta" id="edit-meta">Titel og hvem det gælder er nok — resten er frivilligt.</div>
+    <div class="field" id="f-slags-felt">
+      <div class="people" id="f-slags">
+        <button class="pchip" data-slags="aftale" aria-pressed="true">Aftale</button>
+        <button class="pchip" data-slags="ferie"  aria-pressed="false">Ferie</button>
+      </div>
+    </div>
     <div class="field">
       <label for="f-title">Titel</label>
       <input type="text" id="f-title" autocomplete="off" placeholder="Fx tandlæge">
@@ -891,14 +935,18 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <label for="f-desc">Beskrivelse</label>
       <textarea id="f-desc" placeholder="Adresse, hvad der skal huskes, hvem der kører …"></textarea>
     </div>
-    <div class="field">
+    <div class="field" id="f-people-felt">
       <label>Hvem gælder det?</label>
       <div class="people" id="f-people"></div>
       <div class="err" id="f-people-err">Vælg mindst én.</div>
     </div>
-    <div class="field"><label for="f-date">Dato</label><input type="date" id="f-date"></div>
-    <label class="check"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
-    <label class="check"><input type="checkbox" id="f-yearly"> Gentages hvert år</label>
+    <div class="row2">
+      <div class="field"><label for="f-date">Dato</label><input type="date" id="f-date"></div>
+      <div class="field"><label for="f-enddate" id="f-enddate-mrk">Slutdato</label><input type="date" id="f-enddate"></div>
+    </div>
+    <div class="err" id="f-date-err"></div>
+    <label class="check" id="f-allday-felt"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
+    <label class="check" id="f-yearly-felt"><input type="checkbox" id="f-yearly"> Gentages hvert år</label>
     <div class="row2" id="f-times">
       <div class="field"><label for="f-start">Start</label><input type="time" id="f-start"></div>
       <div class="field"><label for="f-end">Slut</label><input type="time" id="f-end"></div>
@@ -918,7 +966,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.11.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.12.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1064,10 +1112,23 @@ function agnesHere(d){
 }
 const agnesChanged = d => agnesOverrides.has(iso(d)) && agnesOverrides.get(iso(d)) !== agnesDefault(d);
 
+/* Ferier — egen slags, gælder altid hele familien */
+let ferier = [];
+const ferieNavn = f => (f.titel && f.titel.trim()) ? f.titel.trim() : "Ferie";
+const ferierPaa = ds => ferier
+  .filter(f => ds >= f.start_dato && ds <= f.slut_dato)
+  .sort((a,b) => a.start_dato < b.start_dato ? -1 : 1);
+
+/* Sidste dag en aftale dækker. Uden slutdato er det dagen selv. */
+const sidsteDag = e => (e.endDate && e.endDate > e.date) ? e.endDate : e.date;
+const dageMellem = (a,b) => Math.round((fromIso(b) - fromIso(a)) / 86400000);
+
 function eventsOn(ds){
   const md = ds.slice(5);
   return events
-    .filter(e => e.date === ds || (e.yearly && e.date.slice(5) === md && e.date <= ds))
+    .filter(e => e.yearly
+      ? (e.date.slice(5) === md && e.date <= ds)
+      : (ds >= e.date && ds <= sidsteDag(e)))
     .sort((a,b) => {
       if(a.allDay !== b.allDay) return a.allDay ? -1 : 1;
       if(a.allDay) return a.title.localeCompare(b.title,"da");
@@ -1078,13 +1139,13 @@ function eventsOn(ds){
 /* ---------- Oversættelse mellem database og app ---------- */
 const hhmm = t => t ? String(t).slice(0,5) : "";
 const fraRaekke = r => ({
-  id: r.id, date: r.dato, allDay: r.heldags,
+  id: r.id, date: r.dato, endDate: r.slut_dato || "", allDay: r.heldags,
   start: hhmm(r.start_tid), end: hhmm(r.slut_tid),
   title: r.titel, desc: r.beskrivelse || "",
   yearly: r.aarlig, people: r.personer || []
 });
 const tilRaekke = e => ({
-  dato: e.date, heldags: e.allDay,
+  dato: e.date, slut_dato: e.endDate || null, heldags: e.allDay,
   start_tid: e.allDay ? null : (e.start || null),
   slut_tid: (e.allDay || !e.end) ? null : e.end,
   titel: e.title, beskrivelse: e.desc || "",
@@ -1106,7 +1167,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
@@ -1115,7 +1176,8 @@ async function hentAlt(forsoeg){
     sb.from("madplan").select("*"),
     sb.from("indkoeb_ekstra").select("*"),
     sb.from("opgaver").select("*"),
-    sb.from("skraldedage").select("*")
+    sb.from("skraldedage").select("*"),
+    sb.from("ferier").select("*")
   ]);
 
   const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
@@ -1145,6 +1207,15 @@ async function hentAlt(forsoeg){
   events = aRes.data.map(fraRaekke);
   agnesOverrides.clear();
   uRes.data.forEach(r => agnesOverrides.set(r.dato, r.er_her));
+
+  /* Ferier hentes for sig, så appen stadig virker hvis tabellen mangler. */
+  if(feRes.error){
+    ferier = [];
+    vis("Ferier kunne ikke hentes: " + feRes.error.message
+      + " — er SQL'en til etape 5 kørt?");
+  } else {
+    ferier = feRes.data || [];
+  }
 
   /* Skrald. Går det galt, skal det SIGES — ikke skjules i konsollen. */
   skraldedage.clear();
@@ -2381,6 +2452,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"indkoeb_ekstra" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"opgaver" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"skraldedage" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"ferier" }, () => hentAlt())
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
@@ -2444,7 +2516,10 @@ function renderDay(){
   const hol = holidayName(ds);
   const mad = madFor(ds);
 
+  const dagensFerier = ferierPaa(ds);
+
   let h = '<div class="daycard'+(here?"":" away")+'">';
+  if(dagensFerier.length) h += '<div class="feriestribe"></div>';
 
   const iDag    = skraldPaa(ds);
   const iMorgen = skraldPaa(iso(addDays(d,1)));
@@ -2464,6 +2539,13 @@ function renderDay(){
      +   '<button id="agnes-btn" aria-label="Skift om Agnes er her">'+(here?"er her":"er hos sin far")+'</button>'
      +   skraldHtml
      + '</div>';
+
+  if(dagensFerier.length){
+    h += '<div class="strip ferie"><span class="prik"></span>'
+       + dagensFerier.map(f =>
+           '<button class="fnavn" data-ferie="'+f.id+'">'+esc(ferieNavn(f))+'</button>').join("")
+       + '</div>';
+  }
 
   const mealText = mad
     ? esc(mad.navn) + (mad.frost ? " ❄" : "") + (mad.portioner > 1 ? " ×" + mad.portioner : "")
@@ -2492,8 +2574,12 @@ function renderDay(){
     h += '<div class="rail">';
     list.forEach(e => {
       const p0 = e.people[0] ? personById(e.people[0]) : null;
+      const flere = sidsteDag(e) !== e.date;
+      const spand = flere
+        ? '<small class="spand">dag '+(dageMellem(e.date, ds)+1)+'/'+(dageMellem(e.date, sidsteDag(e))+1)+'</small>'
+        : "";
       h += '<div class="slot">'
-         +   '<div class="time">'+(e.allDay ? '<small>hele<br>dagen</small>' : esc(e.start) + (e.end ? '<small>'+esc(e.end)+'</small>' : ''))+'</div>'
+         +   '<div class="time">'+(e.allDay ? '<small>hele<br>dagen</small>' : esc(e.start) + (e.end ? '<small>'+esc(e.end)+'</small>' : ''))+ spand + '</div>'
          +   '<span class="stem"></span>'
          +   '<div class="body">'
          +     '<button class="ev" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
@@ -2519,11 +2605,16 @@ function renderWeek(){
     const list = eventsOn(ds), hol = holidayName(ds), mad = madFor(ds);
     const cls = "weekrow" + (agnesHere(d)?"":" away") + (sameDay(d,today)?" today":"");
     h += '<button class="'+cls+'" data-goto="'+ds+'">'
+       +   (ferierPaa(ds).length ? '<span class="feriestribe kant"></span>' : "")
        +   '<span class="wd"><span class="n">'+d.getDate()+'</span><span class="m">'+UGEDAGE_KORT[i]+'</span>'
        +     (skraldPaa(ds).length ? '<span class="skrald uge">'+skraldPaa(ds).map(f => skraldIkon(f,16)).join("")+'</span>' : "")
        +   '</span>'
        +   '<span class="items">';
     if(hol) h += '<span class="witem"><span class="wn holiday-tag">'+esc(hol)+'</span></span>';
+    ferierPaa(ds).forEach(f => {
+      h += '<span class="witem"><span class="wt"></span><span class="fmark"></span>'
+         +   '<span class="wn">'+esc(ferieNavn(f))+'</span></span>';
+    });
     const dagensOpg = opgaverPaa(ds);
     dagensOpg.forEach(o => {
       h += '<span class="witem'+(o.faerdig_dato?" klaret":"")+'">'
@@ -2572,6 +2663,7 @@ function renderMonth(){
         + (holidayName(ds)?" holiday":"");
       const mSkrald = skraldPaa(ds);
       h += '<button class="'+cls+'" data-goto="'+ds+'">'
+         +   (ferierPaa(ds).length ? '<span class="feriestribe kant"></span>' : "")
          +   '<span class="num">'+d.getDate()+'</span>'
          +   '<span class="mdots">'+ids.map(id => dotEl(id,"sm")).join("")+'</span>'
          +   (mSkrald.length ? '<span class="skrald maaned">'+mSkrald.map(f => skraldIkon(f,11)).join("")+'</span>' : "")
@@ -2795,6 +2887,8 @@ document.getElementById("stage").addEventListener("click", async ev => {
   const retk = ev.target.closest("[data-ret]");
   if(retk){ aabnRet(retk.dataset.ret); return; }
   if(agn){ await vendAgnesDag(); return; }
+  const fer = ev.target.closest("[data-ferie]");
+  if(fer){ aabnFerie(fer.dataset.ferie); return; }
   if(evb){ openDetail(evb.dataset.ev); return; }
   if(week){ cursor = fromIso(week.dataset.week); setView("week"); return; }
   if(goto){ cursor = fromIso(goto.dataset.goto); setView("day"); return; }
@@ -2828,8 +2922,15 @@ function openDetail(id){
   openEventId = id;
   document.getElementById("detail-title").textContent = e.title;
   const d = fromIso(e.date), wd = UGEDAGE[(d.getDay()+6)%7];
+  let naar = wd + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
+  if(sidsteDag(e) !== e.date){
+    const s2 = fromIso(sidsteDag(e));
+    naar = d.getDate() + ". " + MAANEDER[d.getMonth()] + " – "
+         + s2.getDate() + ". " + MAANEDER[s2.getMonth()]
+         + " (" + (dageMellem(e.date, sidsteDag(e)) + 1) + " dage)";
+  }
   document.getElementById("detail-meta").textContent =
-    timeLabel(e) + " · " + wd + " " + d.getDate() + ". " + MAANEDER[d.getMonth()] + (e.yearly ? " · gentages hvert år" : "");
+    timeLabel(e) + " · " + naar + (e.yearly ? " · gentages hvert år" : "");
   const dd = document.getElementById("detail-desc");
   dd.textContent = e.desc || "";
   dd.style.display = e.desc ? "block" : "none";
@@ -2871,17 +2972,67 @@ document.getElementById("f-people").addEventListener("click", ev => {
   drawPeopleChips();
 });
 function syncTimeFields(){
-  document.getElementById("f-times").style.display = document.getElementById("f-allday").checked ? "none" : "flex";
+  const skjul = formSlags === "ferie" || document.getElementById("f-allday").checked;
+  document.getElementById("f-times").style.display = skjul ? "none" : "flex";
 }
 document.getElementById("f-allday").onchange = syncTimeFields;
 
+/* ---------- Aftale eller ferie ----------
+   Samme ark, to slags. En ferie har ingen personer og ingen klokkeslæt;
+   den gælder hele familien og farver dagene. */
+let formSlags = "aftale";
+let redigererFerieId = null;
+
+function saetSlags(slags){
+  formSlags = slags;
+  const erFerie = slags === "ferie";
+  document.querySelectorAll("#f-slags [data-slags]").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.slags === slags)));
+  document.getElementById("f-people-felt").hidden = erFerie;
+  document.getElementById("f-allday-felt").hidden = erFerie;
+  document.getElementById("f-yearly-felt").hidden = erFerie;
+  document.getElementById("f-title").placeholder = erFerie ? "Behøver ikke et navn" : "Fx tandlæge";
+  document.getElementById("f-enddate-mrk").textContent = erFerie ? "Sidste dag" : "Slutdato";
+  document.getElementById("edit-meta").textContent = erFerie
+    ? "En ferie gælder hele familien og farver dagene. Navnet er frivilligt."
+    : "Titel og hvem det gælder er nok — resten er frivilligt.";
+  if(!editingId && !redigererFerieId)
+    document.getElementById("edit-title").textContent = erFerie ? "Ny ferie" : "Ny aftale";
+  if(erFerie && !document.getElementById("f-enddate").value)
+    document.getElementById("f-enddate").value = document.getElementById("f-date").value;
+  document.getElementById("f-people-err").classList.remove("show");
+  syncTimeFields();
+  syncSpand();
+}
+document.getElementById("f-slags").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-slags]");
+  if(b) saetSlags(b.dataset.slags);
+});
+
+/* En aftale kan enten strække sig over flere dage eller gentages hvert
+   år — ikke begge dele. Det ene felt slukker for det andet. */
+function syncSpand(){
+  const start = document.getElementById("f-date").value;
+  const slut  = document.getElementById("f-enddate").value;
+  const aarlig = document.getElementById("f-yearly");
+  if(formSlags === "ferie"){ aarlig.disabled = false; document.getElementById("f-enddate").disabled = false; return; }
+  const flerdags = !!(start && slut && slut > start);
+  if(flerdags && aarlig.checked) aarlig.checked = false;
+  aarlig.disabled = flerdags;
+  document.getElementById("f-enddate").disabled = aarlig.checked;
+}
+["f-date","f-enddate","f-yearly"].forEach(id =>
+  document.getElementById(id).addEventListener("change", syncSpand));
+
 function openEditor(id){
   editingId = id || null;
+  redigererFerieId = null;
   const e = id ? events.find(x => x.id === id) : null;
   document.getElementById("edit-title").textContent = e ? "Rediger aftale" : "Ny aftale";
   document.getElementById("f-title").value = e ? e.title : "";
   document.getElementById("f-desc").value  = e ? (e.desc||"") : "";
   document.getElementById("f-date").value  = e ? e.date : iso(cursor);
+  document.getElementById("f-enddate").value = e ? (e.endDate || "") : "";
   document.getElementById("f-allday").checked = e ? !!e.allDay : false;
   document.getElementById("f-yearly").checked = e ? !!e.yearly : false;
   document.getElementById("f-start").value = e ? (e.start||"") : "";
@@ -2892,6 +3043,28 @@ function openEditor(id){
   document.getElementById("f-title-err").classList.remove("show");
   document.getElementById("f-people-err").classList.remove("show");
   document.getElementById("f-time-err").classList.remove("show");
+  document.getElementById("f-date-err").classList.remove("show");
+  document.getElementById("f-slags-felt").hidden = !!id;
+  saetSlags("aftale");
+  show("edit-back");
+}
+
+function openFerieEditor(f){
+  editingId = null;
+  redigererFerieId = f ? f.id : null;
+  document.getElementById("edit-title").textContent = f ? "Rediger ferie" : "Ny ferie";
+  document.getElementById("f-title").value   = f ? (f.titel || "") : "";
+  document.getElementById("f-desc").value    = f ? (f.beskrivelse || "") : "";
+  document.getElementById("f-date").value    = f ? f.start_dato : iso(cursor);
+  document.getElementById("f-enddate").value = f ? f.slut_dato  : iso(cursor);
+  document.getElementById("f-allday").checked = false;
+  document.getElementById("f-yearly").checked = false;
+  chosen = new Set();
+  drawPeopleChips();
+  ["f-title-err","f-people-err","f-time-err","f-date-err"].forEach(i =>
+    document.getElementById(i).classList.remove("show"));
+  document.getElementById("f-slags-felt").hidden = !!f;
+  saetSlags("ferie");
   show("edit-back");
 }
 document.getElementById("add-btn").onclick = () =>
@@ -2899,6 +3072,7 @@ document.getElementById("add-btn").onclick = () =>
 document.getElementById("edit-cancel").onclick = () => hide("edit-back");
 
 document.getElementById("edit-save").onclick = async () => {
+  if(formSlags === "ferie") return gemFerie();
   const title  = document.getElementById("f-title").value.trim();
   const allDay = document.getElementById("f-allday").checked;
   const start  = document.getElementById("f-start").value;
@@ -2921,16 +3095,24 @@ document.getElementById("edit-save").onclick = async () => {
     }
   }
 
+  const startDato = document.getElementById("f-date").value || iso(cursor);
+  const slutDato  = document.getElementById("f-enddate").value;
+  const datoFejl  = document.getElementById("f-date-err");
+  const okDato    = !(slutDato && slutDato < startDato);
+  if(!okDato) datoFejl.textContent = "Slutdatoen ligger før datoen.";
+
   document.getElementById("f-title-err").classList.toggle("show", !okTitle);
   document.getElementById("f-people-err").classList.toggle("show", !okPeople);
+  datoFejl.classList.toggle("show", !okDato);
   tidFejl.textContent = tidBesked;
   tidFejl.classList.toggle("show", !okTid);
-  if(!okTitle || !okPeople || !okTid) return;
+  if(!okTitle || !okPeople || !okTid || !okDato) return;
 
   const data = {
     title,
     desc:   document.getElementById("f-desc").value.trim(),
-    date:   document.getElementById("f-date").value || iso(cursor),
+    date:   startDato,
+    endDate: (slutDato && slutDato > startDato) ? slutDato : "",
     allDay,
     start:  allDay ? "" : start,
     end:    allDay ? "" : slut,
@@ -2955,6 +3137,87 @@ document.getElementById("edit-save").onclick = async () => {
     cursor = fromIso(data.date);
   }
   hide("edit-back");
+  render();
+};
+
+async function gemFerie(){
+  const knap  = document.getElementById("edit-save");
+  const titel = document.getElementById("f-title").value.trim();
+  const start = document.getElementById("f-date").value || iso(cursor);
+  const slut  = document.getElementById("f-enddate").value || start;
+  const fejl  = document.getElementById("f-date-err");
+
+  if(slut < start){
+    fejl.textContent = "Sidste dag ligger før den første.";
+    fejl.classList.add("show");
+    return;
+  }
+  fejl.classList.remove("show");
+
+  const raekke = {
+    titel: titel || null,
+    beskrivelse: document.getElementById("f-desc").value.trim(),
+    start_dato: start,
+    slut_dato: slut
+  };
+
+  knap.disabled = true; knap.textContent = "Gemmer …";
+  const svar = redigererFerieId
+    ? await sb.from("ferier").update(raekke).eq("id", redigererFerieId).select()
+    : await sb.from("ferier").insert(raekke).select();
+  knap.disabled = false; knap.textContent = "Gem";
+
+  if(svar.error){ vis("Kunne ikke gemme ferien: " + svar.error.message); return; }
+  const ny = svar.data && svar.data[0];
+  if(ny){
+    const i = ferier.findIndex(x => x.id === ny.id);
+    if(i > -1) ferier[i] = ny; else ferier.push(ny);
+  }
+  if(!redigererFerieId) cursor = fromIso(start);
+  redigererFerieId = null;
+  hide("edit-back");
+  render();
+}
+
+/* ---------- Ferieboksen ---------- */
+let aabenFerieId = null;
+
+function aabnFerie(id){
+  const f = ferier.find(x => x.id === id); if(!f) return;
+  aabenFerieId = id;
+  const a = fromIso(f.start_dato), b = fromIso(f.slut_dato);
+  const antal = dageMellem(f.start_dato, f.slut_dato) + 1;
+  document.getElementById("ferie-titel").textContent = ferieNavn(f);
+  document.getElementById("ferie-meta").textContent =
+    (f.start_dato === f.slut_dato
+      ? a.getDate() + ". " + MAANEDER[a.getMonth()]
+      : a.getDate() + ". " + MAANEDER[a.getMonth()] + " – " + b.getDate() + ". " + MAANEDER[b.getMonth()])
+    + " · " + antal + (antal === 1 ? " dag" : " dage") + " · hele familien";
+  const d = document.getElementById("ferie-desc");
+  d.textContent = f.beskrivelse || "";
+  d.style.display = f.beskrivelse ? "block" : "none";
+  show("ferie-back");
+}
+document.getElementById("ferie-luk").onclick = () => hide("ferie-back");
+document.getElementById("ferie-rediger").onclick = () => {
+  const f = ferier.find(x => x.id === aabenFerieId); if(!f) return;
+  hide("ferie-back");
+  openFerieEditor(f);
+};
+document.getElementById("ferie-slet").onclick = () => {
+  const f = ferier.find(x => x.id === aabenFerieId); if(!f) return;
+  const a = fromIso(f.start_dato), b = fromIso(f.slut_dato);
+  document.getElementById("ferieslet-meta").textContent =
+    ferieNavn(f) + " · " + a.getDate() + ". " + MAANEDER[a.getMonth()]
+    + " – " + b.getDate() + ". " + MAANEDER[b.getMonth()];
+  show("ferieslet-back");
+};
+document.getElementById("ferieslet-nej").onclick = () => hide("ferieslet-back");
+document.getElementById("ferieslet-ja").onclick = async () => {
+  const { error } = await sb.from("ferier").delete().eq("id", aabenFerieId);
+  if(error){ vis("Kunne ikke slette ferien: " + error.message); return; }
+  ferier = ferier.filter(x => x.id !== aabenFerieId);
+  hide("ferieslet-back"); hide("ferie-back");
   render();
 };
 
@@ -2996,6 +3259,7 @@ document.getElementById("menu-export").onclick = () => {
     gemt: new Date().toISOString(),
     personer: PEOPLE,
     aftaler: events,
+    ferier: ferier,
     delebarn_undtagelser: [...agnesOverrides.entries()].map(([dato,er_her]) => ({dato, er_her}))
   };
   const blob = new Blob([JSON.stringify(kopi, null, 2)], {type:"application/json"});
