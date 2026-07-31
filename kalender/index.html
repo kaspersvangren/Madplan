@@ -231,6 +231,45 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .tilfoej:hover{color:var(--ink)}
 .snart{padding:60px 20px;text-align:center;color:var(--muted)}
 
+/* ---------- Opgaver ---------- */
+.opgliste{display:flex;flex-direction:column;gap:8px}
+.opgkort{
+  display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;
+}
+.opgkort:hover{border-color:var(--line-strong)}
+.boks{
+  width:23px;height:23px;border:2px solid var(--muted);border-radius:7px;flex:none;margin-top:1px;
+  display:grid;place-items:center;color:transparent;background:none;
+}
+.boks:hover{border-color:var(--line-strong)}
+.boks.sat{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.opgkort .midt{flex:1;min-width:0}
+.opgkort .titel{font-weight:600;font-size:16px}
+.opgkort .note{font-size:13px;color:var(--muted);margin-top:2px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.opgkort .frist{font-size:13px;color:var(--muted);margin-top:3px}
+.opgkort .frist.over{color:var(--holiday);font-weight:600}
+.opgkort.klaret .titel{text-decoration:line-through;color:var(--muted)}
+.gruppetop{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);margin:16px 2px 2px}
+.gruppetop:first-child{margin-top:2px}
+
+/* Opgaver i dagsvisningen */
+.dagopg{padding:10px 15px 2px}
+.dagopgtop{display:flex;align-items:center;gap:9px;padding:2px 0 4px;
+  font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.dagopgtop .antal{margin-left:auto;letter-spacing:0;text-transform:none;font-weight:600}
+.dagopg .raekke{display:flex;gap:11px;align-items:flex-start;padding:8px 0;width:100%;text-align:left}
+.dagopg .midt{flex:1;min-width:0}
+.dagopg .titel{font-weight:600;display:block}
+.dagopg .note{font-size:13px;color:var(--muted);display:block;margin-top:2px}
+.dagopg .raekke.klaret .titel{text-decoration:line-through;color:var(--muted)}
+.opgskel{height:1px;background:var(--line);margin:6px 15px 0}
+.witem .todomark{width:13px;height:13px;border:1.8px solid var(--muted);border-radius:4px;flex:none;
+  display:inline-grid;place-items:center;align-self:center}
+.witem.klaret .wn{text-decoration:line-through;color:var(--muted)}
+
 /* ---------- Madplan ---------- */
 .dagrad{
   display:flex;gap:12px;align-items:center;width:100%;text-align:left;
@@ -483,6 +522,13 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <button class="nav" id="next" aria-label="Næste"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   </div>
 
+  <div class="soegerad" id="todorad" hidden>
+    <div class="segment" role="group" aria-label="Vis opgaver">
+      <button id="t-aktive" aria-pressed="true">Aktive</button>
+      <button id="t-faerdige" aria-pressed="false">Færdige</button>
+    </div>
+  </div>
+
   <div class="soegerad" id="soegerad" hidden>
     <div class="soegefelt">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -512,11 +558,46 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M6 6L5 3H2"/></svg></span>
     Indkøb
   </button>
+  <button data-fane="todo" aria-current="false">
+    <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><path d="M6 7.5l1.4 1.4L9.4 6.4"/><rect x="4" y="14" width="7" height="7" rx="2"/><path d="M14 7.5h6M14 17.5h6"/></svg></span>
+    Todo
+  </button>
   <button data-fane="kogebog" aria-current="false">
     <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg></span>
     Kogebog
   </button>
 </div></nav>
+
+<!-- Opgave -->
+<div class="backdrop" id="opg-back">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="opg-titel">
+    <h2 id="opg-titel">Ny opgave</h2>
+    <div class="meta">Deadline er frivillig. Uden dato står opgaven kun i Todo-fanen.</div>
+    <div class="field">
+      <label for="o-titel">Hvad skal der gøres?</label>
+      <input type="text" id="o-titel" autocomplete="off" placeholder="Fx bestil dæk til bilen">
+      <div class="err" id="o-titel-err">Skriv en titel.</div>
+    </div>
+    <div class="field">
+      <label for="o-note">Beskrivelse</label>
+      <textarea id="o-note" placeholder="Detaljer, links, hvad der skal huskes …"></textarea>
+    </div>
+    <div class="field">
+      <label>Hvem gælder det?</label>
+      <div class="people" id="o-people"></div>
+      <div class="err" id="o-people-err">Vælg mindst én.</div>
+    </div>
+    <div class="field">
+      <label for="o-deadline">Deadline</label>
+      <input type="date" id="o-deadline">
+    </div>
+    <div class="actions">
+      <button class="btn" id="opg-fortryd">Fortryd</button>
+      <button class="btn danger" id="opg-slet">Slet</button>
+      <button class="btn primary" id="opg-gem">Gem</button>
+    </div>
+  </div>
+</div>
 
 <!-- Vejr: timerne i et tidsrum -->
 <div class="backdrop" id="vejr-back">
@@ -766,7 +847,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.8.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.9.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -908,17 +989,18 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
     sb.from("retter").select("*"),
     sb.from("ingredienser").select("*"),
     sb.from("madplan").select("*"),
-    sb.from("indkoeb_ekstra").select("*")
+    sb.from("indkoeb_ekstra").select("*"),
+    sb.from("opgaver").select("*")
   ]);
 
-  const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error;
+  const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
   if(fejl){
     // Uret på enheden og på serveren kan være et par sekunder ude af trit
     // lige efter login. Prøv igen én gang, før vi råber op.
@@ -934,6 +1016,7 @@ async function hentAlt(forsoeg){
   ingredienser = iRes.data || [];
   madplanDage  = mRes.data || [];
   indkoebEkstra = eRes.data || [];
+  opgaver       = oRes.data || [];
   tegnFiltre();
 
   if(pRes.data && pRes.data.length){
@@ -968,8 +1051,9 @@ function saetFane(f){
   document.getElementById("today-btn").textContent = kalender ? "I dag" : "Denne uge";
   ekstraTekst = "";
   document.getElementById("soegerad").hidden   = f !== "kogebog";
+  document.getElementById("todorad").hidden    = f !== "todo";
 
-  const titler = { madplan:"Madplan", indkoeb:"Indkøb", kogebog:"Kogebog" };
+  const titler = { madplan:"Madplan", indkoeb:"Indkøb", kogebog:"Kogebog", todo:"Opgaver" };
   if(!kalender) document.getElementById("tb-titel").textContent = titler[f];
 
   // Sikkerhedsnet, men kun når det kan gøre en forskel: er realtiden
@@ -978,8 +1062,9 @@ function saetFane(f){
      (!realtidOk || Date.now() - sidsteHentning > 120000)) hentAlt();
 
   const fab = document.getElementById("add-btn");
-  fab.hidden = !(kalender || f === "kogebog");
-  document.getElementById("add-tekst").textContent = kalender ? "Ny aftale" : "Ny ret";
+  fab.hidden = !(kalender || f === "kogebog" || f === "todo");
+  document.getElementById("add-tekst").textContent =
+    kalender ? "Ny aftale" : f === "todo" ? "Ny opgave" : "Ny ret";
 
   render();
 }
@@ -1732,6 +1817,203 @@ function indkoebSomTekst(){
 }
 
 
+
+/* =======================================================================
+   Opgaver
+   faerdig_dato tom betyder aktiv. Er den sat til i dag, står opgaven
+   stadig i listen med streg igennem — så kan et fejltryk fortrydes
+   samme dag. Fra i morgen ligger den i arkivet.
+   ======================================================================= */
+let opgaver = [];
+let todoVisning = "aktive";        // aktive | faerdige
+
+const erKlaretIDag = o => o.faerdig_dato === iso(new Date());
+const erArkiveret  = o => o.faerdig_dato && o.faerdig_dato < iso(new Date());
+
+function fristTekst(o){
+  if(!o.deadline) return "Ingen frist";
+  const idag = iso(new Date());
+  const d = fromIso(o.deadline);
+  const dage = Math.round((d - fromIso(idag)) / 86400000);
+  if(dage === 0)  return "I dag";
+  if(dage === 1)  return "I morgen";
+  if(dage === -1) return "I går";
+  if(dage < 0)    return dage * -1 + " dage over";
+  if(dage < 7)    return "Om " + dage + " dage";
+  return d.getDate() + ". " + MAANEDER[d.getMonth()];
+}
+
+function sorterAktive(){
+  const idag = iso(new Date());
+  const gruppe = o => {
+    if(erKlaretIDag(o))                      return 3;   // klaret i dag, nederst
+    if(o.deadline && o.deadline < idag)      return 0;   // overskredet, øverst
+    if(o.deadline)                           return 1;
+    return 2;                                            // uden frist
+  };
+  return opgaver.filter(o => !erArkiveret(o)).sort((a,b) => {
+    const ga = gruppe(a), gb = gruppe(b);
+    if(ga !== gb) return ga - gb;
+    if(a.deadline && b.deadline && a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
+    return (a.oprettet || "").localeCompare(b.oprettet || "");
+  });
+}
+
+function opgKort(o){
+  const klaret = !!o.faerdig_dato;
+  const over = o.deadline && !klaret && o.deadline < iso(new Date());
+  return '<div class="opgkort'+(klaret?" klaret":"")+'">'
+    + '<button class="boks'+(klaret?" sat":"")+'" data-kryds="'+o.id+'" aria-label="Marker som klaret">'
+    +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+    + '</button>'
+    + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
+    +   '<span class="titel">'+esc(o.titel)+'</span>'
+    +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
+    +   '<span class="frist'+(over?" over":"")+'">'+fristTekst(o)+'</span>'
+    + '</button>'
+    + dotsEl(o.personer || [])
+    + '</div>';
+}
+
+function renderTodo(){
+  if(todoVisning === "aktive"){
+    const liste = sorterAktive();
+    if(!liste.length) return '<div class="empty">Ingen opgaver lige nu.<br>Tryk på Ny opgave for at lægge en ind.</div>';
+    return '<div class="opgliste">' + liste.map(opgKort).join("") + '</div>';
+  }
+
+  // Arkivet: kun det der blev klaret før i dag
+  const arkiv = opgaver.filter(erArkiveret)
+                       .sort((a,b) => b.faerdig_dato.localeCompare(a.faerdig_dato));
+  if(!arkiv.length) return '<div class="empty">Der er ikke klaret noget endnu.</div>';
+
+  const ugeStart = iso(mondayOf(new Date()));
+  const grupper = [
+    ["Denne uge", arkiv.filter(o => o.faerdig_dato >= ugeStart)],
+    ["Tidligere", arkiv.filter(o => o.faerdig_dato <  ugeStart)]
+  ];
+  return grupper.filter(([, l]) => l.length).map(([navn, l]) =>
+    '<div class="gruppetop">'+navn+'</div><div class="opgliste">' + l.map(opgKort).join("") + '</div>'
+  ).join("");
+}
+
+/* ---------- Opgaver på en bestemt dag ---------- */
+function opgaverPaa(ds){
+  return opgaver.filter(o => o.deadline === ds && !erArkiveret(o))
+                .sort((a,b) => (a.oprettet||"").localeCompare(b.oprettet||""));
+}
+
+function renderDagOpgaver(ds){
+  const liste = opgaverPaa(ds);
+  if(!liste.length) return "";
+  const uklarede = liste.filter(o => !o.faerdig_dato).length;
+  return '<div class="dagopg">'
+    + '<div class="dagopgtop">Opgaver<span class="antal">'
+    +   (uklarede ? uklarede + " tilbage" : "alle klaret") + '</span></div>'
+    + liste.map(o => '<div class="raekke'+(o.faerdig_dato?" klaret":"")+'">'
+        + '<button class="boks'+(o.faerdig_dato?" sat":"")+'" data-kryds="'+o.id+'" aria-label="Marker som klaret">'
+        +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+        + '</button>'
+        + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
+        +   '<span class="titel">'+esc(o.titel)+'</span>'
+        +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
+        + '</button>'
+        + dotsEl(o.personer || [])
+        + '</div>').join("")
+    + '</div><div class="opgskel"></div>';
+}
+
+/* ---------- Kryds af og fortryd ---------- */
+async function krydsAf(id){
+  const o = opgaver.find(x => x.id === id); if(!o) return;
+  const ny = o.faerdig_dato ? null : iso(new Date());
+  const foer = o.faerdig_dato;
+  o.faerdig_dato = ny; render();
+  const { error } = await sb.from("opgaver").update({ faerdig_dato: ny }).eq("id", id);
+  if(error){ o.faerdig_dato = foer; render(); vis("Kunne ikke gemme: " + error.message); }
+}
+
+/* ---------- Opret og ret ---------- */
+let redigererOpgId = null;
+let opgValgte = new Set();
+
+function tegnOpgChips(){
+  document.getElementById("o-people").innerHTML = PEOPLE.map(p =>
+    '<button class="pchip" data-op="'+p.id+'" aria-pressed="'+opgValgte.has(p.id)+'">'+dotEl(p.id)+p.navn+'</button>'
+  ).join("");
+}
+document.getElementById("o-people").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-op]"); if(!b) return;
+  const id = b.dataset.op;
+  if(id === "familie"){ opgValgte.clear(); opgValgte.add("familie"); }
+  else { opgValgte.delete("familie"); opgValgte.has(id) ? opgValgte.delete(id) : opgValgte.add(id); }
+  tegnOpgChips();
+});
+
+function aabnOpgave(id){
+  redigererOpgId = id || null;
+  const o = id ? opgaver.find(x => x.id === id) : null;
+  document.getElementById("opg-titel").textContent = o ? "Rediger opgave" : "Ny opgave";
+  document.getElementById("o-titel").value    = o ? o.titel : "";
+  document.getElementById("o-note").value     = o ? (o.beskrivelse || "") : "";
+  document.getElementById("o-deadline").value = o ? (o.deadline || "") : (fane === "kalender" ? iso(cursor) : "");
+  opgValgte = new Set(o ? (o.personer || []) : ["familie"]);
+  tegnOpgChips();
+  document.getElementById("o-titel-err").classList.remove("show");
+  document.getElementById("o-people-err").classList.remove("show");
+  document.getElementById("opg-slet").hidden = !o;
+  show("opg-back");
+}
+document.getElementById("opg-fortryd").onclick = () => hide("opg-back");
+
+document.getElementById("opg-gem").onclick = async () => {
+  const titel = document.getElementById("o-titel").value.trim();
+  const okTitel = titel.length > 0, okFolk = opgValgte.size > 0;
+  document.getElementById("o-titel-err").classList.toggle("show", !okTitel);
+  document.getElementById("o-people-err").classList.toggle("show", !okFolk);
+  if(!okTitel || !okFolk) return;
+
+  const data = {
+    titel,
+    beskrivelse: document.getElementById("o-note").value.trim(),
+    deadline: document.getElementById("o-deadline").value || null,
+    personer: [...opgValgte]
+  };
+  const knap = document.getElementById("opg-gem");
+  knap.disabled = true; knap.textContent = "Gemmer …";
+
+  if(redigererOpgId){
+    const { data: r, error } = await sb.from("opgaver").update(data).eq("id", redigererOpgId).select();
+    knap.disabled = false; knap.textContent = "Gem";
+    if(error){ vis("Kunne ikke gemme: " + error.message); return; }
+    const i = opgaver.findIndex(x => x.id === redigererOpgId);
+    if(i > -1 && r && r[0]) opgaver[i] = r[0];
+  } else {
+    const { data: r, error } = await sb.from("opgaver").insert(data).select();
+    knap.disabled = false; knap.textContent = "Gem";
+    if(error){ vis("Kunne ikke gemme: " + error.message); return; }
+    if(r && r[0]) opgaver.push(r[0]);
+  }
+  hide("opg-back");
+  render();
+};
+
+document.getElementById("opg-slet").onclick = async () => {
+  const id = redigererOpgId; if(!id) return;
+  const { error } = await sb.from("opgaver").delete().eq("id", id);
+  if(error){ vis("Kunne ikke slette: " + error.message); return; }
+  opgaver = opgaver.filter(o => o.id !== id);
+  hide("opg-back"); render();
+};
+
+document.getElementById("t-aktive").onclick   = () => { todoVisning = "aktive";   opdaterTodoValg(); };
+document.getElementById("t-faerdige").onclick = () => { todoVisning = "faerdige"; opdaterTodoValg(); };
+function opdaterTodoValg(){
+  document.getElementById("t-aktive").setAttribute("aria-pressed", todoVisning === "aktive");
+  document.getElementById("t-faerdige").setAttribute("aria-pressed", todoVisning === "faerdige");
+  render();
+}
+
 /* =======================================================================
    Vejr fra Open-Meteo
    Ét kald dækker 16 dage. Ingen nøgle, ingen tilmelding.
@@ -1963,6 +2245,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"ingredienser" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"madplan" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"indkoeb_ekstra" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"opgaver" }, () => hentAlt())
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
@@ -2053,8 +2336,10 @@ function renderDay(){
     h += '<div class="strip"><span class="label">Helligdag</span><span class="holiday-tag">'+esc(hol)+'</span></div>';
   }
 
+  h += renderDagOpgaver(ds);
+
   if(!list.length){
-    h += '<div class="empty">Ingen aftaler denne dag.<br>Tryk på Ny aftale for at lægge en ind.</div>';
+    h += '<div class="empty">Ingen aftaler denne dag.</div>';
   } else {
     h += '<div class="rail">';
     list.forEach(e => {
@@ -2089,7 +2374,16 @@ function renderWeek(){
        +   '<span class="wd"><span class="n">'+d.getDate()+'</span><span class="m">'+UGEDAGE_KORT[i]+'</span></span>'
        +   '<span class="items">';
     if(hol) h += '<span class="witem"><span class="wn holiday-tag">'+esc(hol)+'</span></span>';
-    if(!list.length && !hol) h += '<span class="none">—</span>';
+    const dagensOpg = opgaverPaa(ds);
+    dagensOpg.forEach(o => {
+      h += '<span class="witem'+(o.faerdig_dato?" klaret":"")+'">'
+         +   '<span class="wt"></span><span class="todomark">'
+         +     (o.faerdig_dato ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>' : '')
+         +   '</span>'
+         +   dotsEl(o.personer || [])
+         +   '<span class="wn">'+esc(o.titel)+'</span></span>';
+    });
+    if(!list.length && !hol && !dagensOpg.length) h += '<span class="none">—</span>';
     list.forEach(e => {
       h += '<span class="witem"><span class="wt">'+(e.allDay ? "—" : esc(e.start))+'</span>'
          +   dotsEl(e.people)+'<span class="wn">'+esc(e.title)+'</span></span>';
@@ -2186,6 +2480,8 @@ function tegnStage(){
     stage.innerHTML = renderMadplan();
   } else if(fane === "indkoeb"){
     stage.innerHTML = renderIndkoeb();
+  } else if(fane === "todo"){
+    stage.innerHTML = renderTodo();
   } else if(fane === "kogebog"){
     stage.innerHTML = renderKogebog();
   } else {
@@ -2336,6 +2632,10 @@ document.getElementById("stage").addEventListener("click", async ev => {
     }catch(err){ vis("Kunne ikke kopiere: " + err.message); }
     return;
   }
+  const kryds = ev.target.closest("[data-kryds]");
+  if(kryds){ await krydsAf(kryds.dataset.kryds); return; }
+  const opgk = ev.target.closest("[data-opg]");
+  if(opgk){ aabnOpgave(opgk.dataset.opg); return; }
   const vjr = ev.target.closest("[data-vejr]");
   if(vjr){ aabnVejr(iso(cursor), Number(vjr.dataset.vejr)); return; }
   const dagk = ev.target.closest("[data-dag]");
@@ -2442,7 +2742,8 @@ function openEditor(id){
   document.getElementById("f-time-err").classList.remove("show");
   show("edit-back");
 }
-document.getElementById("add-btn").onclick     = () => fane === "kogebog" ? aabnRetRed(null) : openEditor(null);
+document.getElementById("add-btn").onclick = () =>
+  fane === "kogebog" ? aabnRetRed(null) : fane === "todo" ? aabnOpgave(null) : openEditor(null);
 document.getElementById("edit-cancel").onclick = () => hide("edit-back");
 
 document.getElementById("edit-save").onclick = async () => {
@@ -2566,7 +2867,7 @@ document.getElementById("menu-export").onclick = () => {
 
   el.addEventListener("touchstart", e => {
     if(e.touches.length !== 1) return;
-    if(fane === "kogebog") return;
+    if(fane === "kogebog" || fane === "todo") return;
     if(document.querySelector(".backdrop.open")) return;
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
