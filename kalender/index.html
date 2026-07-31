@@ -481,6 +481,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .err.show{display:block}
 .menu-row{display:flex;width:100%;align-items:center;gap:11px;padding:14px 4px;font-size:15px;border-bottom:1px solid var(--line);text-align:left}
 .menu-row:last-of-type{border-bottom:none}
+
+/* ---------- Import af skraldedatoer ---------- */
+.sk-hjaelp{font-size:12px;color:var(--muted);line-height:1.6;margin:-4px 0 13px}
+.sk-hjaelp code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;background:var(--chip);padding:1px 5px;border-radius:5px}
+.sk-oversigt{font-size:13.5px;line-height:1.75;margin:2px 0 11px}
+.sk-oversigt .tal{font-weight:700}
+.sk-oversigt .advarsel{color:var(--holiday)}
+.sk-liste{max-height:200px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;padding:7px 10px;margin-bottom:12px}
+.sk-rad{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;font-variant-numeric:tabular-nums}
+.sk-rad .dag{width:104px;color:var(--muted)}
+.sk-rad .ikoner{display:flex;align-items:center;gap:3px}
 svg{display:block}
 
 /* ---------- Login ---------- */
@@ -779,6 +790,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
       Gem en kopi af alle data
     </button>
+    <button class="menu-row" id="menu-skrald">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M12 18V11M9 14l3 3 3-3"/></svg>
+      Hent skraldedatoer ind
+      <span class="stand" id="skrald-stand">—</span>
+    </button>
     <button class="menu-row" id="menu-reload">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>
       Hent data forfra
@@ -788,6 +804,49 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       Log ud
     </button>
     <div class="actions"><button class="btn" id="menu-close">Luk</button></div>
+  </div>
+</div>
+
+
+<!-- Skraldedatoer -->
+<div class="backdrop" id="skrald-back">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sk-h2">
+    <h2 id="sk-h2">Hent skraldedatoer ind</h2>
+    <div class="meta" id="sk-meta">—</div>
+
+    <div class="field">
+      <label for="sk-tekst">Sæt teksten fra kommunens kalender ind</label>
+      <textarea id="sk-tekst" rows="7" spellcheck="false" placeholder="2027-01-05  Rest/Mad, Papir&#10;2027-01-12  Pap&#10;2027-01-19  Rest/Mad"></textarea>
+    </div>
+    <div class="sk-hjaelp">
+      En dato pr. linje med fraktionerne bagefter. Datoen må gerne stå som
+      <code>2027-01-05</code>, <code>05-01-2027</code> eller <code>5. januar</code>.
+      Står fraktionen som overskrift og datoerne under, virker det også.
+      Tomme linjer og alt andet bliver sprunget over.
+    </div>
+
+    <div class="field">
+      <label for="sk-aar">Årgang — bruges kun på datoer der ikke selv siger hvilket år</label>
+      <input type="number" id="sk-aar" min="2020" max="2099" inputmode="numeric">
+    </div>
+
+    <div class="actions" style="margin-top:2px">
+      <button class="btn" id="sk-fil">Hent en fil</button>
+      <button class="btn" id="sk-laes">Læs teksten</button>
+    </div>
+    <input type="file" id="sk-filvalg" accept=".txt,.csv,.ics,.sql,text/plain" hidden>
+
+    <div id="sk-resultat" hidden>
+      <div class="sk-oversigt" id="sk-oversigt"></div>
+      <div class="sk-liste" id="sk-liste"></div>
+      <label class="check"><input type="checkbox" id="sk-erstat" checked> <span id="sk-erstat-tekst">Erstat årgangen helt</span></label>
+    </div>
+    <div class="err" id="sk-fejl"></div>
+
+    <div class="actions">
+      <button class="btn" id="sk-luk">Luk</button>
+      <button class="btn primary" id="sk-gem" disabled>Gem i basen</button>
+    </div>
   </div>
 </div>
 
@@ -859,8 +918,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.10.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.11.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
+const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
+const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
 
@@ -1138,6 +1199,7 @@ function saetFane(f){
   document.getElementById("add-tekst").textContent =
     kalender ? "Ny aftale" : f === "todo" ? "Ny opgave" : "Ny ret";
 
+  resetIdle();          // tilbagefaldet er kort i kalenderen, langt alle andre steder
   render();
 }
 document.querySelector(".tabbar").addEventListener("click", ev => {
@@ -2914,6 +2976,10 @@ document.getElementById("menu-btn").onclick = async () => {
   document.getElementById("menu-mail").textContent =
     (data && data.user ? "Logget ind som " + data.user.email + " · " : "") + "Version " + VERSION
     + " · " + skraldedage.size + " skralddatoer";
+  const aar = new Set();
+  skraldedage.forEach((fs, d) => aar.add(d.slice(0,4)));
+  document.getElementById("skrald-stand").textContent =
+    aar.size ? [...aar].sort().join(", ") : "ingen";
   show("menu-back");
 };
 document.getElementById("menu-close").onclick = () => hide("menu-back");
@@ -2940,6 +3006,299 @@ document.getElementById("menu-export").onclick = () => {
   URL.revokeObjectURL(a.href);
   hide("menu-back");
 };
+
+
+/* =======================================================================
+   Etape 4 — hent skraldedatoer ind
+   Teksten fra kommunens kalender læses her i appen, så en ny årgang
+   kan komme ind uden at nogen skal røre hverken koden eller basen.
+   ======================================================================= */
+
+/* æ ø å væk, så der kun skal sammenlignes ét sæt bogstaver */
+function skFold(t){
+  return String(t).toLowerCase()
+    .replace(/æ/g,"ae").replace(/ø/g,"oe").replace(/å/g,"aa")
+    .replace(/\u00a0/g," ");
+}
+
+/* Ordene kommunen bruger, oversat til de otte fraktioner appen kender.
+   Længste ord først, ellers spiser "pap" begyndelsen af "papir". */
+const SKRALD_ORD = [
+  ["plast",      ["mad- og drikkekartoner","drikkekartoner","kartoner","plast","papir"]],
+  ["restmad",    ["restaffald","madaffald","dagrenovation","rest/mad","rest og mad","restmad","rest"]],
+  ["glas",       ["glas/metal","glas","metal"]],
+  ["pap",        ["pap"]],
+  ["storskrald", ["storskrald"]],
+  ["farligt",    ["farligt affald","farligt","miljoeboks","miljoekasse","miljoeboks"]],
+  ["have",       ["haveaffald","have"]],
+  ["juletrae",   ["juletraeer","juletrae"]]
+];
+const SKRALD_MOENSTER = (function(){
+  const par = [];
+  SKRALD_ORD.forEach(([f, ord]) => ord.forEach(o => par.push([skFold(o), f])));
+  par.sort((a,b) => b[0].length - a[0].length);
+  const alt = par.map(p => p[0].replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&")).join("|");
+  return { regex: new RegExp("(?:^|[^a-z0-9])(" + alt + ")", "g"), slaaOp: new Map(par) };
+})();
+
+function skFraktionerI(linje){
+  const t = skFold(linje);
+  const fundet = [];
+  SKRALD_MOENSTER.regex.lastIndex = 0;
+  let m;
+  while((m = SKRALD_MOENSTER.regex.exec(t)) !== null){
+    const f = SKRALD_MOENSTER.slaaOp.get(m[1]);
+    if(f && !fundet.includes(f)) fundet.push(f);
+    if(m.index === SKRALD_MOENSTER.regex.lastIndex) SKRALD_MOENSTER.regex.lastIndex++;
+  }
+  return fundet;
+}
+
+const SK_MDR = ["januar","februar","marts","april","maj","juni",
+                "juli","august","september","oktober","november","december"];
+
+function skDato(aar, maaned, dag){
+  if(!aar || maaned < 1 || maaned > 12 || dag < 1 || dag > 31) return null;
+  const d = new Date(aar, maaned - 1, dag);
+  if(d.getFullYear() !== aar || d.getMonth() !== maaned - 1 || d.getDate() !== dag) return null;
+  return iso(d);
+}
+
+/* Alle datoer på én linje. Samme linje kan sagtens rumme flere. */
+function skDatoerI(linje, standardAar){
+  const t = skFold(linje);
+  const ude = [];
+  let m, r;
+
+  r = /\b(20\d\d)-(\d{1,2})-(\d{1,2})\b/g;                    // 2027-01-05
+  while((m = r.exec(t))) { const d = skDato(+m[1],+m[2],+m[3]); if(d) ude.push(d); }
+  if(ude.length) return ude;
+
+  r = /\b(\d{1,2})[.\-\/ ]{1,2}(\d{1,2})[.\-\/ ]{1,2}(20\d\d)\b/g;   // 05-01-2027
+  while((m = r.exec(t))) { const d = skDato(+m[3],+m[2],+m[1]); if(d) ude.push(d); }
+  if(ude.length) return ude;
+
+  r = new RegExp("\\b(\\d{1,2})\\.?\\s*(" + SK_MDR.join("|") + ")\\.?\\s*(20\\d\\d)?", "g");
+  while((m = r.exec(t))) {                                     // 5. januar 2027
+    const d = skDato(m[3] ? +m[3] : standardAar, SK_MDR.indexOf(m[2]) + 1, +m[1]);
+    if(d) ude.push(d);
+  }
+  if(ude.length) return ude;
+
+  r = /\b(20\d\d)(\d{2})(\d{2})\b/g;                           // DTSTART:20270105
+  while((m = r.exec(t))) { const d = skDato(+m[1],+m[2],+m[3]); if(d) ude.push(d); }
+  if(ude.length) return ude;
+
+  r = /\b(\d{1,2})[.\-\/](\d{1,2})\b(?!\s*[.\-\/]?\s*\d)/g;    // 5/1 uden år
+  while((m = r.exec(t))) { const d = skDato(standardAar, +m[2], +m[1]); if(d) ude.push(d); }
+  return ude;
+}
+
+/* En .ics-fil skal skilles ad først, ellers ender datoen i én linje og
+   fraktionen i den næste, og så bliver de parret forkert. */
+function skForbered(tekst){
+  if(!/BEGIN:VEVENT/i.test(tekst)) return tekst;
+  const samlet = String(tekst).replace(/\r?\n[ \t]/g, "");     // ICS brækker lange linjer
+  const ude = [];
+  samlet.split(/BEGIN:VEVENT/i).slice(1).forEach(blok => {
+    const d = blok.match(/DTSTART[^:\n]*:\s*(\d{8})/i);
+    const t = blok.match(/SUMMARY[^:\n]*:\s*(.*)/i);
+    if(d) ude.push(d[1] + " " + (t ? t[1] : ""));
+  });
+  return ude.length ? ude.join("\n") : tekst;
+}
+
+/* Selve læsningen. Fraktionen må gerne stå som overskrift over datoerne. */
+function skLaes(raatekst, standardAar){
+  const tekst = skForbered(raatekst);
+  const raekker = new Map();          // "2027-01-05|pap" -> {dato,fraktion}
+  const uklare = [];
+  let overskrift = null;
+
+  tekst.split(/\r?\n/).forEach(raa => {
+    const linje = raa.trim();
+    if(!linje || /^(--|#|\/\/)/.test(linje)) return;
+
+    const datoer = skDatoerI(linje, standardAar);
+    let fraktioner = skFraktionerI(linje);
+
+    if(!datoer.length){
+      if(fraktioner.length){ overskrift = fraktioner; }         // ren overskrift
+      else if(linje.length > 2) uklare.push(linje);
+      return;
+    }
+    if(!fraktioner.length){
+      if(overskrift) fraktioner = overskrift;
+      else { uklare.push(linje); return; }
+    }
+    datoer.forEach(d => fraktioner.forEach(f => raekker.set(d + "|" + f, { dato:d, fraktion:f })));
+  });
+
+  const liste = [...raekker.values()].sort((a,b) =>
+    a.dato === b.dato ? SKRALD_ORDEN.indexOf(a.fraktion) - SKRALD_ORDEN.indexOf(b.fraktion)
+                      : a.dato < b.dato ? -1 : 1);
+  const aargange = [...new Set(liste.map(r => r.dato.slice(0,4)))].sort();
+  return { liste, aargange, uklare };
+}
+
+let skFund = null;
+
+function skTegnResultat(){
+  const kasse   = document.getElementById("sk-resultat");
+  const gemKnap = document.getElementById("sk-gem");
+  if(!skFund || !skFund.liste.length){
+    kasse.hidden = true;
+    gemKnap.disabled = true;
+    gemKnap.textContent = "Gem i basen";
+    return;
+  }
+  kasse.hidden = false;
+
+  /* Datoer, ikke rækker — én dato med to fraktioner er stadig én dag */
+  const dage = new Map();
+  skFund.liste.forEach(r => {
+    if(!dage.has(r.dato)) dage.set(r.dato, []);
+    dage.get(r.dato).push(r.fraktion);
+  });
+
+  const tael = {};
+  skFund.liste.forEach(r => tael[r.fraktion] = (tael[r.fraktion] || 0) + 1);
+
+  let o = '<div><span class="tal">' + dage.size + '</span> datoer i teksten'
+        + (skFund.aargange.length ? " · " + skFund.aargange.join(", ") : "") + '</div>';
+  o += '<div>' + SKRALD_ORDEN.filter(f => tael[f])
+        .map(f => esc(SKRALD_NAVN[f].replace(" — bestillingsfrist","")) + " " + tael[f])
+        .join(" · ") + '</div>';
+  if(skFund.uklare.length){
+    o += '<div class="advarsel">' + skFund.uklare.length
+       + ' linjer blev sprunget over, fx: ' + esc(skFund.uklare.slice(0,2).join(" / ").slice(0,90)) + '</div>';
+  }
+  document.getElementById("sk-oversigt").innerHTML = o;
+
+  const ugedage = ["søn","man","tir","ons","tor","fre","lør"];
+  document.getElementById("sk-liste").innerHTML = [...dage.entries()].map(([d, fs]) => {
+    const dt = new Date(d + "T12:00:00");
+    return '<div class="sk-rad"><span class="dag">' + ugedage[dt.getDay()] + " " + d + '</span>'
+         + '<span class="ikoner">' + SKRALD_ORDEN.filter(f => fs.includes(f))
+             .map(f => skraldIkon(f, 18)).join("") + '</span></div>';
+  }).join("");
+
+  /* Hvad står der i basen for de samme årgange? */
+  let ifoerste = 0;
+  skraldedage.forEach((fs, d) => { if(skFund.aargange.includes(d.slice(0,4))) ifoerste++; });
+  document.getElementById("sk-erstat-tekst").textContent =
+    "Erstat " + skFund.aargange.join(" og ") + " helt — de "
+    + ifoerste + " datoer der ligger der nu, bliver slettet først";
+
+  gemKnap.disabled = false;
+  gemKnap.textContent = "Gem " + dage.size + " datoer";
+}
+
+function skVisFejl(t){
+  const f = document.getElementById("sk-fejl");
+  f.textContent = t || "";
+  f.classList.toggle("show", !!t);
+}
+
+function skAabn(){
+  const aar = new Map();
+  skraldedage.forEach((fs, d) => aar.set(d.slice(0,4), (aar.get(d.slice(0,4)) || 0) + 1));
+  document.getElementById("sk-meta").textContent = aar.size
+    ? "I basen nu: " + [...aar.entries()].sort()
+        .map(([a,n]) => a + ": " + n + (n === 1 ? " dato" : " datoer")).join(" · ")
+    : "Der ligger ingen skraldedatoer i basen endnu.";
+  document.getElementById("sk-aar").value = new Date().getFullYear() + 1;
+  skFund = null;
+  document.getElementById("sk-tekst").value = "";
+  skVisFejl("");
+  skTegnResultat();
+  show("skrald-back");
+}
+
+document.getElementById("menu-skrald").onclick = () => { hide("menu-back"); skAabn(); };
+document.getElementById("sk-luk").onclick = () => hide("skrald-back");
+
+document.getElementById("sk-fil").onclick = () => document.getElementById("sk-filvalg").click();
+document.getElementById("sk-filvalg").onchange = ev => {
+  const fil = ev.target.files && ev.target.files[0];
+  if(!fil) return;
+  const laeser = new FileReader();
+  laeser.onload = () => {
+    document.getElementById("sk-tekst").value = laeser.result;
+    ev.target.value = "";
+    document.getElementById("sk-laes").click();
+  };
+  laeser.onerror = () => skVisFejl("Filen kunne ikke læses.");
+  laeser.readAsText(fil, "utf-8");
+};
+
+document.getElementById("sk-laes").onclick = () => {
+  skVisFejl("");
+  const tekst = document.getElementById("sk-tekst").value;
+  const aar   = parseInt(document.getElementById("sk-aar").value, 10) || new Date().getFullYear();
+  if(!tekst.trim()){ skVisFejl("Der er ingen tekst at læse."); skFund = null; skTegnResultat(); return; }
+  skFund = skLaes(tekst, aar);
+  if(!skFund.liste.length){
+    skVisFejl("Der blev ikke fundet en eneste dato med en fraktion. Tjek at hver linje har både en dato og fx Rest/Mad.");
+  }
+  skTegnResultat();
+};
+
+document.getElementById("sk-gem").onclick = async () => {
+  if(!skFund || !skFund.liste.length) return;
+  const knap = document.getElementById("sk-gem");
+  const erstat = document.getElementById("sk-erstat").checked;
+  knap.disabled = true;
+  const gammelTekst = knap.textContent;
+  knap.textContent = "Gemmer …";
+  skVisFejl("");
+  /* Det der ligger i basen nu for de samme årgange — så der er noget at
+     lægge tilbage, hvis det går galt midt i. */
+  const gamle = [];
+  skraldedage.forEach((fs, d) => {
+    if(skFund.aargange.includes(d.slice(0,4))) fs.forEach(f => gamle.push({ dato:d, fraktion:f }));
+  });
+  let harSlettet = false;
+
+  try{
+    if(erstat){
+      for(const a of skFund.aargange){
+        const { error } = await sb.from("skraldedage").delete()
+          .gte("dato", a + "-01-01").lte("dato", a + "-12-31");
+        if(error) throw error;
+        harSlettet = true;
+      }
+    }
+    let raekker = skFund.liste;
+    if(!erstat){
+      raekker = raekker.filter(r => !(skraldedage.get(r.dato) || []).includes(r.fraktion));
+    }
+    for(let i = 0; i < raekker.length; i += 300){
+      const { error } = await sb.from("skraldedage").insert(raekker.slice(i, i + 300));
+      if(error) throw error;
+    }
+    const antalDage = new Set(raekker.map(r => r.dato)).size;
+    await hentAlt();
+    hide("skrald-back");
+    vis(raekker.length
+      ? "Skraldedatoer gemt: " + antalDage + " datoer for " + skFund.aargange.join(", ") + "."
+      : "Der var ikke noget nyt at gemme — datoerne lå der i forvejen.");
+    skFund = null;
+  }catch(err){
+    let besked = "Kunne ikke gemme: " + (err.message || err);
+    if(harSlettet && gamle.length){
+      const { error } = await sb.from("skraldedage").insert(gamle);
+      besked += error
+        ? " — og de gamle datoer kunne ikke lægges tilbage. Brug \u0022Gem en kopi af alle data\u0022 og sig til."
+        : " De gamle datoer er lagt tilbage, så intet er gået tabt.";
+      await hentAlt();
+    }
+    skVisFejl(besked);
+    knap.disabled = false;
+    knap.textContent = gammelTekst;
+  }
+};
+
 
 /* =======================================================================
    Stryg til siden for at bladre
@@ -3066,16 +3425,34 @@ slor().addEventListener("pointerdown", ev => {
 
 /* =======================================================================
    Går hjem til i dag når skærmen har stået urørt
+   Hvor længe der skal gå, afhænger af hvad der står åbent, og det kan
+   nå at ændre sig efter sidste berøring. Derfor ét ur der tikker og
+   spørger om det er tid nu, i stedet for en frist der låses fast.
    ======================================================================= */
-let idleTimer = null;
-function resetIdle(){
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if(fane !== "kalender") { resetIdle(); return; }
-    if(document.querySelector(".backdrop.open") || document.getElementById("gate").classList.contains("open")){ resetIdle(); return; }
-    goHome();
-  }, IDLE_MS);
+const ARBEJDSBOKSE = ["edit-back", "opg-back", "retred-back", "skrald-back"];  // halvfærdigt: 1 time
+const LAESEBOKSE   = ["ret-back"];                                            // opskrift: aldrig
+
+var sidsteBeroering = Date.now();
+function resetIdle(){ sidsteBeroering = Date.now(); }
+const boksAaben = id => document.getElementById(id).classList.contains("open");
+
+function idleFrist(){
+  if(LAESEBOKSE.some(boksAaben))   return Infinity;
+  if(ARBEJDSBOKSE.some(boksAaben)) return IDLE_ARBEJDE_MS;
+  return fane === "kalender" ? IDLE_MS : IDLE_ANDET_MS;
 }
+
+setInterval(() => {
+  const frist = idleFrist();
+  if(document.getElementById("gate").classList.contains("open") || !isFinite(frist)){
+    resetIdle();                       // uret starter forfra når opskriften lukkes igen
+    return;
+  }
+  if(Date.now() - sidsteBeroering < frist) return;
+  document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
+  goHome();
+}, 2000);
+
 ["pointerdown","keydown","wheel","touchstart"].forEach(t => document.addEventListener(t, resetIdle, {passive:true}));
 
 /* =======================================================================
