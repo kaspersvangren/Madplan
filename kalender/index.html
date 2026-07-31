@@ -354,8 +354,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .daycard.away{background:var(--day-away)}
 .strip{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);font-size:15px}
 .strip .label{color:var(--muted);font-size:13px}
-.strip.presence button{margin-left:auto;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--muted)}
-.strip.presence button:hover{border-color:var(--line-strong);color:var(--ink)}
+.strip.presence button{font-size:15px;color:var(--ink);padding:3px 0;border-bottom:1px dashed var(--line-strong);border-radius:0}
+.strip.presence button:hover{color:var(--ink);border-bottom-style:solid}
+.strip.presence button:active{opacity:.55}
 
 /* ---------- Skrald ---------- */
 .skrald{display:flex;align-items:center;gap:3px;line-height:0;flex:none}
@@ -858,7 +859,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.10.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.10.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
@@ -2395,9 +2396,8 @@ function renderDay(){
 
   h += '<div class="strip presence">'
      +   '<span class="label">Agnes</span>'
-     +   '<span>'+(here?"er her":"er hos sin far")+'</span>'
+     +   '<button id="agnes-btn" aria-label="Skift om Agnes er her">'+(here?"er her":"er hos sin far")+'</button>'
      +   skraldHtml
-     +   '<button id="agnes-btn">'+(here?"Marker som hos far":"Marker som her")+'</button>'
      + '</div>';
 
   const mealText = mad
