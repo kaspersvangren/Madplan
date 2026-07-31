@@ -28,7 +28,7 @@
   --chip:#F2F1ED;
   --holiday:#B0503A;
   --rail:#CFCCC4;--nat:#2B3450;--sky:#8C9096;
-  --ferie:#E0A03A;
+  --ferie:#E0A03A;--ferie-svag:rgba(224,160,58,.30);
   --radius:14px;
   --tap:44px;
   --font-display:"Bricolage Grotesque","Inter",system-ui,sans-serif;
@@ -47,7 +47,7 @@ html[data-theme="dark"]{
   --chip:#252821;
   --holiday:#E08A70;
   --rail:#3A3E36;--nat:#3D4870;
-  --ferie:#D9A24A;
+  --ferie:#D9A24A;--ferie-svag:rgba(217,162,74,.30);
 }
 
 *{box-sizing:border-box}
@@ -488,6 +488,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .feriestribe{height:5px;background:var(--ferie);flex:none}
 .feriestribe.kant{position:absolute;left:0;right:0;top:0;height:4px;pointer-events:none}
 .mcell .feriestribe.kant{right:-1px;height:3px}
+/* Stregen alene siger ikke hvilken række den hører til. En svag skravering
+   af selve cellen gør det. Baggrunden skinner igennem mellem stregerne,
+   så delebarns-markeringen er stadig til at se. */
+.feriedag{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(135deg,
+    var(--ferie-svag) 0 2px, transparent 2px 8px)}
+.mcell.other .feriedag{opacity:.45}
 .mcell.other .feriestribe.kant{opacity:.45}
 .strip.ferie .fnavn{color:var(--ink);padding:2px 0;border-bottom:1px dashed var(--ferie);border-radius:0;font-size:15px;text-align:left}
 .strip.ferie .fnavn:active{opacity:.55}
@@ -966,7 +973,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.12.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.12.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2693,7 +2700,8 @@ function renderMonth(){
         + (holidayName(ds)?" holiday":"");
       const mSkrald = skraldPaa(ds);
       h += '<button class="'+cls+'" data-goto="'+ds+'">'
-         +   (ferierPaa(ds).length ? '<span class="feriestribe kant"></span>' : "")
+         +   (ferierPaa(ds).length
+               ? '<span class="feriedag"></span><span class="feriestribe kant"></span>' : "")
          +   '<span class="num">'+d.getDate()+'</span>'
          +   '<span class="mdots">'+ids.map(id => dotEl(id,"sm")).join("")+'</span>'
          +   (mSkrald.length ? '<span class="skrald maaned">'+mSkrald.map(f => skraldIkon(f,11)).join("")+'</span>' : "")
