@@ -168,11 +168,14 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .soegefelt{position:relative}
 .soegefelt input{width:100%;padding:11px 12px 11px 38px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit}
 .soegefelt svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
-.filtre{display:flex;gap:7px;flex-wrap:wrap}
+.filtre{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+.filtre::-webkit-scrollbar{display:none}
 .fchip{
-  display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
-  border:1px solid var(--line);font-size:13px;color:var(--muted);background:var(--surface);white-space:nowrap;
+  display:flex;align-items:center;gap:3px;padding:7px 10px;border-radius:999px;flex:none;
+  border:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--surface);white-space:nowrap;
 }
+.fchip .tegn{font-size:10.5px;line-height:1}
+.fchip.ikon{padding:7px 11px;font-size:14px}
 .fchip[data-stand="krav"]{border-color:var(--line-strong);color:var(--ink);font-weight:600;background:var(--chip)}
 .fchip[data-stand="uden"]{border-color:var(--holiday);color:var(--holiday);font-weight:600}
 
@@ -1031,7 +1034,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.13.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.13.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1372,7 +1375,7 @@ const ENHEDER = ["", "g", "kg", "ml", "l", "dl", "stk", "dåse", "pakke", "bundt
 let retter = [], ingredienser = [], madplanDage = [];
 let soegning = "";
 const filtre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };   // fri | krav | uden
-const FILTERNAVNE = { vegetar:"Vegetar", nem:"Nem ret", agnes_kan_lide:"Agnes kan lide" };
+const FILTERNAVNE = { vegetar:"Veg.", nem:"Nem", agnes_kan_lide:"Agnes" };
 let visTilbehoer = false;
 let visKunFrost = false;
 
@@ -1448,13 +1451,14 @@ async function afskrivFrost(){
 function tegnFiltre(){
   const naeste = { fri:"krav", krav:"uden", uden:"fri" };
   const tegn = { fri:"", krav:"✓", uden:"✕" };
+  const HELE = { vegetar:"Vegetar", nem:"Nem ret", agnes_kan_lide:"Agnes kan lide" };
   document.getElementById("filtre").innerHTML =
     Object.keys(FILTERNAVNE).map(n =>
-      '<button class="fchip" data-filter="'+n+'" data-stand="'+filtre[n]+'">'
-      + (tegn[filtre[n]] ? '<span>'+tegn[filtre[n]]+'</span>' : '')
+      '<button class="fchip" data-filter="'+n+'" data-stand="'+filtre[n]+'" title="'+HELE[n]+'">'
+      + (tegn[filtre[n]] ? '<span class="tegn">'+tegn[filtre[n]]+'</span>' : '')
       + FILTERNAVNE[n] + '</button>').join("")
-    + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'">Tilbehør</button>'
-    + '<button class="fchip" data-frost="1" data-stand="'+(visKunFrost?"krav":"fri")+'">❄ I fryseren</button>';
+    + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'" title="Vis tilbehør i stedet for retter">Tilbehør</button>'
+    + '<button class="fchip ikon" data-frost="1" data-stand="'+(visKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>';
   void naeste;
 }
 document.getElementById("filtre").addEventListener("click", ev => {
@@ -2022,12 +2026,13 @@ function aabnVaelger(tilstand){
 
 function tegnVaelgFiltre(){
   const tegn = { fri:"", krav:"✓", uden:"✕" };
+  const HELE = { vegetar:"Vegetar", nem:"Nem ret", agnes_kan_lide:"Agnes kan lide" };
   document.getElementById("vaelg-filtre").innerHTML =
     Object.keys(FILTERNAVNE).map(n =>
-      '<button class="fchip" data-vfilter="'+n+'" data-stand="'+vaelgFiltre[n]+'">'
-      + (tegn[vaelgFiltre[n]] ? '<span>'+tegn[vaelgFiltre[n]]+'</span>' : '')
+      '<button class="fchip" data-vfilter="'+n+'" data-stand="'+vaelgFiltre[n]+'" title="'+HELE[n]+'">'
+      + (tegn[vaelgFiltre[n]] ? '<span class="tegn">'+tegn[vaelgFiltre[n]]+'</span>' : '')
       + FILTERNAVNE[n] + '</button>').join("")
-    + '<button class="fchip" data-vfrost="1" data-stand="'+(vaelgKunFrost?"krav":"fri")+'">❄ I fryseren</button>';
+    + '<button class="fchip ikon" data-vfrost="1" data-stand="'+(vaelgKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>';
 }
 document.getElementById("vaelg-filtre").addEventListener("click", ev => {
   const f  = ev.target.closest("[data-vfilter]");
@@ -2190,16 +2195,22 @@ function beregnIndkoeb(fredag){
     });
 
     /* "Frost eller rest" gælder kun hovedretten. Vælger man tilbehør til
-       en ret fra fryseren, skal tilbehøret stadig købes ind.          */
-    const kilder = [...(m.frost ? [] : [m.ret_id]), ...(m.tilbehoer || []).map(t => t.id)].filter(Boolean);
+       en ret fra fryseren, skal tilbehøret stadig købes ind. Hver kilde
+       bærer sit eget navn med, så listen kan sige at varen hører til
+       tilbehøret og ikke til selve retten.                            */
+    const kilder = [];
+    if(!m.frost && m.ret_id) kilder.push({ id:m.ret_id, kilde:m.ret_navn });
+    (m.tilbehoer || []).forEach(t => {
+      if(t.id) kilder.push({ id:t.id, kilde:t.navn + " (tilbehør til " + m.ret_navn + ")" });
+    });
     if(!kilder.length) continue;
-    kilder.forEach(rid => {
-      ingredienserFor(rid).forEach(ing => {
+    kilder.forEach(kilde => {
+      ingredienserFor(kilde.id).forEach(ing => {
         const kort = ing.kategori === "tjek" ? tjek : koeb;
         const noegle = ing.navn.toLowerCase() + "|" + (ing.enhed || "");
         const post = kort.get(noegle) || { navn: ing.navn, enhed: ing.enhed || "", maengde: null, retter: new Set() };
         if(ing.maengde != null) post.maengde = (post.maengde || 0) + ing.maengde * (m.portioner || 1);
-        post.retter.add(m.ret_navn);
+        post.retter.add(kilde.kilde);
         kort.set(noegle, post);
       });
     });
