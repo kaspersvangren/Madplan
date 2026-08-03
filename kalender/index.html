@@ -1089,7 +1089,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     </div>
     <div class="row2">
       <div class="field"><label for="f-date">Dato</label><input type="date" id="f-date"></div>
-      <div class="field"><label for="f-enddate" id="f-enddate-mrk">Slutdato</label><input type="date" id="f-enddate"></div>
+      <div class="field" id="f-enddate-felt"><label for="f-enddate" id="f-enddate-mrk">Slutdato</label><input type="date" id="f-enddate"></div>
     </div>
     <div class="err" id="f-date-err"></div>
     <label class="check" id="f-allday-felt"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
@@ -1142,7 +1142,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.15.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.15.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2950,10 +2950,19 @@ document.getElementById("opg-gem").onclick = async () => {
   const frist = document.getElementById("o-deadline").value || null;
   const regel = gOpgave.hent();
   const okTitel = titel.length > 0, okFolk = opgValgte.size > 0;
-  const okFrist = !regel || !!frist;      // uden dato er der intet at tælle fra
+  const serieSlut = document.getElementById("o-gslut").value;
+  const fejlFrist = document.getElementById("o-deadline-err");
+  let okFrist = true;
+  if(regel && !frist){
+    okFrist = false;                       // uden dato er der intet at tælle fra
+    fejlFrist.textContent = "En opgave der gentages skal have en dato at tælle fra.";
+  } else if(regel && serieSlut && frist && serieSlut < frist){
+    okFrist = false;
+    fejlFrist.textContent = "\u0022Kører til og med\u0022 ligger før første gang — så bliver opgaven aldrig til noget.";
+  }
   document.getElementById("o-titel-err").classList.toggle("show", !okTitel);
   document.getElementById("o-people-err").classList.toggle("show", !okFolk);
-  document.getElementById("o-deadline-err").classList.toggle("show", !okFrist);
+  fejlFrist.classList.toggle("show", !okFrist);
   if(!okTitel || !okFolk || !okFrist) return;
 
   const rr = parseRegel(regel);
@@ -3841,7 +3850,10 @@ function saetSlags(slags){
   document.getElementById("f-people-felt").hidden = erFerie;
   document.getElementById("f-allday-felt").hidden = erFerie;
   document.getElementById("f-gentag-felt").hidden = erFerie;
-  if(erFerie) document.getElementById("f-gentag-mere").hidden = true;
+  if(erFerie){
+    document.getElementById("f-gentag-mere").hidden = true;
+    document.getElementById("f-enddate-felt").hidden = false;
+  }
   document.getElementById("f-title").placeholder = erFerie ? "Behøver ikke et navn" : "Fx tandlæge";
   document.getElementById("f-enddate-mrk").textContent = erFerie ? "Sidste dag" : "Slutdato";
   document.getElementById("edit-meta").textContent = erFerie
@@ -3871,11 +3883,22 @@ function syncSpand(){
   document.getElementById("f-start-mrk").textContent = overFlere ? "Første dag fra" : "Start";
   document.getElementById("f-end-mrk").textContent   = overFlere ? "Sidste dag til" : "Slut";
   const g = document.getElementById("f-gentag");
-  if(formSlags === "ferie"){ g.disabled = true; document.getElementById("f-enddate").disabled = false; return; }
+  const slutFelt = document.getElementById("f-enddate-felt");
+  if(formSlags === "ferie"){
+    slutFelt.hidden = false;
+    document.getElementById("f-enddate").disabled = false;
+    return;
+  }
+  /* Enten strækker aftalen sig over flere dage, eller ogsaa gentager den sig.
+     At vise begge felter samtidig — det ene graat — forvirrede mere end det
+     hjalp, saa nu er kun det ene fremme ad gangen. */
   const flerdags = !!(start && slut && slut > start);
   if(flerdags && g.value){ g.value = ""; gAftale.opdater(); }
-  g.disabled = flerdags;
-  document.getElementById("f-enddate").disabled = !!g.value;
+  if(g.value && document.getElementById("f-enddate").value)
+    document.getElementById("f-enddate").value = "";
+  document.getElementById("f-enddate").disabled = false;
+  slutFelt.hidden = !!g.value;
+  document.getElementById("f-gentag-felt").hidden = flerdags;
 }
 ["f-date","f-enddate","f-gentag"].forEach(id =>
   document.getElementById(id).addEventListener("change", syncSpand));
@@ -3960,8 +3983,16 @@ document.getElementById("edit-save").onclick = async () => {
   }
 
   const datoFejl  = document.getElementById("f-date-err");
-  const okDato    = !(slutDato && slutDato < startDato);
-  if(!okDato) datoFejl.textContent = "Slutdatoen ligger før datoen.";
+  const serieSlut = document.getElementById("f-gslut").value;
+  const brugerGentag = !!document.getElementById("f-gentag").value;
+  let okDato = true;
+  if(slutDato && slutDato < startDato){
+    okDato = false;
+    datoFejl.textContent = "Slutdatoen ligger før datoen.";
+  } else if(brugerGentag && serieSlut && serieSlut < startDato){
+    okDato = false;
+    datoFejl.textContent = "\u0022Kører til og med\u0022 ligger før første gang — så findes aftalen ikke på nogen dag. Ryd feltet, eller flyt datoen frem.";
+  }
 
   document.getElementById("f-title-err").classList.toggle("show", !okTitle);
   document.getElementById("f-people-err").classList.toggle("show", !okPeople);
