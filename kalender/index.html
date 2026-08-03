@@ -262,6 +262,36 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .opgkort .frist{display:block;font-size:13px;color:var(--muted);margin-top:3px}
 .opgkort .frist.over{color:var(--holiday);font-weight:600}
 .opgkort.klaret .titel{text-decoration:line-through;color:var(--muted)}
+
+/* Afkrydsning: kortet folder sig sammen, før listen tegnes om, og glider
+   på plads igen der hvor sorteringen har flyttet det hen.             */
+.opgkort.krydser{
+  overflow:hidden;
+  transition:max-height .26s ease, opacity .22s ease, padding-top .26s ease,
+             padding-bottom .26s ease, margin-bottom .26s ease, border-width .26s ease;
+}
+.opgkort.krydser.vaek{
+  max-height:0 !important;opacity:0;padding-top:0;padding-bottom:0;
+  margin-bottom:-8px;border-top-width:0;border-bottom-width:0;
+}
+@keyframes opglander{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+.opgkort.lander{animation:opglander .28s ease-out}
+
+/* Dagsvisningen flytter ikke rundt på rækkerne — dér tegnes stregen i
+   stedet, så man kan se at det var den her opgave der blev klaret.    */
+@keyframes overstreg{from{background-size:0 1.5px}to{background-size:100% 1.5px}}
+.dagopg .raekke.klaret.lander .titel{
+  text-decoration:none;
+  background-image:linear-gradient(currentColor,currentColor);
+  background-repeat:no-repeat;background-position:0 58%;
+  animation:overstreg .3s ease-out forwards;
+}
+@keyframes flueben{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.lander .boks.sat svg{animation:flueben .25s cubic-bezier(.2,1.4,.5,1)}
+@media (prefers-reduced-motion:reduce){
+  .opgkort.krydser,.opgkort.lander,.lander .boks.sat svg,
+  .dagopg .raekke.klaret.lander .titel{transition:none;animation:none}
+}
 .gruppetop{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   color:var(--muted);margin:16px 2px 2px}
 .gruppetop:first-child{margin-top:2px}
@@ -388,6 +418,11 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .slot .stem{position:absolute;left:74px;top:16px;width:12px;height:1px;background:var(--rail)}
 .slot .body{flex:1;margin-left:20px;min-width:0}
 .ev{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;display:block}
+.ev.fdag{background:rgba(200,16,46,.05)}
+html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
+.flagikon{vertical-align:-2px;margin-right:5px;flex:none}
+.mcell .mflag{position:absolute;top:3px;right:3px;line-height:0}
+.mcell.other .mflag{opacity:.45}
 .ev:hover{border-color:var(--line-strong)}
 .ev .t{font-weight:600;font-size:16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
 .ev .d{font-size:13px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -867,6 +902,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       Hold skærmen tændt
       <span class="stand" id="vaagen-stand">fra</span>
     </button>
+    <button class="menu-row" id="menu-fdag">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h13l-2.5 4L18 12H5"/></svg>
+      Flag ved fødselsdage
+      <span class="stand" id="fdag-stand">til</span>
+    </button>
     <button class="menu-row" id="menu-export">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
       Gem en kopi af alle data
@@ -1034,7 +1074,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.13.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.14.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1082,6 +1122,21 @@ const SKRALD_IKON = {
   juletrae: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAFlElEQVR42u2c/28TZRzH39w916bdVo0XthU2ETIaN8rabRqGUzBRmdEfcIauLI5vQWPMAolR/wGj/kowMYTIQBkhmpKQhTAgxihiQQKzmE2EbuIaYGUdBey61q7X6g/Qy4620A25O7bPO9kPfZ67J8srn/d9vlzTOas6X9rNeLYJQBoAB1IhSgPgpJS0h7sDDwRvSuIAgPFsEwcgRTymrRQHgCcO0xZPtv0/vEwigASQABJAEgEkgASQAJIIIAEkgASQNCMASikJUkoigNOFJ5pFiGZR1xB1CTCejOG5p5qwr3U/9rXux4qFKxFPxghgoZFXXmzFu8++J69tfuYdlBdbdRmJugOYTE9gdU0LSovmymulRXOxuqYFyfQEAbxf9FWJi+Gyu7L2XHYXqsTFuotCTm/R95azPe9+S82buotC3QCMJ2NYVrkcLyxYIa95A154A175c/PiV7GscrmuEopuAJoEMzbUb1Ss7e7dha5zXyvWNtRvhEkwE8DJGktEsKqqGTbRJq95+j0I3BrCYHgAnn6PvG4TbVhV1YyxRIQAZhJHhaUS7to2eS00Poru8wchcAYInAHd5w8iND4q77tr21BhqdRFQtEcYK6y5dCFblyLBsF4BsYzXIsGcehCty7LGk7r6Lu7bPGH/TjQ54HAGeReWOAMONDngT/s111Zo3kErnNuUHz+tu8bMJ5BNIsoMhahyFgE0SzKe/e6VwsxLaOvfn4DmhY0KdbdS9fCvXRtQWc0LWhC/fwG/Hq1F4xnswtgXIphTY6OY3ImLkRr7C54AydQwltml4UZxxCKjjzwOaHoCBjHZp+FBc6ALt9eXIlcgcX4GKrEKtRZ6xSlzPG/fgQArFz4oiJL+4I+DIYHEUn8jSP+HgicYfYBZDxDOBZGl+92p7Ht9c8V+9tPboM3cAIAcC7ow6evfKbY/+KX29ebmFmz55/mWZjxDIxj6Gjcqoi+YwNHcfryKZQYLSgxWnD68ikcGzgq79dZ69DRuBWMY5rC0xxgPBnDkjK7og4MjY+iy7dXYcuM3Sd3Iy67C0vK7JoPFjQDKKUkmAQzOhq3ZFk304VMjtRr0SC2n9ymuLajcQtMglnTYlozgHEpBndtm6JsyVg317TFJJizrGwTbXDXtiEuxWYXQCklwWF1ot3Rfk/r5svck63c7miHw+rULAo1Ach4lmXdnWd2ZFk31335rKxVMlEdYDwZwxs1LVnWPX7ph4IGpfms3LrUrUlC4dS27pIyOzY3vD0l6xZi5XXO9ZpkZU5r63ae/fK+1s1n5Z1nduTMyjMS4FgiktO6xwaOKGZ/hf4JnAHfD36X08pqjvuZWtZ1WJ1Z1u3xH0aFpRJGZkRCSkzpzMw9Pf7DqJvXIPfK65zrcfbqGfw+0q9KNM557avmf9WA+PHLnyjatQzEyUOCaU1jcpzhD/vxQc/7M8PC8WQMteWOLHgAHhhevjNsog215Q5VEspDByhwBgRuDiky5sNWaHwUgZtDqoy5VLGwlJIwzzIP1aU1OfeTqWTWy6XO3l0IRUMAgMrHn1R0LZ5+DwbDAxB4Ied5f4TOYzgyrEpxrUoSYTzDcGQYgVtDOSM0LsUQnYgqAJ4MePHnjUEAwNNzqxUAfw78hN+C5/JOogXOoFpnolr/k3nHm7O7QHa2LDYWw8RurxcbipV7hhLNB6maT2Nmiphe/7FoIiqPqZLpJAGcqqpLa1BeYgUALHpiEQGcqj58/qNHwsKP5DMwIf1DAO/WxesXFF8eyidf0IeL1y/qBqBqvXAhxTbj2X2fd5duXJKvpWfgXXWilJLgH/VPu56c9UlET2CokCaABJAAkgggASSABJBEAAkgASSAJAJIAPUKkH4Kfvqin4J/EEkpieeklLTnzuc0ISlY6TuvFfb8B9A7UOXCymRbAAAAAElFTkSuQmCC"
 };
 const erMoerk = () => document.documentElement.getAttribute("data-theme") === "dark";
+
+/* ---------- Fødselsdage ----------
+   Ingen ny kolonne: står ordet i titlen, er det en fødselsdag. Kan slås
+   fra i menuen, for den der skriver "gave til Idas fødselsdag" på en
+   opgave mener ikke selve dagen.                                      */
+let visFoedselsdage = true;
+const FDAG_ORD = /f(ø|oe)dselsdag/i;
+const erFoedselsdag = e => visFoedselsdage && FDAG_ORD.test(e.title || "");
+const FLAG_IKON = s =>
+  '<svg class="flagikon" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" role="img" aria-label="fødselsdag">'
+  + '<path d="M4 2.5v19" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" fill="none"/>'
+  + '<rect x="5.2" y="3" width="15.8" height="11" fill="#C8102E"/>'
+  + '<rect x="9.4" y="3" width="2.6" height="11" fill="#fff"/>'
+  + '<rect x="5.2" y="7.2" width="15.8" height="2.6" fill="#fff"/>'
+  + '</svg>';
 const farveFor = p => erMoerk() ? p.moerk : p.lys;
 
 /* =======================================================================
@@ -2461,11 +2516,39 @@ function renderDagOpgaver(ds){
 }
 
 /* ---------- Kryds af og fortryd ---------- */
+const roligtUdseende = () =>
+  !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+function opgRamme(id){
+  const k = document.querySelector('[data-kryds="' + id + '"]');
+  return k ? k.closest(".opgkort, .dagopg .raekke") : null;
+}
+
 async function krydsAf(id){
   const o = opgaver.find(x => x.id === id); if(!o) return;
   const ny = o.faerdig_dato ? null : iso(new Date());
   const foer = o.faerdig_dato;
-  o.faerdig_dato = ny; render();
+
+  /* I todo-fanen flytter sorteringen kortet, så det skal folde sig sammen
+     først — ellers springer det bare. I dagsvisningen bliver rækken hvor
+     den er, og dér ville en sammenfoldning kun blinke.                 */
+  const ramme = opgRamme(id);
+  const rolig = roligtUdseende();
+  if(ramme && ramme.classList.contains("opgkort") && !rolig){
+    ramme.style.maxHeight = ramme.offsetHeight + "px";
+    ramme.classList.add("krydser");
+    void ramme.offsetHeight;                 // tving browseren til at se udgangspunktet
+    ramme.classList.add("vaek");
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  o.faerdig_dato = ny;
+  render();
+  if(!rolig){
+    const ny2 = opgRamme(id);
+    if(ny2) ny2.classList.add("lander");
+  }
+
   const { error } = await sb.from("opgaver").update({ faerdig_dato: ny }).eq("id", id);
   if(error){ o.faerdig_dato = foer; render(); vis("Kunne ikke gemme: " + error.message); }
 }
@@ -2928,8 +3011,8 @@ function renderDay(){
          +   '<div class="time">'+ tidHtml + spand + '</div>'
          +   '<span class="stem"></span>'
          +   '<div class="body">'
-         +     '<button class="ev" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
-         +       '<span class="t"><span>'+esc(e.title)+(e.yearly?' <span aria-label="gentages hvert år">↻</span>':'')+'</span>'+dotsEl(e.people,"lg")+'</span>'
+         +     '<button class="ev'+(erFoedselsdag(e)?" fdag":"")+'" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
+         +       '<span class="t"><span>'+(erFoedselsdag(e)?FLAG_IKON(15):"")+esc(e.title)+(e.yearly?' <span aria-label="gentages hvert år">↻</span>':'')+'</span>'+dotsEl(e.people,"lg")+'</span>'
          +       (e.desc ? '<span class="d">'+esc(e.desc)+'</span>' : '')
          +     '</button>'
          +   '</div>'
@@ -2978,7 +3061,7 @@ function renderWeek(){
                : t.slags === "til"     ? "til " + esc(t.tid)
                : esc(t.start);
       h += '<span class="witem"><span class="wt">'+wt+'</span>'
-         +   dotsEl(e.people)+'<span class="wn">'+esc(e.title)+'</span></span>';
+         +   dotsEl(e.people)+'<span class="wn">'+(erFoedselsdag(e)?FLAG_IKON(12):"")+esc(e.title)+'</span></span>';
     });
     if(mad){
       h += '<span class="meal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 3v8a2 2 0 0 0 4 0V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'+esc(mad.navn)+(mad.frost ? " ❄" : "")+'</span>';
@@ -3013,9 +3096,11 @@ function renderMonth(){
         + (sameDay(d,today)?" today":"")
         + (holidayName(ds)?" holiday":"");
       const mSkrald = skraldPaa(ds);
+      const mFdag = eventsOn(ds).some(erFoedselsdag);
       h += '<button class="'+cls+'" data-goto="'+ds+'">'
          +   (ferierPaa(ds).length
                ? '<span class="feriedag"></span><span class="feriestribe kant"></span>' : "")
+         +   (mFdag ? '<span class="mflag">'+FLAG_IKON(12)+'</span>' : "")
          +   '<span class="num">'+d.getDate()+'</span>'
          +   '<span class="mdots">'+ids.map(id => dotEl(id,"sm")).join("")+'</span>'
          +   (mSkrald.length ? '<span class="skrald maaned">'+mSkrald.map(f => skraldIkon(f,11)).join("")+'</span>' : "")
@@ -3608,6 +3693,14 @@ document.getElementById("menu-btn").onclick = async () => {
 };
 document.getElementById("menu-close").onclick = () => hide("menu-back");
 document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); };
+
+function saetFoedselsdage(paa){
+  visFoedselsdage = paa;
+  try{ localStorage.setItem("kalender-fdag", paa ? "1" : "0"); }catch(e){}
+  document.getElementById("fdag-stand").textContent = paa ? "til" : "fra";
+  render();
+}
+document.getElementById("menu-fdag").onclick = () => saetFoedselsdage(!visFoedselsdage);
 document.getElementById("menu-logout").onclick = async () => {
   hide("menu-back");
   stopLytning();
@@ -4126,6 +4219,8 @@ async function start(){
   try{ if(localStorage.getItem("kalender-vaagen") === "1") saetVaagen(true); }catch(e){}
   tegnVaagenStand();
   try{ const t = localStorage.getItem("kalender-tema"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+  try{ visFoedselsdage = localStorage.getItem("kalender-fdag") !== "0"; }catch(e){}
+  document.getElementById("fdag-stand").textContent = visFoedselsdage ? "til" : "fra";
   render();
   const { data } = await sb.auth.getSession();
   if(data && data.session){ await start(); }
