@@ -509,6 +509,10 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
 .field input,.field textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
 .field textarea{min-height:72px;resize:vertical}
+.field select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.gentagblok{border-left:3px solid var(--line);padding-left:11px;margin:0 0 12px}
+.gsum{font-size:13px;color:var(--muted);margin-top:2px}
+.gmaerke{font-size:.85em;opacity:.65;margin-left:3px}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 .people{display:flex;flex-wrap:wrap;gap:7px}
@@ -677,6 +681,37 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <div class="field">
       <label for="o-deadline">Deadline</label>
       <input type="date" id="o-deadline">
+      <div class="err" id="o-deadline-err">En opgave der gentages skal have en deadline.</div>
+    </div>
+    <div class="field" id="o-gentag-felt">
+      <label for="o-gentag">Gentages</label>
+      <select id="o-gentag">
+        <option value="">Aldrig</option>
+        <option value="DAILY">Dagligt</option>
+        <option value="WEEKLY">Ugentligt</option>
+        <option value="MONTHLY">Månedligt</option>
+        <option value="YEARLY">Årligt</option>
+      </select>
+    </div>
+    <div class="gentagblok" id="o-gentag-mere" hidden>
+      <div class="field">
+        <label for="o-interval">Hvor tit</label>
+        <select id="o-interval"></select>
+      </div>
+      <div class="field" id="o-uge-felt" hidden>
+        <label>På hvilke dage</label>
+        <div class="people" id="o-uge"></div>
+      </div>
+      <div class="field" id="o-maaned-felt" hidden>
+        <label>Hvornår i måneden</label>
+        <div class="people" id="o-maaned"></div>
+      </div>
+      <label class="check" id="o-fraudf-felt" hidden><input type="checkbox" id="o-fraudf"> Tæl fra den dag opgaven bliver krydset af</label>
+      <div class="field">
+        <label for="o-gslut">Kører til og med (frivilligt)</label>
+        <input type="date" id="o-gslut">
+      </div>
+      <div class="gsum" id="o-gsum"></div>
     </div>
     <div class="actions">
       <button class="btn" id="opg-fortryd">Fortryd</button>
@@ -1014,8 +1049,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <!-- Bekræft sletning -->
 <div class="backdrop" id="confirm-back">
   <div class="sheet" role="dialog" aria-modal="true">
-    <h2>Slet aftalen?</h2>
+    <h2 id="confirm-h">Slet aftalen?</h2>
     <div class="meta" id="confirm-meta"></div>
+    <div class="actions" id="confirm-serie" hidden>
+      <button class="btn" id="confirm-kun">Kun denne dag</button>
+      <button class="btn" id="confirm-fremover">Denne og fremover</button>
+    </div>
     <div class="actions">
       <button class="btn" id="confirm-no">Behold</button>
       <button class="btn primary" id="confirm-yes">Slet</button>
@@ -1054,7 +1093,36 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     </div>
     <div class="err" id="f-date-err"></div>
     <label class="check" id="f-allday-felt"><input type="checkbox" id="f-allday"> Hele dagen, uden klokkeslæt</label>
-    <label class="check" id="f-yearly-felt"><input type="checkbox" id="f-yearly"> Gentages hvert år</label>
+    <input type="checkbox" id="f-yearly" hidden>
+    <div class="field" id="f-gentag-felt">
+      <label for="f-gentag">Gentages</label>
+      <select id="f-gentag">
+        <option value="">Aldrig</option>
+        <option value="DAILY">Dagligt</option>
+        <option value="WEEKLY">Ugentligt</option>
+        <option value="MONTHLY">Månedligt</option>
+        <option value="YEARLY">Årligt</option>
+      </select>
+    </div>
+    <div class="gentagblok" id="f-gentag-mere" hidden>
+      <div class="field">
+        <label for="f-interval">Hvor tit</label>
+        <select id="f-interval"></select>
+      </div>
+      <div class="field" id="f-uge-felt" hidden>
+        <label>På hvilke dage</label>
+        <div class="people" id="f-uge"></div>
+      </div>
+      <div class="field" id="f-maaned-felt" hidden>
+        <label>Hvornår i måneden</label>
+        <div class="people" id="f-maaned"></div>
+      </div>
+      <div class="field">
+        <label for="f-gslut">Kører til og med (frivilligt)</label>
+        <input type="date" id="f-gslut">
+      </div>
+      <div class="gsum" id="f-gsum"></div>
+    </div>
     <div class="row2" id="f-times">
       <div class="field"><label for="f-start" id="f-start-mrk">Start</label><input type="time" id="f-start"></div>
       <div class="field"><label for="f-end" id="f-end-mrk">Slut</label><input type="time" id="f-end"></div>
@@ -1074,7 +1142,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.14.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.15.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1266,9 +1334,12 @@ function sorterTid(e, ds){
 function eventsOn(ds){
   const md = ds.slice(5);
   return events
-    .filter(e => e.yearly
-      ? (e.date.slice(5) === md && e.date <= ds)
-      : (ds >= e.date && ds <= sidsteDag(e)))
+    .filter(e => {
+      if(undtagelser.has(e.id + "|" + ds)) return false;
+      if(e.gentag) return rammer(e.gentag, e.date, ds);
+      if(e.yearly) return e.date.slice(5) === md && e.date <= ds;
+      return ds >= e.date && ds <= sidsteDag(e);
+    })
     .sort((a,b) => {
       const ta = sorterTid(a, ds), tb = sorterTid(b, ds);
       if(!ta !== !tb) return ta ? 1 : -1;          // uden klokkeslæt står øverst
@@ -1277,20 +1348,249 @@ function eventsOn(ds){
     });
 }
 
+/* =======================================================================
+   Gentagelser
+   Reglen gemmes som én streng i RRULE-stil (RFC 5545), fx
+   FREQ=WEEKLY;INTERVAL=2;BYDAY=SU. Startdatoen på aftalen eller
+   opgaven er ankeret — reglen siger kun hvordan der tælles derfra.
+   ======================================================================= */
+const UGE_KODER = ["MO","TU","WE","TH","FR","SA","SU"];
+const ugeIndex  = d => (d.getDay()+6)%7;
+const sidsteIMaaned = d => new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+const storBogstav = t => t.charAt(0).toUpperCase() + t.slice(1);
+
+function parseRegel(s){
+  if(!s) return null;
+  const o = { freq:"", interval:1, byday:[], bymonthday:0, bysetpos:0, until:"" };
+  String(s).split(";").forEach(del => {
+    const i = del.indexOf("=");
+    if(i < 0) return;
+    const k = del.slice(0,i), v = del.slice(i+1);
+    if(k === "FREQ") o.freq = v;
+    else if(k === "INTERVAL")   o.interval = Math.max(1, parseInt(v,10) || 1);
+    else if(k === "BYDAY")      o.byday = v.split(",").filter(x => UGE_KODER.indexOf(x) > -1);
+    else if(k === "BYMONTHDAY") o.bymonthday = parseInt(v,10) || 0;
+    else if(k === "BYSETPOS")   o.bysetpos = parseInt(v,10) || 0;
+    else if(k === "UNTIL")      o.until = v.length === 8 ? v.slice(0,4)+"-"+v.slice(4,6)+"-"+v.slice(6,8) : v;
+  });
+  return o.freq ? o : null;
+}
+function skrivRegel(o){
+  if(!o || !o.freq) return "";
+  let s = "FREQ=" + o.freq + ";INTERVAL=" + (o.interval || 1);
+  if(o.byday && o.byday.length) s += ";BYDAY=" + o.byday.join(",");
+  if(o.bymonthday) s += ";BYMONTHDAY=" + o.bymonthday;
+  if(o.bysetpos)   s += ";BYSETPOS="   + o.bysetpos;
+  if(o.until)      s += ";UNTIL="      + o.until.replace(/-/g,"");
+  return s;
+}
+/* Er ds en forekomst af reglen, når serien starter på anker? */
+function rammer(regel, anker, ds){
+  const r = parseRegel(regel);
+  if(!r || !anker || ds < anker) return false;
+  if(r.until && ds > r.until) return false;
+  const a = fromIso(anker), d = fromIso(ds), n = r.interval || 1;
+  if(r.freq === "DAILY")  return dageMellem(anker, ds) % n === 0;
+  if(r.freq === "WEEKLY"){
+    const dage = r.byday.length ? r.byday : [UGE_KODER[ugeIndex(a)]];
+    if(dage.indexOf(UGE_KODER[ugeIndex(d)]) < 0) return false;
+    const uger = Math.round((mondayOf(d) - mondayOf(a)) / 604800000);
+    return uger >= 0 && uger % n === 0;
+  }
+  if(r.freq === "MONTHLY"){
+    const mdr = (d.getFullYear()-a.getFullYear())*12 + (d.getMonth()-a.getMonth());
+    if(mdr < 0 || mdr % n !== 0) return false;
+    if(r.bysetpos && r.byday.length){
+      if(UGE_KODER[ugeIndex(d)] !== r.byday[0]) return false;
+      if(r.bysetpos === -1) return d.getDate() + 7 > sidsteIMaaned(d);
+      return Math.ceil(d.getDate()/7) === r.bysetpos;
+    }
+    if(r.bymonthday === -1) return d.getDate() === sidsteIMaaned(d);
+    return d.getDate() === (r.bymonthday || a.getDate());
+  }
+  if(r.freq === "YEARLY"){
+    const aar = d.getFullYear() - a.getFullYear();
+    return aar >= 0 && aar % n === 0 && ds.slice(5) === anker.slice(5);
+  }
+  return false;
+}
+/* Første forekomst fra og med fraDs. Tom streng hvis serien er løbet ud. */
+function foersteForekomst(regel, anker, fraDs){
+  const r = parseRegel(regel); if(!r) return "";
+  let d = fromIso(fraDs < anker ? anker : fraDs);
+  for(let i = 0; i < 1500; i++){
+    const ds = iso(d);
+    if(r.until && ds > r.until) return "";
+    if(rammer(regel, anker, ds)) return ds;
+    d = addDays(d, 1);
+  }
+  return "";
+}
+const naesteForekomst = (regel, anker, efterDs) =>
+  foersteForekomst(regel, anker, iso(addDays(fromIso(efterDs), 1)));
+/* Sidste forekomst til og med tilDs — bruges når en serie skal klippes over. */
+function sidsteForekomst(regel, anker, tilDs){
+  if(tilDs < anker) return "";
+  let d = fromIso(tilDs);
+  for(let i = 0; i < 1500; i++){
+    const ds = iso(d);
+    if(ds < anker) return "";
+    if(rammer(regel, anker, ds)) return ds;
+    d = addDays(d, -1);
+  }
+  return "";
+}
+/* Reglen sagt på dansk. */
+function gentagTekst(regel, anker){
+  const r = parseRegel(regel); if(!r) return "";
+  const n = r.interval || 1;
+  let s = "";
+  if(r.freq === "DAILY") s = n === 1 ? "hver dag" : "hver " + n + ". dag";
+  else if(r.freq === "WEEKLY"){
+    const dage = (r.byday.length ? r.byday : [UGE_KODER[ugeIndex(fromIso(anker))]])
+      .map(k => UGEDAGE[UGE_KODER.indexOf(k)]);
+    const liste = dage.length > 1
+      ? dage.slice(0,-1).join(", ") + " og " + dage[dage.length-1]
+      : dage[0];
+    s = n === 1 ? "hver " + liste : "hver " + n + ". uge på " + liste;
+  }
+  else if(r.freq === "MONTHLY"){
+    const m = n === 1 ? "hver måned" : "hver " + n + ". måned";
+    if(r.bymonthday === -1) s = "sidste dag i måneden, " + m;
+    else if(r.bysetpos && r.byday.length){
+      const nav = UGEDAGE[UGE_KODER.indexOf(r.byday[0])];
+      s = (r.bysetpos === -1 ? "sidste " + nav : r.bysetpos + ". " + nav) + " i måneden, " + m;
+    }
+    else s = "den " + (r.bymonthday || fromIso(anker).getDate()) + ". " + m;
+  }
+  else if(r.freq === "YEARLY") s = n === 1 ? "hvert år" : "hvert " + n + ". år";
+  if(r.until) s += " indtil " + datoTekst(r.until);
+  return s;
+}
+/* Enkeltdage der er sprunget over. Nøgle: aftaleId|dato */
+const undtagelser = new Set();
+
+/* -----------------------------------------------------------------------
+   Vælgeren. Samme opbygning to steder: aftaler (f-) og opgaver (o-).
+   ----------------------------------------------------------------------- */
+function gentagWidget(pfx, datoFeltId, ekstraFeltId){
+  const el = s => document.getElementById(pfx + "-" + s);
+  let valgteDage = new Set();
+  let maanedValg = "dag";                 // dag | ugedag | sidste
+  let ugeAuto    = true;                  // ugedagen følger datoen indtil man selv vælger
+
+  const anker = () => document.getElementById(datoFeltId).value || iso(new Date());
+
+  function fyldInterval(){
+    const f = el("gentag").value;
+    const ord = f === "DAILY" ? "dag" : f === "WEEKLY" ? "uge" : f === "MONTHLY" ? "måned" : "år";
+    const nu = el("interval").value || "1";
+    let h = "";
+    for(let i = 1; i <= 12; i++){
+      const t = ord === "år"
+        ? (i === 1 ? "Hvert år" : "Hvert " + i + ". år")
+        : (i === 1 ? "Hver " + ord : "Hver " + i + ". " + ord);
+      h += '<option value="' + i + '">' + t + '</option>';
+    }
+    el("interval").innerHTML = h;
+    el("interval").value = nu;
+  }
+  function tegnUge(){
+    el("uge").innerHTML = UGE_KODER.map((k,i) =>
+      '<button type="button" class="pchip" data-ug="' + k + '" aria-pressed="'
+      + valgteDage.has(k) + '">' + storBogstav(UGEDAGE_KORT[i]) + '</button>').join("");
+  }
+  function tegnMaaned(){
+    const d = fromIso(anker());
+    const valg = [
+      ["dag",    "Den " + d.getDate() + "."],
+      ["ugedag", Math.ceil(d.getDate()/7) + ". " + UGEDAGE[ugeIndex(d)]],
+      ["sidste", "Sidste dag i måneden"]
+    ];
+    el("maaned").innerHTML = valg.map(([v,t]) =>
+      '<button type="button" class="pchip" data-mv="' + v + '" aria-pressed="'
+      + (maanedValg === v) + '">' + t + '</button>').join("");
+  }
+  function opdater(){
+    const f = el("gentag").value;
+    el("gentag-mere").hidden = !f;
+    if(ekstraFeltId) document.getElementById(ekstraFeltId).hidden = f !== "DAILY";
+    if(!f){ el("gsum").textContent = ""; return; }
+    el("uge-felt").hidden    = f !== "WEEKLY";
+    el("maaned-felt").hidden = f !== "MONTHLY";
+    if(f === "WEEKLY" && (ugeAuto || !valgteDage.size))
+      valgteDage = new Set([UGE_KODER[ugeIndex(fromIso(anker()))]]);
+    tegnUge(); tegnMaaned();
+    const t = gentagTekst(hent(), anker());
+    el("gsum").textContent = t ? "Gentages " + t : "";
+  }
+  function hent(){
+    const f = el("gentag").value; if(!f) return "";
+    const o = { freq:f, interval: parseInt(el("interval").value,10) || 1,
+                byday:[], bymonthday:0, bysetpos:0, until: el("gslut").value || "" };
+    if(f === "WEEKLY") o.byday = UGE_KODER.filter(k => valgteDage.has(k));
+    if(f === "MONTHLY"){
+      const d = fromIso(anker());
+      if(maanedValg === "sidste") o.bymonthday = -1;
+      else if(maanedValg === "ugedag"){ o.byday = [UGE_KODER[ugeIndex(d)]]; o.bysetpos = Math.ceil(d.getDate()/7); }
+      else o.bymonthday = d.getDate();
+    }
+    return skrivRegel(o);
+  }
+  function saet(regel){
+    const r = parseRegel(regel);
+    valgteDage = new Set();
+    maanedValg = "dag";
+    el("gentag").value = r ? r.freq : "";
+    fyldInterval();
+    el("interval").value = r ? String(r.interval || 1) : "1";
+    el("gslut").value = (r && r.until) ? r.until : "";
+    ugeAuto = !(r && r.freq === "WEEKLY" && r.byday.length);
+    if(r && r.freq === "WEEKLY") (r.byday || []).forEach(k => valgteDage.add(k));
+    if(r && r.freq === "MONTHLY"){
+      if(r.bymonthday === -1) maanedValg = "sidste";
+      else if(r.bysetpos)     maanedValg = "ugedag";
+    }
+    opdater();
+  }
+  el("gentag").addEventListener("change", () => { ugeAuto = true; fyldInterval(); opdater(); });
+  el("interval").addEventListener("change", opdater);
+  el("gslut").addEventListener("change", opdater);
+  el("uge").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-ug]"); if(!b) return;
+    const k = b.dataset.ug;
+    ugeAuto = false;
+    if(valgteDage.has(k)){ if(valgteDage.size > 1) valgteDage.delete(k); }
+    else valgteDage.add(k);
+    opdater();
+  });
+  el("maaned").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-mv]"); if(!b) return;
+    maanedValg = b.dataset.mv;
+    opdater();
+  });
+  document.getElementById(datoFeltId).addEventListener("change", () => {
+    if(el("gentag").value) opdater();
+  });
+  return { saet, hent, opdater, vaerdi: () => el("gentag").value };
+}
+const gAftale = gentagWidget("f", "f-date");
+const gOpgave = gentagWidget("o", "o-deadline", "o-fraudf-felt");
+
 /* ---------- Oversættelse mellem database og app ---------- */
 const hhmm = t => t ? String(t).slice(0,5) : "";
 const fraRaekke = r => ({
   id: r.id, date: r.dato, endDate: r.slut_dato || "", allDay: r.heldags,
   start: hhmm(r.start_tid), end: hhmm(r.slut_tid),
   title: r.titel, desc: r.beskrivelse || "",
-  yearly: r.aarlig, people: r.personer || []
+  yearly: r.aarlig, gentag: r.gentag || "", people: r.personer || []
 });
 const tilRaekke = e => ({
   dato: e.date, slut_dato: e.endDate || null, heldags: e.allDay,
   start_tid: e.allDay ? null : (e.start || null),
   slut_tid: (e.allDay || !e.end) ? null : e.end,
   titel: e.title, beskrivelse: e.desc || "",
-  aarlig: e.yearly, personer: e.people
+  aarlig: e.yearly, gentag: e.gentag || null, personer: e.people
 });
 
 /* =======================================================================
@@ -1308,7 +1608,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
@@ -1318,7 +1618,8 @@ async function hentAlt(forsoeg){
     sb.from("indkoeb_ekstra").select("*"),
     sb.from("opgaver").select("*"),
     sb.from("skraldedage").select("*"),
-    sb.from("ferier").select("*")
+    sb.from("ferier").select("*"),
+    sb.from("gentag_undtag").select("*")
   ]);
 
   const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
@@ -1332,6 +1633,9 @@ async function hentAlt(forsoeg){
     vis("Kunne ikke hente data: " + fejl.message);
     return;
   }
+  undtagelser.clear();
+  (gRes.data || []).forEach(r => undtagelser.add(r.aftale_id + "|" + r.dato));
+
   sidsteHentning = Date.now();
   retter       = rRes.data || [];
   ingredienser = iRes.data || [];
@@ -2875,6 +3179,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"opgaver" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"skraldedage" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"ferier" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"gentag_undtag" }, () => hentAlt())
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
@@ -3011,8 +3316,8 @@ function renderDay(){
          +   '<div class="time">'+ tidHtml + spand + '</div>'
          +   '<span class="stem"></span>'
          +   '<div class="body">'
-         +     '<button class="ev'+(erFoedselsdag(e)?" fdag":"")+'" data-ev="'+e.id+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
-         +       '<span class="t"><span>'+(erFoedselsdag(e)?FLAG_IKON(15):"")+esc(e.title)+(e.yearly?' <span aria-label="gentages hvert år">↻</span>':'')+'</span>'+dotsEl(e.people,"lg")+'</span>'
+         +     '<button class="ev'+(erFoedselsdag(e)?" fdag":"")+'" data-ev="'+e.id+'" data-evdato="'+ds+'" style="border-left-color:'+(p0?farveFor(p0):"var(--line)")+'">'
+         +       '<span class="t"><span>'+(erFoedselsdag(e)?FLAG_IKON(15):"")+esc(e.title)+((e.gentag||e.yearly)?' <span class="gmaerke" aria-label="gentages">↻</span>':'')+'</span>'+dotsEl(e.people,"lg")+'</span>'
          +       (e.desc ? '<span class="d">'+esc(e.desc)+'</span>' : '')
          +     '</button>'
          +   '</div>'
@@ -3326,7 +3631,7 @@ document.getElementById("stage").addEventListener("click", async ev => {
   if(agn){ await vendAgnesDag(); return; }
   const fer = ev.target.closest("[data-ferie]");
   if(fer){ aabnFerie(fer.dataset.ferie); return; }
-  if(evb){ openDetail(evb.dataset.ev); return; }
+  if(evb){ openDetail(evb.dataset.ev, evb.dataset.evdato || iso(cursor)); return; }
   if(week){ cursor = fromIso(week.dataset.week); setView("week"); return; }
   if(goto){ cursor = fromIso(goto.dataset.goto); setView("day"); return; }
 });
@@ -3351,14 +3656,17 @@ async function vendAgnesDag(){
 
 /* ---------- Detaljer ---------- */
 let openEventId = null;
+let openEventDato = "";
 const show = id => document.getElementById(id).classList.add("open");
 const hide = id => document.getElementById(id).classList.remove("open");
 
-function openDetail(id){
+function openDetail(id, ds){
   const e = events.find(x => x.id === id); if(!e) return;
   openEventId = id;
+  const loeber = !!(e.gentag || e.yearly);
+  openEventDato = (loeber && ds) ? ds : e.date;
   document.getElementById("detail-title").textContent = e.title;
-  const d = fromIso(e.date), wd = UGEDAGE[(d.getDay()+6)%7];
+  const d = fromIso(loeber ? openEventDato : e.date), wd = UGEDAGE[(d.getDay()+6)%7];
   let naar = wd + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
   if(sidsteDag(e) !== e.date){
     const s2 = fromIso(sidsteDag(e));
@@ -3366,8 +3674,9 @@ function openDetail(id){
          + s2.getDate() + ". " + MAANEDER[s2.getMonth()]
          + " (" + (dageMellem(e.date, sidsteDag(e)) + 1) + " dage)";
   }
+  const gTekst = e.gentag ? gentagTekst(e.gentag, e.date) : (e.yearly ? "hvert år" : "");
   document.getElementById("detail-meta").textContent =
-    timeLabel(e) + " · " + naar + (e.yearly ? " · gentages hvert år" : "");
+    timeLabel(e) + " · " + naar + (gTekst ? " · gentages " + gTekst : "");
   const dd = document.getElementById("detail-desc");
   dd.textContent = e.desc || "";
   dd.style.display = e.desc ? "block" : "none";
@@ -3380,10 +3689,51 @@ document.getElementById("detail-close").onclick = () => hide("detail-back");
 document.getElementById("detail-edit").onclick  = () => { hide("detail-back"); openEditor(openEventId); };
 document.getElementById("detail-delete").onclick = () => {
   const e = events.find(x => x.id === openEventId);
-  document.getElementById("confirm-meta").textContent = e ? '"'+e.title+'" fjernes fra kalenderen.' : "";
+  const loeber = !!(e && (e.gentag || e.yearly));
+  document.getElementById("confirm-h").textContent = loeber ? "Slet den gentagne aftale?" : "Slet aftalen?";
+  document.getElementById("confirm-meta").textContent = !e ? ""
+    : loeber
+      ? '"' + e.title + '" gentages ' + gentagTekst(e.gentag || "FREQ=YEARLY;INTERVAL=1", e.date) + ". Hvad skal væk?"
+      : '"' + e.title + '" fjernes fra kalenderen.';
+  document.getElementById("confirm-serie").hidden = !loeber;
+  document.getElementById("confirm-yes").textContent = loeber ? "Hele serien" : "Slet";
   show("confirm-back");
 };
 document.getElementById("confirm-no").onclick = () => hide("confirm-back");
+
+/* Kun denne ene dag: dagen lægges i undtagelserne. */
+document.getElementById("confirm-kun").onclick = async () => {
+  const id = openEventId, ds = openEventDato;
+  if(!id || !ds) return;
+  undtagelser.add(id + "|" + ds);
+  hide("confirm-back"); hide("detail-back"); render();
+  const { error } = await sb.from("gentag_undtag").insert({ aftale_id: id, dato: ds });
+  if(error){ undtagelser.delete(id + "|" + ds); render(); vis("Kunne ikke gemme: " + error.message); }
+};
+
+/* Denne og fremover: serien klippes af dagen før. Er der ingen tidligere
+   forekomster, er der ikke noget at bevare, og hele rækken ryger. */
+document.getElementById("confirm-fremover").onclick = async () => {
+  const id = openEventId, ds = openEventDato;
+  const e = events.find(x => x.id === id); if(!e || !ds) return;
+  const regel = e.gentag || "FREQ=YEARLY;INTERVAL=1";
+  const foer  = iso(addDays(fromIso(ds), -1));
+  const sidst = sidsteForekomst(regel, e.date, foer);
+  if(!sidst){
+    const { error } = await sb.from("aftaler").delete().eq("id", id);
+    if(error){ vis("Kunne ikke slette: " + error.message); return; }
+    events = events.filter(x => x.id !== id);
+  } else {
+    const gr = parseRegel(regel); gr.until = foer;
+    const klip = { gentag: skrivRegel(gr), aarlig: false };
+    const { error } = await sb.from("aftaler").update(klip).eq("id", id);
+    if(error){ vis("Kunne ikke gemme: " + error.message); return; }
+    const i = events.findIndex(x => x.id === id);
+    if(i > -1){ events[i].gentag = klip.gentag; events[i].yearly = false; }
+  }
+  hide("confirm-back"); hide("detail-back"); render();
+};
+
 document.getElementById("confirm-yes").onclick = async () => {
   const id = openEventId;
   const { error } = await sb.from("aftaler").delete().eq("id", id);
@@ -3427,7 +3777,8 @@ function saetSlags(slags){
     b.setAttribute("aria-pressed", String(b.dataset.slags === slags)));
   document.getElementById("f-people-felt").hidden = erFerie;
   document.getElementById("f-allday-felt").hidden = erFerie;
-  document.getElementById("f-yearly-felt").hidden = erFerie;
+  document.getElementById("f-gentag-felt").hidden = erFerie;
+  if(erFerie) document.getElementById("f-gentag-mere").hidden = true;
   document.getElementById("f-title").placeholder = erFerie ? "Behøver ikke et navn" : "Fx tandlæge";
   document.getElementById("f-enddate-mrk").textContent = erFerie ? "Sidste dag" : "Slutdato";
   document.getElementById("edit-meta").textContent = erFerie
@@ -3446,24 +3797,24 @@ document.getElementById("f-slags").addEventListener("click", ev => {
   if(b) saetSlags(b.dataset.slags);
 });
 
-/* En aftale kan enten strække sig over flere dage eller gentages hvert
-   år — ikke begge dele. Det ene felt slukker for det andet. */
+/* En aftale kan enten strække sig over flere dage eller gentage sig —
+   ikke begge dele. Det ene felt slukker for det andet. */
 function syncSpand(){
   const start = document.getElementById("f-date").value;
   const slut  = document.getElementById("f-enddate").value;
-  const aarlig = document.getElementById("f-yearly");
   /* Strækker aftalen sig over flere dage, hører klokkeslættene til
      hver sin ende — det skal etiketterne også sige. */
   const overFlere = !!(start && slut && slut > start && formSlags === "aftale");
   document.getElementById("f-start-mrk").textContent = overFlere ? "Første dag fra" : "Start";
   document.getElementById("f-end-mrk").textContent   = overFlere ? "Sidste dag til" : "Slut";
-  if(formSlags === "ferie"){ aarlig.disabled = false; document.getElementById("f-enddate").disabled = false; return; }
+  const g = document.getElementById("f-gentag");
+  if(formSlags === "ferie"){ g.disabled = true; document.getElementById("f-enddate").disabled = false; return; }
   const flerdags = !!(start && slut && slut > start);
-  if(flerdags && aarlig.checked) aarlig.checked = false;
-  aarlig.disabled = flerdags;
-  document.getElementById("f-enddate").disabled = aarlig.checked;
+  if(flerdags && g.value){ g.value = ""; gAftale.opdater(); }
+  g.disabled = flerdags;
+  document.getElementById("f-enddate").disabled = !!g.value;
 }
-["f-date","f-enddate","f-yearly"].forEach(id =>
+["f-date","f-enddate","f-gentag"].forEach(id =>
   document.getElementById(id).addEventListener("change", syncSpand));
 
 function openEditor(id){
@@ -3477,6 +3828,7 @@ function openEditor(id){
   document.getElementById("f-enddate").value = e ? (e.endDate || "") : "";
   document.getElementById("f-allday").checked = e ? !!e.allDay : false;
   document.getElementById("f-yearly").checked = e ? !!e.yearly : false;
+  gAftale.saet(e ? (e.gentag || (e.yearly ? "FREQ=YEARLY;INTERVAL=1" : "")) : "");
   document.getElementById("f-start").value = e ? (e.start||"") : "";
   document.getElementById("f-end").value   = e ? (e.end||"") : "";
   chosen = new Set(e ? e.people : []);
@@ -3501,6 +3853,7 @@ function openFerieEditor(f){
   document.getElementById("f-enddate").value = f ? f.slut_dato  : iso(cursor);
   document.getElementById("f-allday").checked = false;
   document.getElementById("f-yearly").checked = false;
+  gAftale.saet("");
   chosen = new Set();
   drawPeopleChips();
   ["f-title-err","f-people-err","f-time-err","f-date-err"].forEach(i =>
@@ -3562,12 +3915,51 @@ document.getElementById("edit-save").onclick = async () => {
     allDay,
     start:  allDay ? "" : start,
     end:    allDay ? "" : slut,
-    yearly: document.getElementById("f-yearly").checked,
+    yearly: false,
+    gentag: "",
     people: [...chosen]
   };
 
+  /* En ren årlig gentagelse sættes ogsaa som aarlig=true, saa en ældre
+     udgave af filen viser aftalen præcis som før. */
+  const regel = overFlereDage ? "" : gAftale.hent();
+  const rr = parseRegel(regel);
+  data.gentag = regel;
+  data.yearly = !!(rr && rr.freq === "YEARLY" && (rr.interval || 1) === 1 && !rr.until);
+
   const knap = document.getElementById("edit-save");
   knap.disabled = true; knap.textContent = "Gemmer …";
+
+  /* Ændrer man en aftale der allerede har kørt, maa det kun gælde i dag og
+     frem. Den gamle serie klippes af i gaar, og en ny lægges ved siden af. */
+  const gl = editingId ? events.find(x => x.id === editingId) : null;
+  const gammelRegel = gl ? (gl.gentag || (gl.yearly ? "FREQ=YEARLY;INTERVAL=1" : "")) : "";
+  const idagDs = iso(new Date());
+  if(gl && gammelRegel && gl.date < idagDs){
+    const igaar = iso(addDays(new Date(), -1));
+    const sidst = sidsteForekomst(gammelRegel, gl.date, igaar);
+    let nyDato = data.date;
+    if(nyDato < idagDs) nyDato = foersteForekomst(gammelRegel, gl.date, idagDs) || idagDs;
+    const nyData = Object.assign({}, data, { date: nyDato });
+
+    if(sidst){
+      const gr = parseRegel(gammelRegel);
+      gr.until = igaar;
+      const klip = { gentag: skrivRegel(gr), aarlig: false };
+      const { error } = await sb.from("aftaler").update(klip).eq("id", editingId);
+      if(error){ knap.disabled = false; knap.textContent = "Gem"; vis("Kunne ikke gemme: " + error.message); return; }
+      const gi = events.findIndex(x => x.id === editingId);
+      if(gi > -1){ events[gi].gentag = klip.gentag; events[gi].yearly = false; }
+    } else {
+      await sb.from("aftaler").delete().eq("id", editingId);
+      events = events.filter(x => x.id !== editingId);
+    }
+    const { data: nyRows, error: nyFejl } = await sb.from("aftaler").insert(tilRaekke(nyData)).select();
+    knap.disabled = false; knap.textContent = "Gem";
+    if(nyFejl){ vis("Kunne ikke gemme: " + nyFejl.message); return; }
+    if(nyRows && nyRows[0]) events.push(fraRaekke(nyRows[0]));
+    hide("edit-back"); render(); return;
+  }
 
   if(editingId){
     const { data: rows, error } = await sb.from("aftaler").update(tilRaekke(data)).eq("id", editingId).select();
