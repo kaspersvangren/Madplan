@@ -191,6 +191,10 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .retkort .under{font-size:13px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
 .mark{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:600}
 .mark.tilbehoer{background:transparent;border:1px solid var(--line)}
+.mark.frost{background:rgba(70,140,210,.16);color:#2f6fa8;font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2ec}
+.frostinfo{font-size:13px;color:var(--muted);margin:-4px 0 10px 95px}
+.frostinfo.advarsel{color:var(--holiday);font-weight:600}
 
 .ingliste{margin:4px 0 0;padding:0;list-style:none;font-size:15px}
 .ingliste li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
@@ -243,14 +247,16 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .boks{
   width:23px;height:23px;border:2px solid var(--muted);border-radius:7px;flex:none;margin-top:1px;
   display:grid;place-items:center;color:transparent;background:none;
+  padding:0;box-sizing:border-box;line-height:0;
 }
 .boks:hover{border-color:var(--line-strong)}
 .boks.sat{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.boks svg{display:block}
 .opgkort .midt{flex:1;min-width:0}
-.opgkort .titel{font-weight:600;font-size:16px}
+.opgkort .titel{display:block;font-weight:600;font-size:16px}
 .opgkort .note{font-size:13px;color:var(--muted);margin-top:2px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.opgkort .frist{font-size:13px;color:var(--muted);margin-top:3px}
+.opgkort .frist{display:block;font-size:13px;color:var(--muted);margin-top:3px}
 .opgkort .frist.over{color:var(--holiday);font-weight:600}
 .opgkort.klaret .titel{text-decoration:line-through;color:var(--muted)}
 .gruppetop{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
@@ -697,6 +703,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <label class="check"><input type="checkbox" id="r-agnes"> Agnes kan lide</label>
     <label class="check"><input type="checkbox" id="r-tilbehoer"> Det her er tilbehør</label>
 
+    <div class="valgrad" style="margin-top:12px">
+      <span class="etiket">I fryseren</span>
+      <span class="vaerdi trin">
+        <button id="r-frost-minus" type="button" aria-label="Færre">–</button>
+        <span class="tal" id="r-frost-tal">0</span>
+        <button id="r-frost-plus" type="button" aria-label="Flere">+</button>
+      </span>
+    </div>
+    <div class="frostinfo" id="r-frost-info"></div>
+
     <div class="gruppe">Ingredienser til indkøbslisten</div>
     <div id="r-ing"></div>
     <button class="tilfoej" id="r-ing-tilfoej">
@@ -750,6 +766,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
         <button id="dag-plus" aria-label="Flere">+</button>
       </span>
     </div>
+    <div class="valgrad" id="dag-fryser-rad" hidden>
+      <span class="etiket">Fra fryseren</span>
+      <span class="vaerdi trin">
+        <button id="dag-fryser-minus" type="button" aria-label="Færre">–</button>
+        <span class="tal" id="dag-fryser-tal">0</span>
+        <button id="dag-fryser-plus" type="button" aria-label="Flere">+</button>
+      </span>
+    </div>
+    <div class="frostinfo" id="dag-fryser-info" hidden></div>
+
     <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — udelad fra indkøb</label>
 
     <div style="margin-top:14px">
@@ -778,6 +804,38 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <div class="filtre" id="vaelg-filtre"></div>
     <div class="vaelgliste" id="vaelg-liste"></div>
     <div class="actions"><button class="btn" id="vaelg-fortryd">Fortryd</button></div>
+  </div>
+</div>
+
+<!-- Madplan: tag fra fryseren? -->
+<div class="backdrop" id="fryser-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Der står portioner i fryseren</h2>
+    <div class="meta" id="fryser-meta"></div>
+    <div class="valgrad" style="margin-top:12px">
+      <span class="etiket">Tag med</span>
+      <span class="vaerdi trin">
+        <button id="fryser-minus" type="button" aria-label="Færre">–</button>
+        <span class="tal" id="fryser-tal">1</span>
+        <button id="fryser-plus" type="button" aria-label="Flere">+</button>
+      </span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="fryser-nej">Nej tak</button>
+      <button class="btn primary" id="fryser-ja">Tag fra fryseren</button>
+    </div>
+  </div>
+</div>
+
+<!-- Opgave: bekræft sletning -->
+<div class="backdrop" id="opgslet-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Slet opgaven?</h2>
+    <div class="meta" id="opgslet-meta"></div>
+    <div class="actions">
+      <button class="btn" id="opgslet-nej">Behold</button>
+      <button class="btn primary" id="opgslet-ja">Slet</button>
+    </div>
   </div>
 </div>
 
@@ -973,7 +1031,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.12.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.13.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1257,6 +1315,10 @@ async function hentAlt(forsoeg){
     }
   }
   render();
+
+  /* Passerede dage skrives af fryserlageret. Sker efter render, så
+     opstarten ikke venter på det.                                    */
+  afskrivFrost();
 }
 
 
@@ -1312,6 +1374,7 @@ let soegning = "";
 const filtre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };   // fri | krav | uden
 const FILTERNAVNE = { vegetar:"Vegetar", nem:"Nem ret", agnes_kan_lide:"Agnes kan lide" };
 let visTilbehoer = false;
+let visKunFrost = false;
 
 function ingredienserFor(retId){
   return ingredienser.filter(i => i.ret_id === retId)
@@ -1328,6 +1391,60 @@ function dageSiden(ds){
   return Math.round((fromIso(iso(new Date())) - fromIso(ds)) / 86400000);
 }
 
+/* ---------- Frostlager ----------
+   Antallet står på RETTEN (retter.frost_lager). Reservationen står på
+   DAGEN (madplan.frost_reserveret). Ledigt = lager minus alt det de
+   kommende dage allerede har lovet væk, så samme portion aldrig kan
+   loves to gange. Når dagen er passeret, skrives reservationen af
+   lageret én gang og dagen mærkes med frost_afskrevet.               */
+const frostLager = retId => {
+  const r = retter.find(x => x.id === retId);
+  return r && r.frost_lager > 0 ? r.frost_lager : 0;
+};
+function frostReserveret(retId, undtagenDato){
+  if(!retId) return 0;
+  const idag = iso(new Date());
+  return madplanDage.reduce((sum, m) =>
+    (m.ret_id === retId && m.dato >= idag && !m.frost_afskrevet && m.dato !== undtagenDato)
+      ? sum + (m.frost_reserveret || 0) : sum, 0);
+}
+// Hvor mange der kan loves væk — set fra en bestemt dag, eller fra ingen dag
+const frostLedigt = (retId, undtagenDato) =>
+  Math.max(0, frostLager(retId) - frostReserveret(retId, undtagenDato));
+
+const frostMaerke = retId => {
+  const l = frostLager(retId);
+  return l > 0 ? '<span class="mark frost">❄ '+l+'</span>' : "";
+};
+
+/* Skriver passerede dage af lageret. Dagen mærkes først — den opdatering
+   rammer kun hvis ingen anden enhed nåede det først, så der ikke trækkes
+   dobbelt når tabletten og telefonen åbner appen samtidig.            */
+async function afskrivFrost(){
+  const idag = iso(new Date());
+  const skyldige = madplanDage.filter(m =>
+    m.dato < idag && (m.frost_reserveret || 0) > 0 && !m.frost_afskrevet);
+  if(!skyldige.length) return;
+
+  let noget = false;
+  for(const m of skyldige){
+    const { data: krav, error } = await sb.from("madplan")
+      .update({ frost_afskrevet:true })
+      .eq("dato", m.dato).eq("frost_afskrevet", false).select();
+    if(error || !krav || !krav.length) continue;      // en anden nåede det
+    m.frost_afskrevet = true;
+
+    const r = retter.find(x => x.id === m.ret_id);
+    if(!r) continue;
+    const nyt = Math.max(0, (r.frost_lager || 0) - m.frost_reserveret);
+    const { error: f2 } = await sb.from("retter").update({ frost_lager:nyt }).eq("id", r.id);
+    if(f2) continue;
+    r.frost_lager = nyt;
+    noget = true;
+  }
+  if(noget) render();
+}
+
 function tegnFiltre(){
   const naeste = { fri:"krav", krav:"uden", uden:"fri" };
   const tegn = { fri:"", krav:"✓", uden:"✕" };
@@ -1336,17 +1453,21 @@ function tegnFiltre(){
       '<button class="fchip" data-filter="'+n+'" data-stand="'+filtre[n]+'">'
       + (tegn[filtre[n]] ? '<span>'+tegn[filtre[n]]+'</span>' : '')
       + FILTERNAVNE[n] + '</button>').join("")
-    + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'">Tilbehør</button>';
+    + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'">Tilbehør</button>'
+    + '<button class="fchip" data-frost="1" data-stand="'+(visKunFrost?"krav":"fri")+'">❄ I fryseren</button>';
   void naeste;
 }
 document.getElementById("filtre").addEventListener("click", ev => {
   const f = ev.target.closest("[data-filter]");
   const t = ev.target.closest("[data-tilbehoer]");
+  const fr = ev.target.closest("[data-frost]");
   if(f){
     const naeste = { fri:"krav", krav:"uden", uden:"fri" };
     filtre[f.dataset.filter] = naeste[filtre[f.dataset.filter]];
   } else if(t){
     visTilbehoer = !visTilbehoer;
+  } else if(fr){
+    visKunFrost = !visKunFrost;
   } else return;
   tegnFiltre();
   render();
@@ -1365,6 +1486,7 @@ document.getElementById("soeg").addEventListener("input", ev => {
 function filtreredeRetter(){
   return retter.filter(r => {
     if(!!r.er_tilbehoer !== visTilbehoer) return false;
+    if(visKunFrost && frostLager(r.id) === 0) return false;
     for(const n of Object.keys(FILTERNAVNE)){
       if(filtre[n] === "krav" && !r[n]) return false;
       if(filtre[n] === "uden" &&  r[n]) return false;
@@ -1391,7 +1513,8 @@ function renderKogebog(){
       r.vegetar && '<span class="mark">vegetar</span>',
       r.nem && '<span class="mark">nem</span>',
       r.agnes_kan_lide && '<span class="mark">Agnes</span>',
-      r.er_tilbehoer && '<span class="mark tilbehoer">tilbehør</span>'
+      r.er_tilbehoer && '<span class="mark tilbehoer">tilbehør</span>',
+      frostMaerke(r.id)
     ].filter(Boolean).join(" ");
     const sidstTekst = sidst
       ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
@@ -1428,7 +1551,21 @@ function aabnRet(id){
       + '</ul>';
   };
 
-  let h = gruppe("Skal købes", "koeb") + gruppe("Tjek om vi har", "tjek");
+  // Hurtig optælling af fryseren — det er her man står med posen i hånden
+  const lager = frostLager(id), lovet = frostReserveret(id, null);
+  let h = '<div class="valgrad" style="margin-top:4px">'
+        +   '<span class="etiket">I fryseren</span>'
+        +   '<span class="vaerdi trin">'
+        +     '<button id="ret-frost-minus" type="button" aria-label="Færre">–</button>'
+        +     '<span class="tal" id="ret-frost-tal">'+lager+'</span>'
+        +     '<button id="ret-frost-plus" type="button" aria-label="Flere">+</button>'
+        +   '</span>'
+        + '</div>'
+        + '<div class="frostinfo'+(lovet > lager ? " advarsel" : "")+'" id="ret-frost-info">'
+        +   (lovet ? lovet + " lovet væk · " + Math.max(0, lager - lovet) + " ledig" + (lager - lovet === 1 ? "" : "e") : "")
+        + '</div>';
+
+  h += gruppe("Skal købes", "koeb") + gruppe("Tjek om vi har", "tjek");
 
   // Skærmlåsen giver kun mening når opskriften står i appen — et link
   // åbner en anden side, og dér gælder vores lås alligevel ikke.
@@ -1457,6 +1594,23 @@ function aabnRet(id){
     }
   }
   document.getElementById("ret-krop").innerHTML = h;
+
+  const saetFrost = async trin => {
+    const r2 = retter.find(x => x.id === aabenRetId); if(!r2) return;
+    const nyt = Math.max(0, (r2.frost_lager || 0) + trin);
+    if(nyt === (r2.frost_lager || 0)) return;
+    const { error } = await sb.from("retter").update({ frost_lager:nyt }).eq("id", r2.id);
+    if(error){ vis("Kunne ikke gemme fryseren: " + error.message); return; }
+    r2.frost_lager = nyt;
+    const lovet2 = frostReserveret(r2.id, null);
+    document.getElementById("ret-frost-tal").textContent = nyt;
+    const info = document.getElementById("ret-frost-info");
+    info.textContent = lovet2 ? lovet2 + " lovet væk · " + Math.max(0, nyt - lovet2) + " ledig" + (nyt - lovet2 === 1 ? "" : "e") : "";
+    info.classList.toggle("advarsel", lovet2 > nyt);
+    render();
+  };
+  document.getElementById("ret-frost-minus").onclick = () => saetFrost(-1);
+  document.getElementById("ret-frost-plus").onclick  = () => saetFrost(1);
 
   const vaagenKnap = document.getElementById("vaagen-her");
   if(vaagenKnap) vaagenKnap.onclick = async () => {
@@ -1493,6 +1647,19 @@ document.getElementById("retslet-ja").onclick = async () => {
 /* ---------- Ret: redigering ---------- */
 let redigererRetId = null;
 let kladdeIng = [];
+let kladdeFrost = 0;
+
+function tegnKladdeFrost(){
+  document.getElementById("r-frost-tal").textContent = kladdeFrost;
+  const lovet = redigererRetId ? frostReserveret(redigererRetId, null) : 0;
+  const info = document.getElementById("r-frost-info");
+  info.textContent = lovet
+    ? lovet + " er allerede lovet væk på madplanen" + (lovet > kladdeFrost ? " — det er flere end der står her" : "")
+    : "";
+  info.classList.toggle("advarsel", lovet > kladdeFrost);
+}
+document.getElementById("r-frost-minus").onclick = () => { kladdeFrost = Math.max(0, kladdeFrost - 1); tegnKladdeFrost(); };
+document.getElementById("r-frost-plus").onclick  = () => { kladdeFrost = Math.min(99, kladdeFrost + 1); tegnKladdeFrost(); };
 
 function tegnIngRaekker(){
   const navne = [...new Set(ingredienser.map(i => i.navn))].sort((a,b)=>a.localeCompare(b,"da"));
@@ -1550,6 +1717,8 @@ function aabnRetRed(id){
   document.getElementById("r-url").value       = r ? (r.opskrift_url||"") : "";
   document.getElementById("r-opskrift-ing").value = r ? (r.opskrift_ingredienser||"") : "";
   document.getElementById("r-fremgang").value  = r ? (r.fremgangsmaade||"") : "";
+  kladdeFrost = r ? (r.frost_lager || 0) : 0;
+  tegnKladdeFrost();
   kladdeIng = r ? ingredienserFor(id).map(i => ({navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori}))
                 : [{navn:"", maengde:null, enhed:null, kategori:"koeb"}];
   tegnIngRaekker();
@@ -1573,6 +1742,7 @@ document.getElementById("retred-gem").onclick = async () => {
     nem:            document.getElementById("r-nem").checked,
     agnes_kan_lide: document.getElementById("r-agnes").checked,
     er_tilbehoer:   document.getElementById("r-tilbehoer").checked,
+    frost_lager:    kladdeFrost,
     opskrift_url:   document.getElementById("r-url").value.trim(),
     opskrift_ingredienser: document.getElementById("r-opskrift-ing").value.trim(),
     fremgangsmaade: document.getElementById("r-fremgang").value.trim()
@@ -1641,7 +1811,9 @@ async function gemDag(ds, felter){
     ret_navn:  nu.ret_navn || "",
     tilbehoer: Array.isArray(nu.tilbehoer) ? nu.tilbehoer : [],
     portioner: nu.portioner || 1,
-    frost:     nu.frost     || false
+    frost:     nu.frost     || false,
+    frost_reserveret: nu.frost_reserveret || 0,
+    frost_afskrevet:  nu.frost_afskrevet  || false
   }, felter);
 
   const { data, error } = await sb.from("madplan").upsert(raekke, {onConflict:"dato"}).select();
@@ -1674,7 +1846,8 @@ function renderMadplan(){
       if(m.ret_navn) hoved = '<span class="r">' + esc(m.ret_navn) + '</span>';
       (m.tilbehoer || []).forEach(t => under.push(esc(t.navn)));
       if(m.portioner > 1)  under.push("×" + m.portioner);
-      if(m.frost)          under.push("❄ frost eller rest");
+      if(m.frost_reserveret > 0) under.push("❄ " + m.frost_reserveret + " fra fryseren");
+      else if(m.frost)     under.push("❄ frost eller rest");
     }
 
     h += '<button class="dagrad' + (ds === idag ? " idag" : "") + '" data-dag="' + ds + '">'
@@ -1698,7 +1871,8 @@ let dagKladde = null;
 const tomKladde = () => ({
   ret_id:null, ret_navn:"",
   tilbehoer:[],                    // [{id, navn}] — id er tomt for noget tastet i hånden
-  portioner:1, frost:false
+  portioner:1, frost:false,
+  frost_reserveret:0, frost_afskrevet:false
 });
 
 function aabnDag(ds){
@@ -1707,7 +1881,9 @@ function aabnDag(ds){
   dagKladde = m ? {
     ret_id:    m.ret_id, ret_navn: m.ret_navn || "",
     tilbehoer: Array.isArray(m.tilbehoer) ? m.tilbehoer.slice() : [],
-    portioner: m.portioner || 1, frost: !!m.frost
+    portioner: m.portioner || 1, frost: !!m.frost,
+    frost_reserveret: m.frost_reserveret || 0,
+    frost_afskrevet:  !!m.frost_afskrevet
   } : tomKladde();
 
   tegnDagArk();
@@ -1727,6 +1903,37 @@ function tegnDagArk(){
   document.getElementById("dag-tilbehoer").textContent = k.tilbehoer.length ? k.tilbehoer.map(t => t.navn).join(", ") : "—";
   document.getElementById("dag-portioner").textContent = k.portioner;
   document.getElementById("dag-frost").checked         = k.frost;
+
+  /* Fryseren. Linjen vises kun når retten faktisk har noget på lager,
+     eller når denne dag allerede har lovet noget væk.                */
+  const rad  = document.getElementById("dag-fryser-rad");
+  const info = document.getElementById("dag-fryser-info");
+  const lager = k.ret_id ? frostLager(k.ret_id) : 0;
+  const loft  = k.ret_id ? frostLedigt(k.ret_id, aabenDag) : 0;   // uden denne dags egen
+
+  if(k.frost_afskrevet && k.frost_reserveret > 0){
+    rad.hidden = true;
+    info.hidden = false;
+    info.className = "frostinfo";
+    info.textContent = "❄ " + k.frost_reserveret + " er taget fra fryseren";
+  } else if(lager > 0 || k.frost_reserveret > 0){
+    rad.hidden = false;
+    document.getElementById("dag-fryser-tal").textContent = k.frost_reserveret;
+    const andre = frostReserveret(k.ret_id, aabenDag);
+    info.hidden = false;
+    if(loft === 0 && k.frost_reserveret === 0){
+      info.className = "frostinfo advarsel";
+      info.textContent = "Alle " + lager + " portioner er allerede lovet væk på andre dage";
+    } else {
+      info.className = "frostinfo";
+      info.textContent = lager + " i fryseren"
+        + (andre ? " · " + andre + " lovet væk på andre dage" : "")
+        + " · højst " + loft + " her";
+    }
+  } else {
+    rad.hidden = true;
+    info.hidden = true;
+  }
 
   // Kun ting der findes i kogebogen kan man springe til.
   // En engangsret tastet i hånden har intet id og får ingen linje.
@@ -1751,10 +1958,22 @@ document.getElementById("dag-frost").onchange  = ev => { dagKladde.frost = ev.ta
 document.getElementById("dag-minus").onclick   = () => { dagKladde.portioner = Math.max(1, dagKladde.portioner - 1); tegnDagArk(); };
 document.getElementById("dag-plus").onclick    = () => { dagKladde.portioner = Math.min(12, dagKladde.portioner + 1); tegnDagArk(); };
 document.getElementById("dag-ryd").onclick     = () => { dagKladde = tomKladde(); tegnDagArk(); };
+document.getElementById("dag-fryser-minus").onclick = () => {
+  dagKladde.frost_reserveret = Math.max(0, dagKladde.frost_reserveret - 1);
+  if(dagKladde.frost_reserveret === 0) dagKladde.frost = false;
+  tegnDagArk();
+};
+document.getElementById("dag-fryser-plus").onclick = () => {
+  const loft = frostLedigt(dagKladde.ret_id, aabenDag);
+  if(dagKladde.frost_reserveret >= loft) return;
+  dagKladde.frost_reserveret++;
+  dagKladde.frost = true;                 // taget op af fryseren skal ikke købes
+  tegnDagArk();
+};
 
 document.getElementById("dag-gem").onclick = async () => {
   const k = dagKladde;
-  const tom = !k.ret_navn && !k.tilbehoer.length && !k.frost && k.portioner === 1;
+  const tom = !k.ret_navn && !k.tilbehoer.length && !k.frost && k.portioner === 1 && !k.frost_reserveret;
   const knap = document.getElementById("dag-gem");
   knap.disabled = true; knap.textContent = "Gemmer …";
   if(tom) await rydDag(aabenDag); else await gemDag(aabenDag, k);
@@ -1773,6 +1992,7 @@ document.getElementById("dag-links").addEventListener("click", ev => {
 let vaelgTilstand = "ret";     // ret | tilbehoer
 let vaelgSoeg = "";
 const vaelgFiltre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };
+let vaelgKunFrost = false;
 
 document.getElementById("dag-vaelg").onclick           = () => aabnVaelger("ret");
 document.getElementById("dag-vaelg-tilbehoer").onclick = () => aabnVaelger("tilbehoer");
@@ -1798,12 +2018,17 @@ function tegnVaelgFiltre(){
     Object.keys(FILTERNAVNE).map(n =>
       '<button class="fchip" data-vfilter="'+n+'" data-stand="'+vaelgFiltre[n]+'">'
       + (tegn[vaelgFiltre[n]] ? '<span>'+tegn[vaelgFiltre[n]]+'</span>' : '')
-      + FILTERNAVNE[n] + '</button>').join("");
+      + FILTERNAVNE[n] + '</button>').join("")
+    + '<button class="fchip" data-vfrost="1" data-stand="'+(vaelgKunFrost?"krav":"fri")+'">❄ I fryseren</button>';
 }
 document.getElementById("vaelg-filtre").addEventListener("click", ev => {
-  const f = ev.target.closest("[data-vfilter]"); if(!f) return;
-  const naeste = { fri:"krav", krav:"uden", uden:"fri" };
-  vaelgFiltre[f.dataset.vfilter] = naeste[vaelgFiltre[f.dataset.vfilter]];
+  const f  = ev.target.closest("[data-vfilter]");
+  const fr = ev.target.closest("[data-vfrost]");
+  if(fr){ vaelgKunFrost = !vaelgKunFrost; }
+  else if(f){
+    const naeste = { fri:"krav", krav:"uden", uden:"fri" };
+    vaelgFiltre[f.dataset.vfilter] = naeste[vaelgFiltre[f.dataset.vfilter]];
+  } else return;
   tegnVaelgFiltre(); tegnVaelgListe();
 });
 let vaelgSoegRaa = "";
@@ -1818,6 +2043,7 @@ function tegnVaelgListe(){
   const liste = retter.filter(r => {
     if(!!r.er_tilbehoer !== tilbehoer) return false;
     if(!tilbehoer){
+      if(vaelgKunFrost && frostLager(r.id) === 0) return false;
       for(const n of Object.keys(FILTERNAVNE)){
         if(vaelgFiltre[n] === "krav" && !r[n]) return false;
         if(vaelgFiltre[n] === "uden" &&  r[n]) return false;
@@ -1846,7 +2072,8 @@ function tegnVaelgListe(){
       ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
       : "Aldrig spist";
     const marker = [r.vegetar && "vegetar", r.nem && "nem", r.agnes_kan_lide && "Agnes"]
-      .filter(Boolean).map(t => '<span class="mark">'+t+'</span>').join(" ");
+      .filter(Boolean).map(t => '<span class="mark">'+t+'</span>').concat(frostMaerke(r.id) || [])
+      .join(" ");
     const valgt = tilbehoer && dagKladde.tilbehoer.some(t => t.id === r.id);
     return '<button class="retkort'+(valgt?" valgt":"")+'" data-vaelg="'+r.id+'"><span style="flex:1;min-width:0">'
          +   '<span class="navn">'+(valgt?"✓ ":"")+esc(r.navn)+'</span>'
@@ -1878,9 +2105,42 @@ document.getElementById("vaelg-liste").addEventListener("click", async ev => {
   }
 
   hide("vaelg-back");
+  // Skifter man ret, hører den gamle reservation ikke til længere
+  if(dagKladde.ret_id !== valgt.id && !dagKladde.frost_afskrevet){
+    dagKladde.frost_reserveret = 0;
+  }
   Object.assign(dagKladde, { ret_id: valgt.id, ret_navn: valgt.navn });
   tegnDagArk();
+
+  const ledigt = valgt.id ? frostLedigt(valgt.id, aabenDag) : 0;
+  if(ledigt > 0 && !dagKladde.frost_reserveret) aabnFryserSpoerg(valgt.navn, ledigt);
 });
+
+/* ---------- Spørg om der skal tages fra fryseren ---------- */
+let fryserAntal = 1, fryserLoft = 1;
+function tegnFryser(){
+  document.getElementById("fryser-tal").textContent = fryserAntal;
+}
+function aabnFryserSpoerg(navn, ledigt){
+  fryserLoft = ledigt;
+  fryserAntal = 1;
+  const lager = frostLager(dagKladde.ret_id);
+  document.getElementById("fryser-meta").textContent =
+    "Der står " + lager + " portion" + (lager === 1 ? "" : "er") + " af " + navn + " i fryseren"
+    + (ledigt < lager ? ", hvoraf " + ledigt + " ikke er lovet væk" : "")
+    + ". Vil du tage derfra i stedet for at lave den forfra?";
+  tegnFryser();
+  show("fryser-back");
+}
+document.getElementById("fryser-minus").onclick = () => { fryserAntal = Math.max(1, fryserAntal - 1); tegnFryser(); };
+document.getElementById("fryser-plus").onclick  = () => { fryserAntal = Math.min(fryserLoft, fryserAntal + 1); tegnFryser(); };
+document.getElementById("fryser-nej").onclick   = () => hide("fryser-back");
+document.getElementById("fryser-ja").onclick    = () => {
+  dagKladde.frost_reserveret = fryserAntal;
+  dagKladde.frost = true;
+  hide("fryser-back");
+  tegnDagArk();
+};
 
 
 /* =======================================================================
@@ -2089,9 +2349,34 @@ function sorterAktive(){
   });
 }
 
-function opgKort(o){
+/* I arkivet siger "3 dage over" ingenting — dér skal der stå datoer.
+   Året tages med når opgaven ikke hører til i år.                    */
+function datoTekst(ds){
+  const d = fromIso(ds);
+  const iAar = d.getFullYear() === new Date().getFullYear();
+  return d.getDate() + ". " + MAANEDER[d.getMonth()] + (iAar ? "" : " " + d.getFullYear());
+}
+function arkivTekst(o){
+  return (o.deadline ? "Frist " + datoTekst(o.deadline) : "Ingen frist")
+       + " · Udført " + datoTekst(o.faerdig_dato);
+}
+
+function opgKort(o, arkiv){
   const klaret = !!o.faerdig_dato;
   const over = o.deadline && !klaret && o.deadline < iso(new Date());
+  if(arkiv && klaret){
+    return '<div class="opgkort klaret">'
+      + '<button class="boks sat" data-kryds="'+o.id+'" aria-label="Fortryd">'
+      +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+      + '</button>'
+      + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
+      +   '<span class="titel">'+esc(o.titel)+'</span>'
+      +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
+      +   '<span class="frist">'+arkivTekst(o)+'</span>'
+      + '</button>'
+      + dotsEl(o.personer || [])
+      + '</div>';
+  }
   return '<div class="opgkort'+(klaret?" klaret":"")+'">'
     + '<button class="boks'+(klaret?" sat":"")+'" data-kryds="'+o.id+'" aria-label="Marker som klaret">'
     +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
@@ -2109,7 +2394,7 @@ function renderTodo(){
   if(todoVisning === "aktive"){
     const liste = sorterAktive();
     if(!liste.length) return '<div class="empty">Ingen opgaver lige nu.<br>Tryk på Ny opgave for at lægge en ind.</div>';
-    return '<div class="opgliste">' + liste.map(opgKort).join("") + '</div>';
+    return '<div class="opgliste">' + liste.map(o => opgKort(o)).join("") + '</div>';
   }
 
   // Arkivet: kun det der blev klaret før i dag
@@ -2123,7 +2408,7 @@ function renderTodo(){
     ["Tidligere", arkiv.filter(o => o.faerdig_dato <  ugeStart)]
   ];
   return grupper.filter(([, l]) => l.length).map(([navn, l]) =>
-    '<div class="gruppetop">'+navn+'</div><div class="opgliste">' + l.map(opgKort).join("") + '</div>'
+    '<div class="gruppetop">'+navn+'</div><div class="opgliste">' + l.map(o => opgKort(o, true)).join("") + '</div>'
   ).join("");
 }
 
@@ -2228,12 +2513,19 @@ document.getElementById("opg-gem").onclick = async () => {
   render();
 };
 
-document.getElementById("opg-slet").onclick = async () => {
+document.getElementById("opg-slet").onclick = () => {
+  const o = opgaver.find(x => x.id === redigererOpgId);
+  document.getElementById("opgslet-meta").textContent = o
+    ? '"' + o.titel + '" fjernes fra listen.' : "";
+  show("opgslet-back");
+};
+document.getElementById("opgslet-nej").onclick = () => hide("opgslet-back");
+document.getElementById("opgslet-ja").onclick = async () => {
   const id = redigererOpgId; if(!id) return;
   const { error } = await sb.from("opgaver").delete().eq("id", id);
   if(error){ vis("Kunne ikke slette: " + error.message); return; }
   opgaver = opgaver.filter(o => o.id !== id);
-  hide("opg-back"); render();
+  hide("opgslet-back"); hide("opg-back"); render();
 };
 
 document.getElementById("t-aktive").onclick   = () => { todoVisning = "aktive";   opdaterTodoValg(); };
