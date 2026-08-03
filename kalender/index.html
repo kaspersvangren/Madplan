@@ -663,7 +663,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <div class="backdrop" id="opg-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="opg-titel">
     <h2 id="opg-titel">Ny opgave</h2>
-    <div class="meta">Deadline er frivillig. Uden dato står opgaven kun i Todo-fanen.</div>
+    <div class="meta" id="opg-meta">Deadline er frivillig. Uden dato står opgaven kun i Todo-fanen.</div>
     <div class="field">
       <label for="o-titel">Hvad skal der gøres?</label>
       <input type="text" id="o-titel" autocomplete="off" placeholder="Fx bestil dæk til bilen">
@@ -679,9 +679,9 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <div class="err" id="o-people-err">Vælg mindst én.</div>
     </div>
     <div class="field">
-      <label for="o-deadline">Deadline</label>
+      <label for="o-deadline" id="o-deadline-mrk">Deadline</label>
       <input type="date" id="o-deadline">
-      <div class="err" id="o-deadline-err">En opgave der gentages skal have en deadline.</div>
+      <div class="err" id="o-deadline-err">En opgave der gentages skal have en dato at tælle fra.</div>
     </div>
     <div class="field" id="o-gentag-felt">
       <label for="o-gentag">Gentages</label>
@@ -1142,7 +1142,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.15.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.15.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1576,6 +1576,18 @@ function gentagWidget(pfx, datoFeltId, ekstraFeltId){
 }
 const gAftale = gentagWidget("f", "f-date");
 const gOpgave = gentagWidget("o", "o-deadline", "o-fraudf-felt");
+
+/* "Deadline" er det rigtige ord for en enkeltstaaende opgave — en frist man
+   gerne maa overskride. Gentages opgaven, er datoen i stedet den første
+   forekomst, og saa hedder feltet det. */
+function opdaterFristMaerkat(){
+  const gentages = !!document.getElementById("o-gentag").value;
+  document.getElementById("o-deadline-mrk").textContent = gentages ? "Første gang" : "Deadline";
+  document.getElementById("opg-meta").textContent = gentages
+    ? "Datoen er første gang opgaven skal gøres. Derfra tæller appen videre."
+    : "Deadline er frivillig. Uden dato står opgaven kun i Todo-fanen.";
+}
+document.getElementById("o-gentag").addEventListener("change", opdaterFristMaerkat);
 
 /* ---------- Oversættelse mellem database og app ---------- */
 const hhmm = t => t ? String(t).slice(0,5) : "";
@@ -2751,7 +2763,7 @@ function opgKort(o, arkiv){
       +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
       + '</button>'
       + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
-      +   '<span class="titel">'+esc(o.titel)+'</span>'
+      +   '<span class="titel">'+esc(o.titel)+(o.gentag?' <span class="gmaerke" aria-label="gentages">↻</span>':'')+'</span>'
       +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
       +   '<span class="frist">'+arkivTekst(o)+'</span>'
       + '</button>'
@@ -2763,7 +2775,7 @@ function opgKort(o, arkiv){
     +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
     + '</button>'
     + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
-    +   '<span class="titel">'+esc(o.titel)+'</span>'
+    +   '<span class="titel">'+esc(o.titel)+(o.gentag?' <span class="gmaerke" aria-label="gentages">↻</span>':'')+'</span>'
     +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
     +   '<span class="frist'+(over?" over":"")+'">'+fristTekst(o)+'</span>'
     + '</button>'
@@ -2811,7 +2823,7 @@ function renderDagOpgaver(ds){
         +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
         + '</button>'
         + '<button class="midt" data-opg="'+o.id+'" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left">'
-        +   '<span class="titel">'+esc(o.titel)+'</span>'
+        +   '<span class="titel">'+esc(o.titel)+(o.gentag?' <span class="gmaerke" aria-label="gentages">↻</span>':'')+'</span>'
         +   (o.beskrivelse ? '<span class="note">'+esc(o.beskrivelse)+'</span>' : '')
         + '</button>'
         + dotsEl(o.personer || [])
@@ -2854,7 +2866,46 @@ async function krydsAf(id){
   }
 
   const { error } = await sb.from("opgaver").update({ faerdig_dato: ny }).eq("id", id);
-  if(error){ o.faerdig_dato = foer; render(); vis("Kunne ikke gemme: " + error.message); }
+  if(error){ o.faerdig_dato = foer; render(); vis("Kunne ikke gemme: " + error.message); return; }
+  if(o.gentag){
+    if(ny) await lavNaesteOpgave(o, ny);
+    else   await fjernAflaeggeren(id);
+  }
+}
+
+/* En gentagen opgave føder den næste, naar den bliver krydset af. Den
+   klarede bliver staaende og gaar i arkivet, saa historikken er i behold. */
+async function lavNaesteOpgave(o, udfoertDs){
+  if(!o.deadline) return;
+  if(opgaver.some(x => x.fra_opgave === o.id)) return;   // allerede født én gang
+  const r = parseRegel(o.gentag); if(!r) return;
+  let naeste;
+  if(o.gentag_fra_udfoert && r.freq === "DAILY"){
+    naeste = iso(addDays(fromIso(udfoertDs), r.interval || 1));
+    if(r.until && naeste > r.until) naeste = "";
+  } else {
+    naeste = naesteForekomst(o.gentag, o.deadline, o.deadline);
+  }
+  if(!naeste) return;
+  const raekke = {
+    titel: o.titel, beskrivelse: o.beskrivelse || "", deadline: naeste,
+    personer: o.personer || [], gentag: o.gentag,
+    gentag_fra_udfoert: !!o.gentag_fra_udfoert, fra_opgave: o.id
+  };
+  const { data, error } = await sb.from("opgaver").insert(raekke).select();
+  if(error){ vis("Kunne ikke lægge næste gang ind: " + error.message); return; }
+  if(data && data[0]) opgaver.push(data[0]);
+  render();
+}
+/* Fortryder man fluebenet, skal næste gang ikke blive staaende. */
+async function fjernAflaeggeren(id){
+  const boern = opgaver.filter(x => x.fra_opgave === id && !x.faerdig_dato);
+  if(!boern.length) return;
+  const ider = boern.map(x => x.id);
+  const { error } = await sb.from("opgaver").delete().in("id", ider);
+  if(error){ vis("Kunne ikke rydde op: " + error.message); return; }
+  opgaver = opgaver.filter(x => ider.indexOf(x.id) < 0);
+  render();
 }
 
 /* ---------- Opret og ret ---------- */
@@ -2881,10 +2932,14 @@ function aabnOpgave(id){
   document.getElementById("o-titel").value    = o ? o.titel : "";
   document.getElementById("o-note").value     = o ? (o.beskrivelse || "") : "";
   document.getElementById("o-deadline").value = o ? (o.deadline || "") : (fane === "kalender" ? iso(cursor) : "");
+  gOpgave.saet(o ? (o.gentag || "") : "");
+  opdaterFristMaerkat();
+  document.getElementById("o-fraudf").checked = o ? !!o.gentag_fra_udfoert : false;
   opgValgte = new Set(o ? (o.personer || []) : ["familie"]);
   tegnOpgChips();
   document.getElementById("o-titel-err").classList.remove("show");
   document.getElementById("o-people-err").classList.remove("show");
+  document.getElementById("o-deadline-err").classList.remove("show");
   document.getElementById("opg-slet").hidden = !o;
   show("opg-back");
 }
@@ -2892,16 +2947,24 @@ document.getElementById("opg-fortryd").onclick = () => hide("opg-back");
 
 document.getElementById("opg-gem").onclick = async () => {
   const titel = document.getElementById("o-titel").value.trim();
+  const frist = document.getElementById("o-deadline").value || null;
+  const regel = gOpgave.hent();
   const okTitel = titel.length > 0, okFolk = opgValgte.size > 0;
+  const okFrist = !regel || !!frist;      // uden dato er der intet at tælle fra
   document.getElementById("o-titel-err").classList.toggle("show", !okTitel);
   document.getElementById("o-people-err").classList.toggle("show", !okFolk);
-  if(!okTitel || !okFolk) return;
+  document.getElementById("o-deadline-err").classList.toggle("show", !okFrist);
+  if(!okTitel || !okFolk || !okFrist) return;
 
+  const rr = parseRegel(regel);
   const data = {
     titel,
     beskrivelse: document.getElementById("o-note").value.trim(),
-    deadline: document.getElementById("o-deadline").value || null,
-    personer: [...opgValgte]
+    deadline: frist,
+    personer: [...opgValgte],
+    gentag: regel || null,
+    gentag_fra_udfoert: !!(rr && rr.freq === "DAILY"
+      && document.getElementById("o-fraudf").checked)
   };
   const knap = document.getElementById("opg-gem");
   knap.disabled = true; knap.textContent = "Gemmer …";
