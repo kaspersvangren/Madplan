@@ -758,7 +758,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <span class="vaerdi" id="dag-tilbehoer">—</span>
       <button class="btn" style="flex:none;width:auto;height:40px;padding:0 14px" id="dag-vaelg-tilbehoer">Vælg</button>
     </div>
-    <div class="valgrad">
+    <div class="valgrad" id="dag-portioner-rad">
       <span class="etiket">Portioner</span>
       <span class="vaerdi trin">
         <button id="dag-minus" aria-label="Færre">–</button>
@@ -776,7 +776,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     </div>
     <div class="frostinfo" id="dag-fryser-info" hidden></div>
 
-    <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — udelad fra indkøb</label>
+    <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — hovedretten udelades fra indkøb</label>
 
     <div style="margin-top:14px">
       <div id="dag-links"></div>
@@ -1031,7 +1031,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.13.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.13.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1845,9 +1845,11 @@ function renderMadplan(){
     if(m){
       if(m.ret_navn) hoved = '<span class="r">' + esc(m.ret_navn) + '</span>';
       (m.tilbehoer || []).forEach(t => under.push(esc(t.navn)));
-      if(m.portioner > 1)  under.push("×" + m.portioner);
       if(m.frost_reserveret > 0) under.push("❄ " + m.frost_reserveret + " fra fryseren");
-      else if(m.frost)     under.push("❄ frost eller rest");
+      else {
+        if(m.portioner > 1) under.push("×" + m.portioner);
+        if(m.frost)         under.push("❄ frost eller rest");
+      }
     }
 
     h += '<button class="dagrad' + (ds === idag ? " idag" : "") + '" data-dag="' + ds + '">'
@@ -1905,11 +1907,15 @@ function tegnDagArk(){
   document.getElementById("dag-frost").checked         = k.frost;
 
   /* Fryseren. Linjen vises kun når retten faktisk har noget på lager,
-     eller når denne dag allerede har lovet noget væk.                */
+     eller når denne dag allerede har lovet noget væk. Tager man fra
+     fryseren, ER antallet portionsantallet — så Portioner-linjen går
+     væk i stedet for at stå og sige noget andet.                     */
   const rad  = document.getElementById("dag-fryser-rad");
   const info = document.getElementById("dag-fryser-info");
   const lager = k.ret_id ? frostLager(k.ret_id) : 0;
   const loft  = k.ret_id ? frostLedigt(k.ret_id, aabenDag) : 0;   // uden denne dags egen
+
+  document.getElementById("dag-portioner-rad").hidden = k.frost_reserveret > 0;
 
   if(k.frost_afskrevet && k.frost_reserveret > 0){
     rad.hidden = true;
@@ -1961,12 +1967,14 @@ document.getElementById("dag-ryd").onclick     = () => { dagKladde = tomKladde()
 document.getElementById("dag-fryser-minus").onclick = () => {
   dagKladde.frost_reserveret = Math.max(0, dagKladde.frost_reserveret - 1);
   if(dagKladde.frost_reserveret === 0) dagKladde.frost = false;
+  else dagKladde.portioner = dagKladde.frost_reserveret;
   tegnDagArk();
 };
 document.getElementById("dag-fryser-plus").onclick = () => {
   const loft = frostLedigt(dagKladde.ret_id, aabenDag);
   if(dagKladde.frost_reserveret >= loft) return;
   dagKladde.frost_reserveret++;
+  dagKladde.portioner = dagKladde.frost_reserveret;
   dagKladde.frost = true;                 // taget op af fryseren skal ikke købes
   tegnDagArk();
 };
@@ -2137,6 +2145,7 @@ document.getElementById("fryser-plus").onclick  = () => { fryserAntal = Math.min
 document.getElementById("fryser-nej").onclick   = () => hide("fryser-back");
 document.getElementById("fryser-ja").onclick    = () => {
   dagKladde.frost_reserveret = fryserAntal;
+  dagKladde.portioner = fryserAntal;
   dagKladde.frost = true;
   hide("fryser-back");
   tegnDagArk();
@@ -2176,12 +2185,14 @@ function beregnIndkoeb(fredag){
     const tilbehoer = (m.tilbehoer || []).map(t => t.navn).join(", ");
     dage.push({
       dag: UGEDAGE_KORT[(d.getDay() + 6) % 7], dato: d.getDate(),
-      navn: m.ret_navn, tilbehoer, frost: !!m.frost, portioner: m.portioner || 1
+      navn: m.ret_navn, tilbehoer, frost: !!m.frost, portioner: m.portioner || 1,
+      fraFryser: m.frost_reserveret || 0
     });
 
-    if(m.frost) continue;                       // frost eller rest: skal ikke købes ind til
-
-    const kilder = [m.ret_id, ...(m.tilbehoer || []).map(t => t.id)].filter(Boolean);
+    /* "Frost eller rest" gælder kun hovedretten. Vælger man tilbehør til
+       en ret fra fryseren, skal tilbehøret stadig købes ind.          */
+    const kilder = [...(m.frost ? [] : [m.ret_id]), ...(m.tilbehoer || []).map(t => t.id)].filter(Boolean);
+    if(!kilder.length) continue;
     kilder.forEach(rid => {
       ingredienserFor(rid).forEach(ing => {
         const kort = ing.kategori === "tjek" ? tjek : koeb;
@@ -2227,8 +2238,8 @@ function renderIndkoeb(){
     h += '<div class="iretter"><div class="overskrift">Ugens retter</div>' + dage.map(d =>
       '<div class="iret"><span class="d">' + d.dag + ' ' + d.dato + '.</span>'
       + '<span class="r">' + esc(d.navn)
-      + (d.portioner > 1 ? " ×" + d.portioner : "")
-      + (d.frost ? " ❄" : "")
+      + (d.fraFryser ? " ❄×" + d.fraFryser
+                     : (d.portioner > 1 ? " ×" + d.portioner : "") + (d.frost ? " ❄" : ""))
       + (d.tilbehoer ? '<span class="ekstra"> med ' + esc(d.tilbehoer) + '</span>' : "")
       + '</span></div>').join("") + '</div>';
   } else {
@@ -2292,9 +2303,9 @@ function indkoebSomTekst(){
                   + " – " + s1.getDate() + ". " + MAANEDER[s1.getMonth()], ""];
 
   dage.forEach(d => linjer.push(d.dag + " " + d.dato + ".: " + d.navn
-    + (d.portioner > 1 ? " ×" + d.portioner : "")
+    + (d.fraFryser ? " ×" + d.fraFryser : (d.portioner > 1 ? " ×" + d.portioner : ""))
     + (d.tilbehoer ? " med " + d.tilbehoer : "")
-    + (d.frost ? " (frost eller rest)" : "")));
+    + (d.fraFryser ? " (" + d.fraFryser + " fra fryseren)" : d.frost ? " (frost eller rest)" : "")));
 
   linjer.push("", "KØB");
   koeb.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + p.enhed : "") + ")" : "")));
