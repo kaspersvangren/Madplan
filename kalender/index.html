@@ -1014,6 +1014,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       Flag ved fødselsdage
       <span class="stand" id="fdag-stand">til</span>
     </button>
+    <button class="menu-row" id="menu-zoom" hidden>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+      Størrelse på skærmen
+      <span class="stand" id="zoom-stand">fra</span>
+    </button>
     <button class="menu-row" id="menu-export">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
       Gem en kopi af alle data
@@ -1214,7 +1219,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.17.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.18.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4329,6 +4334,39 @@ document.getElementById("menu-btn").onclick = async () => {
 document.getElementById("menu-close").onclick = () => hide("menu-back");
 document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); };
 
+/* =======================================================================
+   Størrelse på store skærme
+   Indholdet er låst til 560 px. På vægtabletten, der er 768 px bred, bliver
+   resten til margen, og skriften bliver ikke større end på en telefon.
+   Ved at fortælle browseren at siden skal regnes som smallere end skærmen
+   forstørrer den ALT proportionalt — skrift, ikoner og afstande — i stedet
+   for bare at trække layoutet bredere. Valget gemmes lokalt, så det kun
+   gælder den skærm man sætter det på.
+   ======================================================================= */
+const ZOOM_TRIN = [
+  ["fra",     0,   "fra"],
+  ["tilpas",  560, "tilpasset"],
+  ["stor",    490, "stor"],
+  ["stoerst", 430, "størst"]
+];
+let zoomTrin = "fra";
+const bredSkaerm = () => Math.min(screen.width, screen.height) >= 600;
+
+function saetZoom(kode, gem){
+  const t = ZOOM_TRIN.find(x => x[0] === kode) || ZOOM_TRIN[0];
+  zoomTrin = t[0];
+  const m = document.querySelector('meta[name="viewport"]');
+  if(m) m.setAttribute("content", (t[1] && bredSkaerm())
+    ? "width=" + t[1] + ", viewport-fit=cover"
+    : "width=device-width, initial-scale=1, viewport-fit=cover");
+  document.getElementById("zoom-stand").textContent = t[2];
+  if(gem !== false){ try{ localStorage.setItem("kalender-zoom", t[0]); }catch(e){} }
+}
+document.getElementById("menu-zoom").onclick = () => {
+  const i = ZOOM_TRIN.findIndex(x => x[0] === zoomTrin);
+  saetZoom(ZOOM_TRIN[(i + 1) % ZOOM_TRIN.length][0]);
+};
+
 function saetFoedselsdage(paa){
   visFoedselsdage = paa;
   try{ localStorage.setItem("kalender-fdag", paa ? "1" : "0"); }catch(e){}
@@ -5238,6 +5276,8 @@ async function start(){
   try{ const t = localStorage.getItem("kalender-tema"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
   try{ visFoedselsdage = localStorage.getItem("kalender-fdag") !== "0"; }catch(e){}
   document.getElementById("fdag-stand").textContent = visFoedselsdage ? "til" : "fra";
+  document.getElementById("menu-zoom").hidden = !bredSkaerm();
+  try{ const z = localStorage.getItem("kalender-zoom"); if(z) saetZoom(z, false); }catch(e){}
   render();
   const { data } = await sb.auth.getSession();
   if(data && data.session){ await start(); }
