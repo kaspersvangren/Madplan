@@ -1236,7 +1236,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.19.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.19.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2324,7 +2324,6 @@ function renderMadplan(){
     /* Samme sprog som kalenderen: graa bund naar Agnes ikke er hjemme. Teksten
        staar nede ved portionerne, for det er dér den betyder noget. */
     const agnesHjemme = agnesHere(d);
-    if(!agnesHjemme) under.push("uden Agnes");
 
     h += '<button class="dagrad' + (ds === idag ? " idag" : "") + (agnesHjemme ? "" : " away") + '" data-dag="' + ds + '">'
        +   '<span class="dag"><span class="n">' + d.getDate() + '</span>'
@@ -2373,7 +2372,10 @@ function tegnDagArk(){
 
   document.getElementById("dag-titel").textContent =
     ugedag.charAt(0).toUpperCase() + ugedag.slice(1) + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
-  document.getElementById("dag-meta").textContent = "";
+  /* Om Agnes er hjemme hører til her, hvor man planlægger dagen — ikke
+     som en ekstra linje i ugelisten. */
+  document.getElementById("dag-meta").textContent =
+    "Agnes " + (agnesHere(fromIso(aabenDag)) ? "er her" : "er hos sin far");
 
   document.getElementById("dag-ret").textContent       = k.ret_navn || "—";
   document.getElementById("dag-tilbehoer").textContent = k.tilbehoer.length ? k.tilbehoer.map(t => t.navn).join(", ") : "—";
