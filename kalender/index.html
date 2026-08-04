@@ -3,23 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<script>
-/* Størrelsen på store berøringsskærme. Skal stå her og køre før resten af
-   siden læses ind — ændrer man metataggets værdi senere, ser browseren det
-   ikke. Derfor genindlæses siden også når indstillingen skiftes. */
-(function(){
-  try{
-    var bredder = { tilpas:560, stor:490, stoerst:430 };
-    var b = bredder[localStorage.getItem("kalender-zoom")];
-    var kort = Math.min(screen.width, screen.height);
-    var roerer = (navigator.maxTouchPoints || 0) > 0
-              || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
-    if(b && kort >= 600 && roerer)
-      document.querySelector('meta[name="viewport"]')
-        .setAttribute("content", "width=" + b + ", viewport-fit=cover");
-  }catch(e){}
-})();
-</script>
 <title>Vores Hverdag</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#F2F1ED" media="(prefers-color-scheme: light)">
@@ -94,7 +77,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--line-strong);outline-offset:2px;border-radius:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-.app{max-width:560px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+body{zoom:var(--z,1)}
+.app{max-width:560px;margin:0 auto;height:calc(100dvh / var(--z,1));display:flex;flex-direction:column;overflow:hidden}
 
 /* ---------- Topbjælke ---------- */
 .topbar{display:flex;align-items:center;gap:6px;padding:14px 12px 10px;position:relative}
@@ -128,7 +112,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .dd-year span{font-family:var(--font-display);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums}
 .dd-year button{width:38px;height:38px;border-radius:999px;display:grid;place-items:center;color:var(--muted)}
 .dd-year button:hover{background:var(--chip);color:var(--ink)}
-.dd-body{max-height:46dvh;overflow-y:auto;overscroll-behavior:contain;padding:8px}
+.dd-body{max-height:calc(46dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain;padding:8px}
 .dd-months{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .dd-months button{height:44px;border-radius:10px;font-size:14px;border:1px solid transparent}
 .dd-months button:hover{background:var(--chip)}
@@ -291,7 +275,7 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .opskriftblok{
   position:sticky;top:0;z-index:2;background:var(--surface);
   margin:10px -18px 0;padding:0 18px 8px;
-  max-height:34dvh;overflow-y:auto;overscroll-behavior:contain;
+  max-height:calc(34dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain;
   border-bottom:1px solid var(--line);
   box-shadow:0 -20px 0 var(--surface);
 }
@@ -409,7 +393,7 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .handling:last-of-type{border-bottom:none}
 .handling.fare{color:var(--holiday)}
 .handling strong{font-weight:700}
-.vaelgliste{display:flex;flex-direction:column;gap:7px;max-height:52dvh;overflow-y:auto;overscroll-behavior:contain;margin-top:10px}
+.vaelgliste{display:flex;flex-direction:column;gap:7px;max-height:calc(52dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain;margin-top:10px}
 
 /* ---------- Indkøb ---------- */
 .ikort{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
@@ -520,7 +504,7 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .kolonner .mm{width:62px;flex:none;text-align:right}
 .kolonner .vind{flex:1;text-align:right}
 .timerramme{overflow:hidden}
-.timer{max-height:52dvh;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;will-change:transform}
+.timer{max-height:calc(52dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;will-change:transform}
 .timer.glider{transition:transform .2s cubic-bezier(.25,.8,.35,1),opacity .2s ease}
 .arktop .midt{transition:opacity .16s ease}
 .arktop .midt.skifter{opacity:0}
@@ -573,7 +557,7 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 /* ---------- Dialoger ---------- */
 .backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .backdrop.open{display:flex}
-.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92dvh;overflow-y:auto;overscroll-behavior:contain}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:calc(92dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain}
 .sheet h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 4px}
 .sheet .meta{font-size:13px;color:var(--muted);margin-bottom:14px}
 .field{margin-bottom:13px}
@@ -1236,7 +1220,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.18.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.18.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4378,14 +4362,27 @@ function zoomEtiket(){
   const t = ZOOM_TRIN.find(x => x[0] === zoomTrin) || ZOOM_TRIN[0];
   document.getElementById("zoom-stand").textContent = t[2];
 }
+/* Forstørrelsen regnes ud af den bredde siden faktisk har fået. Sådan rammer
+   den rigtigt uanset om browseren kører siden som mobil- eller skrivebordssted,
+   og uanset hvor bred skærmen er. */
+function anvendZoom(){
+  const t = ZOOM_TRIN.find(x => x[0] === zoomTrin) || ZOOM_TRIN[0];
+  const bred = document.documentElement.clientWidth || window.innerWidth || 0;
+  const z = (t[1] && kanZoome() && bred)
+    ? Math.max(1, Math.min(2.4, bred / t[1]))
+    : 1;
+  document.documentElement.style.setProperty("--z", z.toFixed(3));
+}
 document.getElementById("menu-zoom").onclick = () => {
   const i = ZOOM_TRIN.findIndex(x => x[0] === zoomTrin);
   const ny = ZOOM_TRIN[(i + 1) % ZOOM_TRIN.length];
   zoomTrin = ny[0];
   zoomEtiket();
+  anvendZoom();
   try{ localStorage.setItem("kalender-zoom", ny[0]); }catch(e){}
-  setTimeout(() => location.reload(), 120);   // først dér slår den igennem
 };
+window.addEventListener("resize", anvendZoom);
+window.addEventListener("orientationchange", () => setTimeout(anvendZoom, 200));
 
 function saetFoedselsdage(paa){
   visFoedselsdage = paa;
@@ -5299,6 +5296,7 @@ async function start(){
   document.getElementById("menu-zoom").hidden = !kanZoome();
   try{ const z = localStorage.getItem("kalender-zoom"); if(z) zoomTrin = z; }catch(e){}
   zoomEtiket();
+  anvendZoom();
   render();
   const { data } = await sb.auth.getSession();
   if(data && data.session){ await start(); }
