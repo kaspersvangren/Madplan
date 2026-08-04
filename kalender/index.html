@@ -151,6 +151,56 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:0 14px 176px;will-change:transform}
 .fab{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;height:50px;padding:0 22px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22);z-index:36}
 .fab[hidden]{display:none}
+/* ---------- Global søgning ---------- */
+.soegfab{
+  position:fixed;right:10px;bottom:80px;z-index:37;
+  width:40px;height:40px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--line);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.10);
+}
+.soegfab .prik{
+  position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:999px;
+  background:var(--muted);border:2px solid var(--surface);
+}
+.soegfab .prik[hidden]{display:none}
+.gs{position:fixed;inset:0;z-index:55;background:var(--bg);display:none;flex-direction:column}
+.gs.open{display:flex}
+.gstop{display:flex;gap:9px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.gsfelt{position:relative;flex:1}
+.gsfelt input{
+  width:100%;padding:11px 36px 11px 38px;border:1px solid var(--line);border-radius:999px;
+  background:var(--surface);color:var(--ink);font:inherit;
+}
+.gsfelt input::-webkit-search-cancel-button{display:none}
+.gsfelt .lup{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.gsryd{
+  position:absolute;right:7px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;border-radius:999px;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+}
+.gsryd[hidden]{display:none}
+.gsliste{flex:1;overflow-y:auto;padding:4px 14px 30px;overscroll-behavior:contain}
+.gsgruppe{margin-top:18px}
+.gsgruppe h3{
+  font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  margin:0 0 8px 3px;font-weight:700;
+}
+.gsafsnit{font-size:12.5px;color:var(--muted);margin:10px 0 6px 3px}
+.gstraef{
+  display:block;width:100%;text-align:left;padding:10px 12px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:7px;
+}
+.gstraef .t{display:block;font-weight:600;font-size:15px}
+.gstraef .u{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+.gsfold{
+  display:block;width:100%;text-align:left;font-size:13px;color:var(--muted);
+  padding:5px 3px 9px;
+}
+.gsunder{padding-left:11px;border-left:2px solid var(--line);margin:0 0 9px 4px}
+.gstom{padding:40px 8px;color:var(--muted);text-align:center;font-size:14px}
+.gshint{padding:26px 8px;color:var(--muted);text-align:center;font-size:14px}
+
 .version{
   position:fixed;left:10px;bottom:80px;z-index:37;
   font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;
@@ -633,6 +683,24 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   </div>
 
   <div class="stage-wrap"><div class="scroll" id="stage"></div></div>
+</div>
+
+<button class="soegfab" id="soeg-fab" aria-label="Søg i alt">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+  <span class="prik" id="soeg-prik" hidden></span>
+</button>
+
+<div class="gs" id="gs" role="dialog" aria-label="Søg">
+  <div class="gstop">
+    <div class="gsfelt">
+      <span class="lup"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></span>
+      <input id="gs-felt" type="search" placeholder="Søg i alt" autocomplete="off"
+             autocorrect="off" spellcheck="false">
+      <button class="gsryd" id="gs-ryd" hidden aria-label="Ryd søgningen">✕</button>
+    </div>
+    <button class="btn" id="gs-luk">Luk</button>
+  </div>
+  <div class="gsliste" id="gs-liste"></div>
 </div>
 
 <button class="fab" id="add-btn">
@@ -1146,7 +1214,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.16.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.17.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4769,6 +4837,372 @@ async function logInd(){
 }
 document.getElementById("g-login").onclick = logInd;
 document.getElementById("g-pass").addEventListener("keydown", ev => { if(ev.key === "Enter") logInd(); });
+
+/* =======================================================================
+   Global søgning
+   Der søges ALTID i alt — der er intet omfangsvalg. Alle tabeller ligger
+   allerede i browseren, så der er intet at spare, og en søgning der ikke
+   finder noget må aldrig efterlade tvivl om det skyldtes omfanget.
+   Grupperne står i fast rækkefølge, så man ikke skal lede efter dem.
+   ======================================================================= */
+const GS_MIN = 2;                 // færre tegn rammer alting
+const GS_PAUSE = 250;             // de tunge grupper venter til man holder pause
+const GS_LOFT = 5;                // så mange pr. gruppe før "vis alle"
+
+let gsQ = "";                     // det man har tastet, i småt
+let gsAaben = false;
+let gsTunge = false;              // er madplan og ingredienser regnet med endnu
+let gsTimer = null;
+let gsScroll = 0;
+let gsFoldet = new Set();         // hvilke sammenklappede afsnit er åbnet
+let gsAlle = new Set();           // hvilke grupper viser alt
+
+const gsRam = (tekst, q) => String(tekst || "").toLowerCase().indexOf(q) > -1;
+
+/* Første dag fra og med fraDs hvor aftalen findes. Tom hvis den er forbi. */
+function gsNaeste(e, fraDs){
+  if(e.gentag) return foersteForekomst(e.gentag, e.date, fraDs);
+  if(e.yearly){
+    const md = e.date.slice(5);
+    const aar = fromIso(fraDs).getFullYear();
+    const iaar = aar + "-" + md;
+    return iaar >= fraDs ? iaar : (aar + 1) + "-" + md;
+  }
+  if(sidsteDag(e) < fraDs) return "";
+  return e.date >= fraDs ? e.date : fraDs;
+}
+function gsRegelTekst(e){
+  if(e.gentag) return gentagTekst(e.gentag, e.date);
+  if(e.yearly) return "hvert år";
+  return "";
+}
+
+/* ---------- Selve opslaget ---------- */
+function gsFind(q, medTunge){
+  const idag = iso(new Date());
+  const r = { kalender:{ folk:[], kommende:[], tidligere:[] },
+              opgaver:{ aktive:[], arkiv:[] },
+              kogebog:[], madplan:[], skrald:[] };
+
+  /* --- Personer: samles til én linje, kun kommende --- */
+  PEOPLE.forEach(pe => {
+    if(!gsRam(pe.navn, q) && !gsRam(pe.kort, q)) return;
+    const hendes = events
+      .filter(e => (e.people || []).indexOf(pe.id) > -1)
+      .map(e => ({ e, ds: gsNaeste(e, idag) }))
+      .filter(x => x.ds)
+      .sort((a,b) => a.ds < b.ds ? -1 : 1);
+    if(hendes.length) r.kalender.folk.push({ person:pe, poster:hendes });
+  });
+
+  /* --- Aftaler --- */
+  events.forEach(e => {
+    const iNavn = gsRam(e.title, q);
+    const iTekst = !iNavn && gsRam(e.desc, q);
+    if(!iNavn && !iTekst) return;
+    const naeste = gsNaeste(e, idag);
+    const post = { slags:"aftale", id:e.id, titel:e.title, e,
+                   hvorfor: iTekst ? "fundet i beskrivelsen" : "", navnetraef: iNavn };
+    if(naeste){
+      post.ds = naeste;
+      r.kalender.kommende.push(post);
+    } else {
+      post.ds = sidsteDag(e);
+      r.kalender.tidligere.push(post);
+    }
+  });
+
+  /* --- Ferier --- */
+  ferier.forEach(f => {
+    const titel = f.titel || "Ferie";
+    const iNavn = gsRam(titel, q);
+    const iTekst = !iNavn && gsRam(f.beskrivelse, q);
+    if(!iNavn && !iTekst) return;
+    const post = { slags:"ferie", id:f.id, titel, f, ds:f.start_dato,
+                   hvorfor: iTekst ? "fundet i beskrivelsen" : "", navnetraef: iNavn };
+    if(f.slut_dato >= idag) r.kalender.kommende.push(post); else r.kalender.tidligere.push(post);
+  });
+
+  const efterNavn = (a,b) => (b.navnetraef?1:0) - (a.navnetraef?1:0);
+  r.kalender.kommende.sort((a,b) => efterNavn(a,b) || (a.ds < b.ds ? -1 : 1));
+  r.kalender.tidligere.sort((a,b) => efterNavn(a,b) || (a.ds > b.ds ? -1 : 1));
+
+  /* --- Opgaver --- */
+  opgaver.forEach(o => {
+    const iNavn = gsRam(o.titel, q);
+    const iTekst = !iNavn && gsRam(o.beskrivelse, q);
+    if(!iNavn && !iTekst) return;
+    const post = { id:o.id, o, hvorfor: iTekst ? "fundet i noten" : "", navnetraef: iNavn };
+    (o.faerdig_dato ? r.opgaver.arkiv : r.opgaver.aktive).push(post);
+  });
+  r.opgaver.aktive.sort((a,b) => efterNavn(a,b) ||
+    ((a.o.deadline || "9999") < (b.o.deadline || "9999") ? -1 : 1));
+  r.opgaver.arkiv.sort((a,b) => (a.o.faerdig_dato > b.o.faerdig_dato ? -1 : 1));
+
+  /* --- Kogebog. Ingredienserne er tunge, navn og fremgangsmåde er ikke. --- */
+  const ingRam = new Map();
+  if(medTunge){
+    ingredienser.forEach(i => {
+      if(!gsRam(i.navn, q)) return;
+      if(!ingRam.has(i.ret_id)) ingRam.set(i.ret_id, i.navn);
+    });
+  }
+  retter.forEach(re => {
+    const iNavn = gsRam(re.navn, q);
+    const iTekst = !iNavn && (gsRam(re.fremgangsmaade, q) || gsRam(re.opskrift_ingredienser, q));
+    const iIng = !iNavn && !iTekst && ingRam.has(re.id);
+    if(!iNavn && !iTekst && !iIng) return;
+    r.kogebog.push({ id:re.id, ret:re, navnetraef:iNavn,
+      hvorfor: iTekst ? "fundet i opskriften"
+             : iIng  ? "indeholder " + ingRam.get(re.id) : "" });
+  });
+  r.kogebog.sort((a,b) => efterNavn(a,b) || a.ret.navn.localeCompare(b.ret.navn, "da"));
+
+  /* --- Madplan: samles til én linje pr. ret, ikke én pr. dag --- */
+  if(medTunge){
+    const pr = new Map();
+    madplanDage.forEach(m => {
+      if(!m.ret_navn || !gsRam(m.ret_navn, q)) return;
+      const n = pr.get(m.ret_navn) || { navn:m.ret_navn, datoer:[] };
+      n.datoer.push(m.dato);
+      pr.set(m.ret_navn, n);
+    });
+    r.madplan = [...pr.values()].map(n => {
+      n.datoer.sort((a,b) => a > b ? -1 : 1);          // nyeste først
+      n.kommende = n.datoer.filter(d => d >= idag).sort();
+      n.senest   = n.datoer.filter(d => d < idag)[0] || "";
+      return n;
+    }).sort((a,b) => b.datoer.length - a.datoer.length);
+  }
+
+  /* --- Skrald: én linje med næste afhentning af den fraktion --- */
+  const alleDatoer = [...skraldedage.keys()].sort();
+  SKRALD_ORDEN.forEach(k => {
+    const ord = (SKRALD_ORD.find(x => x[0] === k) || [k, []])[1];
+    const traef = gsRam(SKRALD_NAVN[k], q) || ord.some(o => gsRam(o, q));
+    if(!traef) return;
+    const naeste = alleDatoer.find(d => d >= idag && (skraldedage.get(d) || []).indexOf(k) > -1);
+    r.skrald.push({ kode:k, navn:SKRALD_NAVN[k], ds:naeste || "" });
+  });
+
+  return r;
+}
+
+/* ---------- Tegning ---------- */
+function gsKort(noegle, titel, under, ekstra){
+  return '<button class="gstraef" data-gs="' + noegle + '">'
+    + '<span class="t">' + esc(titel) + '</span>'
+    + (under ? '<span class="u">' + esc(under) + (ekstra ? " · " + esc(ekstra) : "") + '</span>' : "")
+    + '</button>';
+}
+function gsAfkort(navn, poster, tegn){
+  const alt = gsAlle.has(navn);
+  const vis = alt ? poster : poster.slice(0, GS_LOFT);
+  let h = vis.map(tegn).join("");
+  if(!alt && poster.length > GS_LOFT)
+    h += '<button class="gsfold" data-gsalle="' + navn + '">Vis alle ' + poster.length + '</button>';
+  return h;
+}
+function gsGruppe(titel, indhold){
+  return indhold ? '<div class="gsgruppe"><h3>' + titel + '</h3>' + indhold + '</div>' : "";
+}
+
+function gsTegn(){
+  const ud = document.getElementById("gs-liste");
+  document.getElementById("gs-ryd").hidden = !gsQ;
+
+  if(gsQ.length < GS_MIN){
+    ud.innerHTML = '<div class="gshint">Skriv mindst ' + GS_MIN
+      + ' tegn. Der søges i kalender, opgaver, kogebog, madplan og skrald på én gang.</div>';
+    return;
+  }
+
+  const r = gsFind(gsQ, gsTunge);
+  let h = "";
+
+  /* Kalender */
+  let kal = "";
+  r.kalender.folk.forEach(f => {
+    const aaben = gsFoldet.has("person:" + f.person.id);
+    kal += '<button class="gstraef" data-gsfold="person:' + f.person.id + '">'
+        +  '<span class="t">' + esc(f.person.navn) + ' — ' + f.poster.length
+        +  ' kommende aftale' + (f.poster.length === 1 ? "" : "r") + '</span>'
+        +  '<span class="u">' + (aaben ? "skjul" : "vis dem") + '</span></button>';
+    if(aaben){
+      kal += '<div class="gsunder">'
+          + f.poster.slice(0, 12).map(x =>
+              gsKort("aftale:" + x.e.id + ":" + x.ds, x.e.title,
+                     datoTekst(x.ds), gsRegelTekst(x.e))).join("")
+          + '</div>';
+    }
+  });
+  if(r.kalender.kommende.length){
+    kal += '<div class="gsafsnit">Kommende</div>'
+        + gsAfkort("kom", r.kalender.kommende, x =>
+            gsKort(x.slags + ":" + x.id + ":" + x.ds, x.titel,
+                   x.slags === "ferie"
+                     ? "Ferie · " + datoTekst(x.f.start_dato) + " – " + datoTekst(x.f.slut_dato)
+                     : datoTekst(x.ds),
+                   gsRegelTekst(x.e || {}) || x.hvorfor));
+  }
+  if(r.kalender.tidligere.length){
+    const aaben = gsFoldet.has("tidligere");
+    const liste = aaben ? r.kalender.tidligere : r.kalender.tidligere.slice(0, 3);
+    kal += '<div class="gsafsnit">Tidligere</div>'
+        + liste.map(x => gsKort(x.slags + ":" + x.id + ":" + x.ds, x.titel,
+                                datoTekst(x.ds), x.hvorfor)).join("");
+    if(!aaben && r.kalender.tidligere.length > 3)
+      kal += '<button class="gsfold" data-gsfold="tidligere">Vis alle '
+          +  r.kalender.tidligere.length + ' tidligere</button>';
+  }
+  h += gsGruppe("Kalender", kal);
+
+  /* Opgaver */
+  let opg = "";
+  if(r.opgaver.aktive.length)
+    opg += gsAfkort("opg", r.opgaver.aktive, x =>
+      gsKort("opgave:" + x.id, x.o.titel,
+             x.o.deadline ? datoTekst(x.o.deadline) : "uden dato",
+             x.o.gentag ? gentagTekst(x.o.gentag, x.o.deadline) : x.hvorfor));
+  if(r.opgaver.arkiv.length){
+    opg += '<div class="gsafsnit">Færdige</div>'
+        + gsAfkort("opgark", r.opgaver.arkiv, x =>
+            gsKort("opgave:" + x.id, x.o.titel,
+                   "udført " + datoTekst(x.o.faerdig_dato), x.hvorfor));
+  }
+  h += gsGruppe("Opgaver", opg);
+
+  /* Kogebog */
+  h += gsGruppe("Kogebog", r.kogebog.length
+    ? gsAfkort("ret", r.kogebog, x =>
+        gsKort("ret:" + x.id, x.ret.navn,
+               x.hvorfor || (x.ret.er_tilbehoer ? "tilbehør" : "ret"),
+               x.ret.frost_lager > 0 ? "❄ " + x.ret.frost_lager + " i fryseren" : ""))
+    : "");
+
+  /* Madplan */
+  let mad = "";
+  if(gsTunge){
+    r.madplan.forEach(n => {
+      const aaben = gsFoldet.has("mad:" + n.navn);
+      const under = "serveret " + n.datoer.length + " gang" + (n.datoer.length === 1 ? "" : "e")
+        + (n.senest ? ", senest " + datoTekst(n.senest) : "")
+        + (n.kommende.length ? " · næste " + datoTekst(n.kommende[0]) : "");
+      mad += '<button class="gstraef" data-gsfold="mad:' + esc(n.navn) + '">'
+          +  '<span class="t">' + esc(n.navn) + '</span>'
+          +  '<span class="u">' + esc(under) + '</span></button>';
+      if(aaben){
+        mad += '<div class="gsunder">'
+            + n.datoer.slice(0, 30).map(d =>
+                gsKort("mad:" + d, datoTekst(d), d >= iso(new Date()) ? "kommende" : "")).join("")
+            + '</div>';
+      }
+    });
+  }
+  h += gsGruppe("Madplan", mad);
+
+  /* Skrald */
+  h += gsGruppe("Skrald", r.skrald.map(x =>
+    gsKort(x.ds ? "skrald:" + x.ds : "", x.navn,
+           x.ds ? "næste afhentning " + datoTekst(x.ds) : "ingen kommende afhentning i basen")).join(""));
+
+  ud.innerHTML = h || '<div class="gstom">Ingen træffere på "' + esc(gsQ) + '".</div>';
+}
+
+/* ---------- Åbn, minimér, ryd ---------- */
+function gsAabn(){
+  gsAaben = true;
+  document.getElementById("gs").classList.add("open");
+  gsTegn();
+  document.getElementById("gs-liste").scrollTop = gsScroll;
+  const felt = document.getElementById("gs-felt");
+  felt.value = gsQ;
+  setTimeout(() => { felt.focus(); if(gsQ) felt.select(); }, 30);
+}
+function gsMinimer(){
+  gsScroll = document.getElementById("gs-liste").scrollTop;
+  gsAaben = false;
+  document.getElementById("gs").classList.remove("open");
+  document.getElementById("gs-felt").blur();
+  document.getElementById("soeg-prik").hidden = gsQ.length < GS_MIN;
+}
+function gsRyd(){
+  gsQ = ""; gsTunge = false; gsScroll = 0;
+  gsFoldet.clear(); gsAlle.clear();
+  document.getElementById("gs-felt").value = "";
+  document.getElementById("soeg-prik").hidden = true;
+  gsTegn();
+  document.getElementById("gs-felt").focus();
+}
+
+document.getElementById("soeg-fab").onclick = () => { if(!gsAaben) gsAabn(); };
+document.getElementById("gs-luk").onclick   = gsMinimer;
+document.getElementById("gs-ryd").onclick   = gsRyd;
+document.getElementById("gs-felt").addEventListener("input", ev => {
+  gsQ = ev.target.value.trim().toLowerCase();
+  gsFoldet.clear(); gsAlle.clear();
+  clearTimeout(gsTimer);
+  gsTunge = false;
+  gsTegn();
+  if(gsQ.length >= GS_MIN)
+    gsTimer = setTimeout(() => { gsTunge = true; if(gsAaben) gsTegn(); }, GS_PAUSE);
+});
+document.addEventListener("keydown", ev => {
+  if(ev.key === "Escape" && gsAaben) gsMinimer();
+});
+
+/* ---------- Et tryk på en træffer: minimér og spring hen ---------- */
+function gsSpringTilDag(ds){
+  saetFane("kalender");
+  setView("day");
+  cursor = fromIso(ds);
+  render();
+}
+document.getElementById("gs-liste").addEventListener("click", ev => {
+  const fold = ev.target.closest("[data-gsfold]");
+  if(fold){
+    const k = fold.dataset.gsfold;
+    if(gsFoldet.has(k)) gsFoldet.delete(k); else gsFoldet.add(k);
+    const top = document.getElementById("gs-liste").scrollTop;
+    gsTegn();
+    document.getElementById("gs-liste").scrollTop = top;
+    return;
+  }
+  const alle = ev.target.closest("[data-gsalle]");
+  if(alle){
+    gsAlle.add(alle.dataset.gsalle);
+    const top = document.getElementById("gs-liste").scrollTop;
+    gsTegn();
+    document.getElementById("gs-liste").scrollTop = top;
+    return;
+  }
+  const kort = ev.target.closest("[data-gs]");
+  if(!kort || !kort.dataset.gs) return;
+
+  const dele = kort.dataset.gs.split(":");
+  const slags = dele[0], id = dele[1], ds = dele[2];
+  gsMinimer();
+
+  if(slags === "aftale"){ gsSpringTilDag(ds); openDetail(id, ds); return; }
+  if(slags === "ferie"){  gsSpringTilDag(ds); return; }
+  if(slags === "skrald"){ gsSpringTilDag(id); return; }
+  if(slags === "opgave"){
+    const o = opgaver.find(x => x.id === id);
+    saetFane("todo");
+    todoVisning = (o && o.faerdig_dato) ? "faerdige" : "aktive";
+    opdaterTodoValg();
+    aabnOpgave(id);
+    return;
+  }
+  if(slags === "ret"){ saetFane("kogebog"); aabnRet(id); return; }
+  if(slags === "mad"){
+    madplanUge = fredagFor(fromIso(id));
+    saetFane("madplan");
+    render();
+    aabnDag(id);
+    return;
+  }
+});
 
 /* =======================================================================
    Opstart
