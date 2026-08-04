@@ -142,12 +142,24 @@ body{zoom:var(--z,1)}
 }
 .tabbar .inner{display:flex;width:100%;max-width:560px}
 .tabbar button{
+  position:relative;
   flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:6px 2px;border-radius:12px;color:var(--muted);font-size:11px;font-weight:500;
 }
 .tabbar button[aria-current="true"]{color:var(--ink);font-weight:600}
 .tabbar button[aria-current="true"] .ikon{background:var(--chip)}
 .ikon{padding:4px 14px;border-radius:999px;display:grid;place-items:center}
+/* Rødt tal på Todo-fanen: antal overskredne opgaver, uanset type */
+.fanemaerke{
+  position:absolute;top:1px;left:50%;margin-left:6px;
+  min-width:17px;height:17px;padding:0 4px;border-radius:999px;
+  background:var(--holiday);color:#fff;
+  font-size:10.5px;font-weight:700;line-height:17px;text-align:center;
+}
+.fanemaerke[hidden]{display:none}
+/* Antallet i skifteren over opgavelisten */
+.segment button .tal{margin-left:5px;font-size:11.5px;font-weight:700;opacity:.65}
+.segment button .tal.over{color:var(--holiday);opacity:1}
 
 .scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:0 14px 176px;will-change:transform}
 .fab{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;height:50px;padding:0 22px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:600;font-size:16px;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,0,0,.22);z-index:36}
@@ -543,6 +555,8 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .wknum:hover{background:var(--chip);color:var(--ink)}
 .mcell{position:relative;min-height:62px;padding:5px 3px 9px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--day-here);display:flex;flex-direction:column;align-items:center;gap:4px}
 .mcell.away{background:var(--day-away)}
+/* Samme sprog som kalenderen: lys bund når Agnes er hjemme, grå når hun ikke er */
+.dagrad.away{background:var(--day-away)}
 .mcell.other .num{opacity:.32}
 .mcell.other .mdots{opacity:.45}
 .mcell .num{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.6;width:26px;height:26px;display:grid;place-items:center;border-radius:999px}
@@ -670,7 +684,8 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 
   <div class="soegerad" id="todorad" hidden>
     <div class="segment" role="group" aria-label="Vis opgaver">
-      <button id="t-aktive" aria-pressed="true">Aktive</button>
+      <button id="t-engangs" aria-pressed="true">Éngangs<span class="tal" id="t-tal-engangs"></span></button>
+      <button id="t-faste" aria-pressed="false">Faste<span class="tal" id="t-tal-faste"></span></button>
       <button id="t-faerdige" aria-pressed="false">Færdige</button>
     </div>
   </div>
@@ -725,6 +740,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   <button data-fane="todo" aria-current="false">
     <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><path d="M6 7.5l1.4 1.4L9.4 6.4"/><rect x="4" y="14" width="7" height="7" rx="2"/><path d="M14 7.5h6M14 17.5h6"/></svg></span>
     Todo
+    <span class="fanemaerke" id="todo-maerke" hidden></span>
   </button>
   <button data-fane="kogebog" aria-current="false">
     <span class="ikon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/></svg></span>
@@ -1220,7 +1236,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.18.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.19.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2305,7 +2321,12 @@ function renderMadplan(){
       }
     }
 
-    h += '<button class="dagrad' + (ds === idag ? " idag" : "") + '" data-dag="' + ds + '">'
+    /* Samme sprog som kalenderen: graa bund naar Agnes ikke er hjemme. Teksten
+       staar nede ved portionerne, for det er dér den betyder noget. */
+    const agnesHjemme = agnesHere(d);
+    if(!agnesHjemme) under.push("uden Agnes");
+
+    h += '<button class="dagrad' + (ds === idag ? " idag" : "") + (agnesHjemme ? "" : " away") + '" data-dag="' + ds + '">'
        +   '<span class="dag"><span class="n">' + d.getDate() + '</span>'
        +     '<span class="u">' + ugedag + '</span></span>'
        +   '<span class="mad">' + hoved
@@ -2786,7 +2807,7 @@ function indkoebSomTekst(){
    samme dag. Fra i morgen ligger den i arkivet.
    ======================================================================= */
 let opgaver = [];
-let todoVisning = "aktive";        // aktive | faerdige
+let todoVisning = "engangs";       // engangs | faste | faerdige
 
 const erKlaretIDag = o => o.faerdig_dato === iso(new Date());
 const erArkiveret  = o => o.faerdig_dato && o.faerdig_dato < iso(new Date());
@@ -2862,9 +2883,16 @@ function opgKort(o, arkiv){
 }
 
 function renderTodo(){
-  if(todoVisning === "aktive"){
-    const liste = sorterAktive();
-    if(!liste.length) return '<div class="empty">Ingen opgaver lige nu.<br>Tryk på Ny opgave for at lægge en ind.</div>';
+  if(todoVisning !== "faerdige"){
+    /* Sorteringen er den samme i begge lister — overskredne øverst, så efter
+       frist. Opdelingen ændrer kun HVILKE opgaver der er med, ikke rækkefølgen. */
+    const faste = todoVisning === "faste";
+    const liste = sorterAktive().filter(o => faste ? !!o.gentag : !o.gentag);
+    if(!liste.length) return '<div class="empty">'
+      + (faste
+          ? 'Ingen faste opgaver.<br>En opgave bliver fast når du giver den en gentagelse.'
+          : 'Ingen enkeltstående opgaver lige nu.<br>Tryk på Ny opgave for at lægge en ind.')
+      + '</div>';
     return '<div class="opgliste">' + liste.map(o => opgKort(o)).join("") + '</div>';
   }
 
@@ -3087,12 +3115,33 @@ document.getElementById("opgslet-ja").onclick = async () => {
   hide("opgslet-back"); hide("opg-back"); render();
 };
 
-document.getElementById("t-aktive").onclick   = () => { todoVisning = "aktive";   opdaterTodoValg(); };
+document.getElementById("t-engangs").onclick  = () => { todoVisning = "engangs";  opdaterTodoValg(); };
+document.getElementById("t-faste").onclick    = () => { todoVisning = "faste";    opdaterTodoValg(); };
 document.getElementById("t-faerdige").onclick = () => { todoVisning = "faerdige"; opdaterTodoValg(); };
 function opdaterTodoValg(){
-  document.getElementById("t-aktive").setAttribute("aria-pressed", todoVisning === "aktive");
-  document.getElementById("t-faerdige").setAttribute("aria-pressed", todoVisning === "faerdige");
+  ["engangs","faste","faerdige"].forEach(k =>
+    document.getElementById("t-" + k).setAttribute("aria-pressed", todoVisning === k));
   render();
+}
+
+/* Tallene tæller det der stadig mangler at blive gjort — en opgave man lige
+   har krydset af står stadig i listen resten af dagen, men skal ikke tælle med
+   som noget der venter. Rødt tal betyder at der er noget overskredet. */
+function opdaterTodoTal(){
+  const idag = iso(new Date());
+  const aktive = opgaver.filter(o => !erArkiveret(o) && !o.faerdig_dato);
+  [["engangs", o => !o.gentag], ["faste", o => !!o.gentag]].forEach(([navn, hvilke]) => {
+    const liste = aktive.filter(hvilke);
+    const over  = liste.filter(o => o.deadline && o.deadline < idag).length;
+    const el = document.getElementById("t-tal-" + navn);
+    el.textContent = liste.length ? String(liste.length) : "";
+    el.classList.toggle("over", over > 0);
+  });
+  const overIAlt = aktive.filter(o => o.deadline && o.deadline < idag).length;
+  const maerke = document.getElementById("todo-maerke");
+  maerke.textContent = String(overIAlt);
+  maerke.hidden = overIAlt === 0;
+  maerke.setAttribute("aria-label", overIAlt + " overskredne opgaver");
 }
 
 /* =======================================================================
@@ -3648,6 +3697,7 @@ function renderMonth(){
    Tegn det hele
    ======================================================================= */
 function render(){
+  opdaterTodoTal();          // tal og mærke skal passe uanset hvilken fane man står på
   if(fane === "madplan" || fane === "indkoeb"){
     const start = fane === "madplan" ? madplanUge : indkoebUge;
     const s0 = start, s1 = addDays(start, 6);
@@ -5260,7 +5310,7 @@ document.getElementById("gs-liste").addEventListener("click", ev => {
   if(slags === "opgave"){
     const o = opgaver.find(x => x.id === id);
     saetFane("todo");
-    todoVisning = (o && o.faerdig_dato) ? "faerdige" : "aktive";
+    todoVisning = (o && o.faerdig_dato) ? "faerdige" : (o && o.gentag ? "faste" : "engangs");
     opdaterTodoValg();
     aabnOpgave(id);
     return;
