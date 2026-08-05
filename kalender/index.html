@@ -1039,6 +1039,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <button class="menu-row" id="menu-export">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
       Gem en kopi af alle data
+      <span class="stand" id="export-stand"></span>
     </button>
     <button class="menu-row" id="menu-skrald">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M12 18V11M9 14l3 3 3-3"/></svg>
@@ -1236,7 +1237,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.19.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.20.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4450,14 +4451,89 @@ document.getElementById("menu-logout").onclick = async () => {
   events = []; agnesOverrides.clear();
   document.getElementById("gate").classList.add("open");
 };
-document.getElementById("menu-export").onclick = () => {
+/* =======================================================================
+   Gem en kopi af alle data
+   Kopien hentes FRISKT fra basen, tabel for tabel, og gemmes som
+   rækkerne står der — ikke som appen har lavet dem om i hukommelsen.
+   Så kan en kopi lægges direkte tilbage i Supabase uden oversættelse,
+   og nye kolonner kommer af sig selv med, fordi der vælges "*".
+   ======================================================================= */
+
+/* Tabel + hvad der sorteres efter. Sorteringskolonnerne SKAL findes,
+   ellers svarer basen med fejl — alle herunder bruges andre steder i
+   filen i forvejen. Der sorteres på to kolonner hvor den første ikke er
+   entydig, så sider ikke kan bytte rundt på rækker den dag en tabel
+   bliver større end én side.                                          */
+const BACKUP_TABELLER = [
+  ["personer",             ["raekkefoelge"]],
+  ["aftaler",              ["dato","id"]],
+  ["delebarn_undtagelser", ["dato"]],
+  ["retter",               ["id"]],
+  ["ingredienser",         ["ret_id","id"]],
+  ["madplan",              ["dato"]],
+  ["indkoeb_ekstra",       ["id"]],
+  ["opgaver",              ["id"]],
+  ["skraldedage",          ["dato","fraktion"]],
+  ["ferier",               ["start_dato","id"]],
+  ["gentag_undtag",        ["aftale_id","dato"]]
+];
+/* Supabase sender højst 1000 rækker ad gangen. Uden det her ville
+   kopien stille og roligt begynde at mangle den dag madplanen runder
+   1000 dage — og det ville ingen opdage før den skulle bruges.        */
+const BACKUP_SIDE = 1000;
+
+async function hentHeleTabellen(navn, sorter){
+  let alle = [], fra = 0;
+  for(;;){
+    let q = sb.from(navn).select("*");
+    sorter.forEach(k => { q = q.order(k); });
+    const { data, error } = await q.range(fra, fra + BACKUP_SIDE - 1);
+    if(error) throw error;
+    alle = alle.concat(data || []);
+    if(!data || data.length < BACKUP_SIDE) return alle;
+    fra += BACKUP_SIDE;
+  }
+}
+
+document.getElementById("menu-export").onclick = async () => {
+  const knap  = document.getElementById("menu-export");
+  const stand = document.getElementById("export-stand");
+  if(knap.disabled) return;
+  knap.disabled = true;
+
   const kopi = {
+    app: "Vores Hverdag",
+    filversion: VERSION,
     gemt: new Date().toISOString(),
-    personer: PEOPLE,
-    aftaler: events,
-    ferier: ferier,
-    delebarn_undtagelser: [...agnesOverrides.entries()].map(([dato,er_her]) => ({dato, er_her}))
+    antal: {},
+    tabeller: {}
   };
+  const fejl = [];
+
+  for(let i = 0; i < BACKUP_TABELLER.length; i++){
+    const navn   = BACKUP_TABELLER[i][0];
+    const sorter = BACKUP_TABELLER[i][1];
+    stand.textContent = (i + 1) + "/" + BACKUP_TABELLER.length;
+    try{
+      const raekker = await hentHeleTabellen(navn, sorter);
+      kopi.tabeller[navn] = raekker;
+      kopi.antal[navn]    = raekker.length;
+    }catch(err){
+      fejl.push(navn + " (" + (err.message || err) + ")");
+      kopi.antal[navn] = null;
+    }
+  }
+
+  knap.disabled = false;
+  stand.textContent = "";
+
+  /* Kom der intet med, er der ingen grund til at gemme en tom fil. */
+  if(!Object.keys(kopi.tabeller).length){
+    vis("Kopien blev ikke hentet: " + fejl.join(" · "));
+    return;
+  }
+  if(fejl.length) kopi.ufuldstaendig = fejl;
+
   const blob = new Blob([JSON.stringify(kopi, null, 2)], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -4465,6 +4541,14 @@ document.getElementById("menu-export").onclick = () => {
   a.click();
   URL.revokeObjectURL(a.href);
   hide("menu-back");
+
+  if(fejl.length){
+    vis("Kopien er UFULDSTÆNDIG — disse tabeller kom ikke med: " + fejl.join(" · "));
+  } else {
+    const sum = Object.values(kopi.antal).reduce((a,b) => a + b, 0);
+    vis("Kopi gemt: " + sum + " rækker fra "
+      + Object.keys(kopi.tabeller).length + " tabeller.");
+  }
 };
 
 
