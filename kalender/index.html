@@ -287,7 +287,7 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .opskriftblok{
   position:sticky;top:0;z-index:2;background:var(--surface);
   margin:10px -18px 0;padding:0 18px 8px;
-  max-height:calc(34dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain;
+  max-height:calc(34dvh / var(--z,1));overflow-y:auto;overscroll-behavior:auto;
   border-bottom:1px solid var(--line);
   box-shadow:0 -20px 0 var(--surface);
 }
@@ -572,6 +572,17 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .backdrop.open{display:flex}
 .sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:calc(92dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain}
+/* Kryds til at lukke oppe i højre hjørne. Nødvendigt fordi knapperne
+   nederst i arket havner under skærmkanten på lange opskrifter.
+   position:sticky, så det bliver hængende øverst mens man ruller;
+   z-index over .opskriftblok, som også er sticky med z-index 2.     */
+.sheet .lukkryds{
+  position:sticky;top:0;z-index:6;float:right;
+  width:34px;height:34px;margin:-4px -6px 0 8px;
+  display:grid;place-items:center;border-radius:999px;
+  background:var(--chip);color:var(--muted)
+}
+.sheet .lukkryds:hover{color:var(--ink)}
 .sheet h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 4px}
 .sheet .meta{font-size:13px;color:var(--muted);margin-bottom:14px}
 .field{margin-bottom:13px}
@@ -828,6 +839,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <!-- Ret: detaljer -->
 <div class="backdrop" id="ret-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ret-titel">
+    <button class="lukkryds" id="ret-kryds" aria-label="Luk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     <h2 id="ret-titel"></h2>
     <div class="meta" id="ret-meta"></div>
     <div id="ret-krop"></div>
@@ -1237,7 +1249,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.20.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.20.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2099,6 +2111,7 @@ function aabnRet(id){
   show("ret-back");
 }
 document.getElementById("ret-luk").onclick = () => hide("ret-back");
+document.getElementById("ret-kryds").onclick = () => hide("ret-back");
 document.getElementById("ret-slet").onclick = () => {
   const r = retter.find(x => x.id === aabenRetId);
   document.getElementById("retslet-meta").textContent = r
