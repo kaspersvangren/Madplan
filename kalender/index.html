@@ -268,6 +268,22 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .ingliste .m{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .gruppe{font-size:13px;color:var(--muted);margin:14px 0 2px;font-weight:600}
 .opskrifttekst{white-space:pre-wrap;font-size:15px;margin-top:6px}
+/* Overskriften inde i ingredienskassen bliver hængende i kassens
+   egen top, så man altid kan se hvad man kigger på. De negative
+   margener gør baggrunden bred nok til også at dække kassens
+   polstring — ellers kunne teksten skimtes i kanterne.          */
+.opskriftblok .fold{
+  position:sticky;top:0;z-index:1;background:var(--surface);
+  width:auto;margin:0 -18px;padding:9px 18px
+}
+/* Og "Fremgangsmåde" klistrer lige UNDER ingredienskassen, som selv
+   sidder fast i toppen. --ingh er kassens faktiske højde, målt i
+   maalIngh(), fordi den skifter med antal ingredienser og med om
+   kassen er foldet sammen.                                        */
+.fremgang{
+  position:sticky;top:var(--ingh,0px);z-index:1;background:var(--surface);
+  margin:0 -18px;padding:13px 18px 4px
+}
 .knaprad{display:flex;gap:9px;margin:16px 0 28px}
 .linkknap{
   flex:1;min-width:0;
@@ -287,7 +303,7 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .opskriftblok{
   position:sticky;top:0;z-index:2;background:var(--surface);
   margin:10px -18px 0;padding:0 18px 8px;
-  max-height:calc(34dvh / var(--z,1));overflow-y:auto;overscroll-behavior:auto;
+  max-height:calc(26dvh / var(--z,1));overflow-y:auto;overscroll-behavior:auto;
   border-bottom:1px solid var(--line);
   box-shadow:0 -20px 0 var(--surface);
 }
@@ -1249,7 +1265,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.20.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.20.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2072,7 +2088,7 @@ function aabnRet(id){
          + '</div>';
     }
     if(r.fremgangsmaade){
-      h += '<div class="gruppe">Fremgangsmåde</div><div class="opskrifttekst">'+esc(r.fremgangsmaade)+'</div>';
+      h += '<div class="gruppe fremgang">Fremgangsmåde</div><div class="opskrifttekst">'+esc(r.fremgangsmaade)+'</div>';
     }
   }
   document.getElementById("ret-krop").innerHTML = h;
@@ -2107,9 +2123,24 @@ function aabnRet(id){
     k.style.display = aaben ? "none" : "block";
     fold.setAttribute("aria-expanded", !aaben);
     document.getElementById("fold-tegn").textContent = aaben ? "▸" : "▾";
+    maalIngh();
   };
   show("ret-back");
+  maalIngh();
 }
+/* Ingredienskassen er klistret til toppen, og "Fremgangsmåde" skal
+   klistre lige under den. Kassens højde kan ikke skrives fast: den
+   skifter med antal ingredienser, med skærmhøjden og med om kassen
+   er foldet sammen. Derfor måles den og lægges i --ingh.          */
+function maalIngh(){
+  const krop = document.getElementById("ret-krop");
+  if(!krop) return;
+  const blok = document.getElementById("opskriftblok");
+  krop.style.setProperty("--ingh",
+    (blok ? Math.round(blok.getBoundingClientRect().height) : 0) + "px");
+}
+window.addEventListener("resize", maalIngh);
+window.addEventListener("orientationchange", maalIngh);
 document.getElementById("ret-luk").onclick = () => hide("ret-back");
 document.getElementById("ret-kryds").onclick = () => hide("ret-back");
 document.getElementById("ret-slet").onclick = () => {
