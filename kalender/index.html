@@ -1265,7 +1265,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.20.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.21.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1865,7 +1865,19 @@ document.querySelector(".tabbar").addEventListener("click", ev => {
 /* =======================================================================
    Kogebog
    ======================================================================= */
-const ENHEDER = ["", "g", "kg", "ml", "l", "dl", "stk", "dåse", "pakke", "bundt", "fed"];
+const ENHEDER = ["", "g", "kg", "ml", "l", "dl", "stk", "dåse", "pakke", "pose", "bundt", "fed"];
+/* Enheder bøjes KUN når de vises. Basen gemmer stadig ental, så gamle
+   rækker virker uden videre, og en ældre udgave af filen viser dem
+   nøjagtig som før. De enheder der ikke står her, bøjes ikke: g, kg,
+   ml, l, dl og stk hedder det samme, og det gør "fed" også — to fed
+   hvidløg, ikke to fedder.                                         */
+const FLERTAL = { "dåse":"dåser", "pakke":"pakker", "pose":"poser", "bundt":"bundter" };
+/* Flertal når der er MERE end én — også ved decimaler, for det hedder
+   "1,5 dåser" på dansk. Under én bliver ental: "0,5 dåse".          */
+function boejEnhed(enhed, maengde){
+  if(!enhed) return "";
+  return (maengde > 1 && FLERTAL[enhed]) ? FLERTAL[enhed] : enhed;
+}
 let retter = [], ingredienser = [], madplanDage = [];
 let soegning = "";
 const filtre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };   // fri | krav | uden
@@ -2045,7 +2057,7 @@ function aabnRet(id){
     if(!d.length) return "";
     return '<div class="gruppe">'+titel+'</div><ul class="ingliste">'
       + d.map(i => '<li><span>'+esc(i.navn)+'</span><span class="m">'
-        + (i.maengde != null ? i.maengde + (i.enhed ? " " + esc(i.enhed) : "") : "") + '</span></li>').join("")
+        + (i.maengde != null ? i.maengde + (i.enhed ? " " + esc(boejEnhed(i.enhed, i.maengde)) : "") : "") + '</span></li>').join("")
       + '</ul>';
   };
 
@@ -2752,7 +2764,7 @@ function renderIndkoeb(){
 
   const vare = p => '<div class="ivare"><span class="n">' + esc(p.navn)
     + '<span class="kilder">' + esc([...p.retter].join(", ")) + '</span></span>'
-    + '<span class="m">' + (p.maengde != null ? tal(p.maengde) + (p.enhed ? " " + esc(p.enhed) : "") : "") + '</span></div>';
+    + '<span class="m">' + (p.maengde != null ? tal(p.maengde) + (p.enhed ? " " + esc(boejEnhed(p.enhed, p.maengde)) : "") : "") + '</span></div>';
 
   const egenVare = e => '<div class="ivare egen"><span class="n">' + esc(e.tekst) + '</span>'
     + '<button class="fjernvare" data-fjern="' + e.id + '" aria-label="Fjern">'
@@ -2836,11 +2848,11 @@ function indkoebSomTekst(){
     + (d.fraFryser ? " (" + d.fraFryser + " fra fryseren)" : d.frost ? " (frost eller rest)" : "")));
 
   linjer.push("", "KØB");
-  koeb.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + p.enhed : "") + ")" : "")));
+  koeb.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + boejEnhed(p.enhed, p.maengde) : "") + ")" : "")));
   egne.forEach(e => linjer.push("- " + e.tekst));
 
   linjer.push("", "TJEK");
-  tjek.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + p.enhed : "") + ")" : "")));
+  tjek.forEach(p => linjer.push("- " + p.navn + (p.maengde != null ? " (" + tal(p.maengde) + (p.enhed ? " " + boejEnhed(p.enhed, p.maengde) : "") + ")" : "")));
 
   return linjer.join("\n");
 }
