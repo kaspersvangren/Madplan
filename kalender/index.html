@@ -617,7 +617,22 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
    lukker af mod kortets kant, sådan som .strip's egen streg ville. */
 /* Markering af hvad vi har hjemme. Ligger i dagens ark, foldet sammen,
    for listen kan blive lang når retten har tilbehør med. */
-.ingmark{margin-top:12px;border-top:1px solid var(--line)}
+/* Knappen skal ligne en knap. Den er let at overse hvis den bare er
+   grå tekst — og den blev overset. Ramme, bund og en pil der vender
+   sig, samme sprog som de andre trykbare rækker.                    */
+.ingmark{margin-top:14px}
+#dag-ingfold{width:100%;display:flex;align-items:center;gap:10px;
+  padding:11px 13px;border:1px solid var(--line);border-radius:12px;
+  background:var(--bg);text-align:left;font-size:15px;color:var(--ink);font-weight:600}
+#dag-ingfold:hover{border-color:var(--line-strong)}
+#dag-ingfold[aria-expanded="true"]{border-color:var(--line-strong);
+  border-bottom-left-radius:0;border-bottom-right-radius:0}
+.imnavn{flex:1;min-width:0}
+.impil{flex:none;color:var(--muted);display:grid;place-items:center;
+  transition:transform .18s ease}
+#dag-ingfold[aria-expanded="true"] .impil{transform:rotate(180deg)}
+#dag-ingliste{border:1px solid var(--line-strong);border-top:none;
+  border-radius:0 0 12px 12px;padding:2px 13px 10px}
 .ingmark .imkilde{font-size:12px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
 .imrad{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:7px 0;
@@ -628,7 +643,11 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .imrad .v{display:flex;gap:6px;flex:none;margin-left:auto}
 .imrad .pchip{padding:5px 11px;font-size:13px}
 .ingmark .tom{color:var(--muted);font-size:14px;padding:10px 0;display:block}
-.imtal{color:var(--muted);font-weight:400}
+.imtal{display:block;color:var(--muted);font-weight:400;font-size:13px;margin-top:2px}
+/* Optøningen limes sammen med aftensmaden: madraden mister sin egen
+   streg, så de to læses som ét. */
+.madblok.medoptoen{border-bottom:1px solid var(--line)}
+.madblok.medoptoen > .strip{border-bottom:none}
 .huskblok{border-top:1px solid var(--line)}
 .strip.paamind{border-bottom:none;padding:12px 15px 13px;gap:9px}
 .strip.paamind + .strip.paamind{padding-top:0}
@@ -1010,8 +1029,8 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 
     <div class="ingmark" id="dag-ingmark" hidden>
       <button class="fold" id="dag-ingfold" aria-expanded="false">
-        <span>Hvad har vi, og hvad skal op af fryseren? <span class="imtal" id="dag-ingtal"></span></span>
-        <span id="dag-ingfold-tegn">▸</span>
+        <span class="imnavn">Hvad har vi, og hvad skal op af fryseren?<span class="imtal" id="dag-ingtal"></span></span>
+        <span class="impil" id="dag-ingfold-tegn" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
       </button>
       <div id="dag-ingliste" style="display:none"></div>
     </div>
@@ -1318,7 +1337,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.23.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.24.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2442,6 +2461,7 @@ async function gemDag(ds, felter){
     portioner: nu.portioner || 1,
     frost:     nu.frost     || false,
     helret_frost: nu.helret_frost || false,
+    optoening_skjult: nu.optoening_skjult || false,
     frost_reserveret: nu.frost_reserveret || 0,
     frost_afskrevet:  nu.frost_afskrevet  || false
   }, felter);
@@ -2667,6 +2687,12 @@ document.getElementById("dag-gem").onclick = async () => {
        kommer den med i upserten, svarer basen med fejl. */
     const felter = Object.assign({}, k);
     delete felter.ingMark;
+    /* Skifter man retten eller markeringerne på dagen, er en tidligere
+       fjernet optøningspåmindelse ikke længere den samme påmindelse.
+       Den nulstilles, så den nye faktisk bliver vist.               */
+    const foer = madplanFor(aabenDag);
+    if(!foer || foer.ret_id !== k.ret_id || !!foer.helret_frost !== !!k.helret_frost)
+      felter.optoening_skjult = false;
     await gemDag(aabenDag, felter);
     await gemIngMark(aabenDag, k.ingMark);
     render();
@@ -2745,13 +2771,12 @@ function tegnIngMark(){
     return mk && (mk.har || mk.frost);
   }).length;
   document.getElementById("dag-ingtal").textContent = synlige
-    ? "\u00b7 " + synlige + (synlige === 1 ? " ingrediens markeret" : " ingredienser markeret")
-    : "";
+    ? synlige + (synlige === 1 ? " ingrediens markeret" : " ingredienser markeret")
+    : "Intet markeret endnu";
 
   document.getElementById("dag-ingliste").innerHTML = h;
   document.getElementById("dag-ingliste").style.display = imAaben ? "block" : "none";
   document.getElementById("dag-ingfold").setAttribute("aria-expanded", String(imAaben));
-  document.getElementById("dag-ingfold-tegn").textContent = imAaben ? "\u25be" : "\u25b8";
 }
 
 document.getElementById("dag-ingfold").onclick = () => {
@@ -2957,6 +2982,21 @@ const tal = n => {
    salaten", så man kan have nok til den ene og ikke til den anden.
    ======================================================================= */
 let madplanIng = [];
+
+/* Hvad skal op af fryseren til en given dag. Én linje pr. ting — man
+   kan have taget den ene op og ikke den anden, og så skal de kunne
+   trykkes væk hver for sig. Hele retten tæller som én ting.        */
+function optoeningTil(ds){
+  const m = madplanFor(ds);
+  if(!m) return [];
+  const ud = [];
+  if(m.frost && m.helret_frost && !m.optoening_skjult && m.ret_navn){
+    ud.push({ slags:"helret", dato:ds, navn:m.ret_navn });
+  }
+  madplanIng.filter(r => r.dato === ds && r.frost && !r.optoening_skjult)
+    .forEach(r => ud.push({ slags:"ing", dato:ds, retId:r.ret_id, navn:r.navn }));
+  return ud;
+}
 
 /* Alle steder en dags ingredienser kommer fra. Hovedretten først, så
    tilbehøret. Kun kilder der findes i kogebogen — noget tastet i hånden
@@ -3894,10 +3934,25 @@ function renderDay(){
     h += '<div class="strip"><span class="label">Vejr</span><span class="vejr">'+stribe+'</span></div>';
   }
 
-  h += '<div class="strip">'
-     +   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
-     +   '<span class="label">Aftensmad</span><span>'+mealText+'</span>'
-     + '</div>';
+  /* Maden, og lige under den: hvad der skal op af fryseren til i morgen.
+     Optøningen hører til maden, ikke til aftalerne, så den bor her.   */
+  const optoen = optoeningTil(iso(addDays(d,1)));
+  h += '<div class="madblok' + (optoen.length ? " medoptoen" : "") + '">'
+     +   '<div class="strip">'
+     +     '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
+     +     '<span class="label">Aftensmad</span><span>'+mealText+'</span>'
+     +   '</div>';
+  optoen.forEach(o => {
+    h += '<div class="strip paamind">'
+       +   '<span class="ikon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v20M4.9 6.5l14.2 11M19.1 6.5L4.9 17.5"/></svg></span>'
+       +   '<span class="tekst">Tag <b>' + esc(o.navn) + '</b> op af fryseren '
+       +     '<span class="naar">til i morgen</span></span>'
+       +   '<button class="vaek" data-optoen="' + esc(o.slags + "\u0001" + o.dato + "\u0001" + (o.retId || "") + "\u0001" + o.navn) + '" aria-label="Fjern p\u00e5mindelsen">'
+       +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+       +   '</button>'
+       + '</div>';
+  });
+  h += '</div>';
 
   if(hol){
     h += '<div class="strip"><span class="label">Helligdag</span><span class="holiday-tag">'+esc(hol)+'</span></div>';
@@ -4229,12 +4284,45 @@ document.getElementById("theme-btn").onclick = () => saetTema(erMoerk() ? "light
    ======================================================================= */
 let venterHusk = null;
 
+/* Optøningen bruger samme dialog som aftalepåmindelsen — det er samme
+   handling, og to næsten ens dialoger ville bare være to at holde ved
+   lige. Fjernelsen gælder kun den ene dag, for linjen vises kun dér. */
+function spoergOptoen(pakke){
+  const [slags, dato, retId, navn] = pakke.split("\u0001");
+  venterHusk = { slags:"optoen", optoenSlags:slags, dato:dato, retId:retId, navn:navn };
+  document.getElementById("husk-meta").textContent =
+    "Så forsvinder linjen om " + navn + " for i dag. "
+    + (slags === "helret"
+        ? "Retten bliver stående på madplanen."
+        : "Markeringen bliver stående, så indkøbslisten er uændret.");
+  show("husk-back");
+}
+
+async function fjernOptoen(v){
+  if(v.optoenSlags === "helret"){
+    const { error } = await sb.from("madplan")
+      .update({ optoening_skjult:true }).eq("dato", v.dato);
+    if(error){ vis("Kunne ikke fjerne påmindelsen: " + error.message); return; }
+    const m = madplanFor(v.dato);
+    if(m) m.optoening_skjult = true;
+  } else {
+    const { error } = await sb.from("madplan_ingrediens")
+      .update({ optoening_skjult:true })
+      .eq("dato", v.dato).eq("ret_id", v.retId).eq("navn", v.navn);
+    if(error){ vis("Kunne ikke fjerne påmindelsen: " + error.message); return; }
+    const r = madplanIng.find(x =>
+      x.dato === v.dato && x.ret_id === v.retId && x.navn === v.navn);
+    if(r) r.optoening_skjult = true;
+  }
+  render();
+}
+
 function spoergHusk(noegle){
   const skille = noegle.lastIndexOf("|");
   const id = noegle.slice(0, skille), forekomst = noegle.slice(skille + 1);
   const e = events.find(x => x.id === id);
   if(!e) return;
-  venterHusk = { id: id, forekomst: forekomst };
+  venterHusk = { slags:"aftale", id: id, forekomst: forekomst };
   document.getElementById("husk-meta").textContent =
     "Så forsvinder påmindelsen om " + e.title + " både i dag og de dage der er "
     + "tilbage. Selve aftalen bliver stående."
@@ -4251,6 +4339,7 @@ document.getElementById("husk-ja").onclick = async () => {
   const v = venterHusk;
   venterHusk = null;
   hide("husk-back");
+  if(v.slags === "optoen") return fjernOptoen(v);
   const { error } = await sb.from("paamind_skjult")
     .insert({ aftale_id: v.id, forekomst_dato: v.forekomst });
   if(error){ vis("Kunne ikke fjerne påmindelsen: " + error.message); return; }
@@ -4261,6 +4350,8 @@ document.getElementById("husk-ja").onclick = async () => {
 document.getElementById("stage").addEventListener("click", async ev => {
   const husk = ev.target.closest("[data-husk]");
   if(husk){ spoergHusk(husk.dataset.husk); return; }
+  const opt = ev.target.closest("[data-optoen]");
+  if(opt){ spoergOptoen(opt.dataset.optoen); return; }
   const goto = ev.target.closest("[data-goto]");
   const week = ev.target.closest("[data-week]");
   const evb  = ev.target.closest("[data-ev]");
