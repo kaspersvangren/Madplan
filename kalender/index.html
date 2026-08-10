@@ -615,6 +615,19 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 /* Påmindelser om aftaler. Ligger nederst i dagskortet, under dagens
    aftaler, i deres egen gruppe med en streg foroven — så gruppen ikke
    lukker af mod kortets kant, sådan som .strip's egen streg ville. */
+/* Markering af hvad vi har hjemme. Ligger i dagens ark, foldet sammen,
+   for listen kan blive lang når retten har tilbehør med. */
+.ingmark{margin-top:12px;border-top:1px solid var(--line)}
+.ingmark .imkilde{font-size:12px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.imrad{display:flex;align-items:center;gap:10px;padding:6px 0;
+  border-bottom:1px solid var(--line)}
+.imrad:last-child{border-bottom:none}
+.imrad .n{flex:1;min-width:0;font-size:15px}
+.imrad .n small{color:var(--muted);font-size:13px;margin-left:6px}
+.imrad .v{display:flex;gap:6px;flex:none}
+.imrad .pchip{padding:5px 11px;font-size:13px}
+.ingmark .tom{color:var(--muted);font-size:14px;padding:10px 0;display:block}
 .huskblok{border-top:1px solid var(--line)}
 .strip.paamind{border-bottom:none;padding:12px 15px 13px;gap:9px}
 .strip.paamind + .strip.paamind{padding-top:0}
@@ -992,6 +1005,15 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <div class="frostinfo" id="dag-fryser-info" hidden></div>
 
     <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — hovedretten udelades fra indkøb</label>
+    <label class="check" id="dag-helfrost-felt" hidden><input type="checkbox" id="dag-helfrost"> Den står i fryseren og skal tøs op</label>
+
+    <div class="ingmark" id="dag-ingmark" hidden>
+      <button class="fold" id="dag-ingfold" aria-expanded="false">
+        <span>Har vi noget af det hjemme?</span>
+        <span id="dag-ingfold-tegn">▸</span>
+      </button>
+      <div id="dag-ingliste" style="display:none"></div>
+    </div>
 
     <div style="margin-top:14px">
       <div id="dag-links"></div>
@@ -1295,7 +1317,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.22.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.23.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1801,7 +1823,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes, phRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes, phRes, miRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
@@ -1813,7 +1835,8 @@ async function hentAlt(forsoeg){
     sb.from("skraldedage").select("*"),
     sb.from("ferier").select("*"),
     sb.from("gentag_undtag").select("*"),
-    sb.from("paamind_skjult").select("*")
+    sb.from("paamind_skjult").select("*"),
+    sb.from("madplan_ingrediens").select("*")
   ]);
 
   const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
@@ -1839,6 +1862,15 @@ async function hentAlt(forsoeg){
   } else {
     (phRes.data || []).forEach(r =>
       paamindSkjult.add(r.aftale_id + "|" + r.forekomst_dato));
+  }
+
+  /* Ingrediensmarkeringer — også for sig, af samme grund. */
+  if(miRes.error){
+    madplanIng = [];
+    vis("Markeringer pr. ingrediens kunne ikke hentes: " + miRes.error.message
+      + " — er SQL'en til madplan_ingrediens kørt?");
+  } else {
+    madplanIng = miRes.data || [];
   }
 
   sidsteHentning = Date.now();
@@ -2408,6 +2440,7 @@ async function gemDag(ds, felter){
     tilbehoer: Array.isArray(nu.tilbehoer) ? nu.tilbehoer : [],
     portioner: nu.portioner || 1,
     frost:     nu.frost     || false,
+    helret_frost: nu.helret_frost || false,
     frost_reserveret: nu.frost_reserveret || 0,
     frost_afskrevet:  nu.frost_afskrevet  || false
   }, felter);
@@ -2420,7 +2453,30 @@ async function gemDag(ds, felter){
   return data[0];
 }
 
+/* Markeringerne for én dag skrives forfra: slet alt for datoen, læg det
+   der står i kladden ind igen. Samme fremgangsmåde som ingredienserne
+   på en ret — enklere end at holde styr på hvad der er ændret, og der
+   er højst en håndfuld rækker pr. dag. */
+async function gemIngMark(ds, mark){
+  const { error } = await sb.from("madplan_ingrediens").delete().eq("dato", ds);
+  if(error){ vis("Kunne ikke gemme markeringerne: " + error.message); return; }
+  madplanIng = madplanIng.filter(r => r.dato !== ds);
+
+  const rene = Object.keys(mark || {}).map(n => {
+    const i = n.indexOf("\u0000");
+    return { dato: ds, ret_id: n.slice(0, i), navn: n.slice(i + 1),
+             har: !!mark[n].har, frost: !!mark[n].frost };
+  }).filter(r => r.har || r.frost);
+
+  if(!rene.length) return;
+  const { data, error: f2 } = await sb.from("madplan_ingrediens").insert(rene).select();
+  if(f2){ vis("Kunne ikke gemme markeringerne: " + f2.message); return; }
+  madplanIng.push(...(data || []));
+}
+
 async function rydDag(ds){
+  await sb.from("madplan_ingrediens").delete().eq("dato", ds);
+  madplanIng = madplanIng.filter(r => r.dato !== ds);
   const { error } = await sb.from("madplan").delete().eq("dato", ds);
   if(error){ vis("Kunne ikke rydde dagen: " + error.message); return; }
   madplanDage = madplanDage.filter(m => m.dato !== ds);
@@ -2473,8 +2529,9 @@ let dagKladde = null;
 const tomKladde = () => ({
   ret_id:null, ret_navn:"",
   tilbehoer:[],                    // [{id, navn}] — id er tomt for noget tastet i hånden
-  portioner:1, frost:false,
-  frost_reserveret:0, frost_afskrevet:false
+  portioner:1, frost:false, helret_frost:false,
+  frost_reserveret:0, frost_afskrevet:false,
+  ingMark:{}                       // "retId\u0000navn" -> {har, frost}
 });
 
 function aabnDag(ds){
@@ -2484,9 +2541,16 @@ function aabnDag(ds){
     ret_id:    m.ret_id, ret_navn: m.ret_navn || "",
     tilbehoer: Array.isArray(m.tilbehoer) ? m.tilbehoer.slice() : [],
     portioner: m.portioner || 1, frost: !!m.frost,
+    helret_frost: !!m.helret_frost,
     frost_reserveret: m.frost_reserveret || 0,
-    frost_afskrevet:  !!m.frost_afskrevet
+    frost_afskrevet:  !!m.frost_afskrevet,
+    ingMark: {}
   } : tomKladde();
+
+  /* Markeringerne ind i kladden, så Fortryd virkelig fortryder. */
+  madplanIng.filter(r => r.dato === ds).forEach(r => {
+    dagKladde.ingMark[r.ret_id + "\u0000" + r.navn] = { har: !!r.har, frost: !!r.frost };
+  });
 
   tegnDagArk();
   show("dag-back");
@@ -2508,6 +2572,9 @@ function tegnDagArk(){
   document.getElementById("dag-tilbehoer").textContent = k.tilbehoer.length ? k.tilbehoer.map(t => t.navn).join(", ") : "—";
   document.getElementById("dag-portioner").textContent = k.portioner;
   document.getElementById("dag-frost").checked         = k.frost;
+  document.getElementById("dag-helfrost-felt").hidden  = !k.frost;
+  document.getElementById("dag-helfrost").checked      = k.helret_frost;
+  tegnIngMark();
 
   /* Fryseren. Linjen vises kun når retten faktisk har noget på lager,
      eller når denne dag allerede har lovet noget væk. Tager man fra
@@ -2563,7 +2630,6 @@ function tegnDagArk(){
 }
 
 document.getElementById("dag-fortryd").onclick = () => hide("dag-back");
-document.getElementById("dag-frost").onchange  = ev => { dagKladde.frost = ev.target.checked; };
 document.getElementById("dag-minus").onclick   = () => { dagKladde.portioner = Math.max(1, dagKladde.portioner - 1); tegnDagArk(); };
 document.getElementById("dag-plus").onclick    = () => { dagKladde.portioner = Math.min(12, dagKladde.portioner + 1); tegnDagArk(); };
 document.getElementById("dag-ryd").onclick     = () => { dagKladde = tomKladde(); tegnDagArk(); };
@@ -2582,12 +2648,28 @@ document.getElementById("dag-fryser-plus").onclick = () => {
   tegnDagArk();
 };
 
+document.getElementById("dag-frost").onchange = ev => {
+  dagKladde.frost = ev.target.checked;
+  if(!ev.target.checked) dagKladde.helret_frost = false;
+  tegnDagArk();
+};
+
 document.getElementById("dag-gem").onclick = async () => {
   const k = dagKladde;
   const tom = !k.ret_navn && !k.tilbehoer.length && !k.frost && k.portioner === 1 && !k.frost_reserveret;
   const knap = document.getElementById("dag-gem");
   knap.disabled = true; knap.textContent = "Gemmer …";
-  if(tom) await rydDag(aabenDag); else await gemDag(aabenDag, k);
+  if(tom){
+    await rydDag(aabenDag);
+  } else {
+    /* ingMark er kladdens eget felt og er IKKE en kolonne i madplan —
+       kommer den med i upserten, svarer basen med fejl. */
+    const felter = Object.assign({}, k);
+    delete felter.ingMark;
+    await gemDag(aabenDag, felter);
+    await gemIngMark(aabenDag, k.ingMark);
+    render();
+  }
   knap.disabled = false; knap.textContent = "Gem";
   hide("dag-back");
 };
@@ -2608,6 +2690,75 @@ let vaelgKunFrost = false;
 document.getElementById("dag-vaelg").onclick           = () => aabnVaelger("ret");
 document.getElementById("dag-vaelg-tilbehoer").onclick = () => aabnVaelger("tilbehoer");
 document.getElementById("vaelg-fortryd").onclick       = () => hide("vaelg-back");
+
+/* ---------- Har vi noget hjemme? ----------
+   Én linje pr. ingrediens pr. kilde. Bevidst IKKE lagt sammen på tværs
+   af kilder: har man 500 g kød i fryseren og to retter der hver skal
+   bruge 500 g, skal man kunne markere den ene og købe frisk til den
+   anden. Tilbehør får kun "Har" — der er ikke noget tilbehør der skal
+   tøs op.                                                            */
+let imRader = [];
+let imAaben = false;
+
+function tegnIngMark(){
+  const blok = document.getElementById("dag-ingmark");
+  const kilder = ingKilder(dagKladde.ret_id ? {
+    ret_id: dagKladde.ret_id, ret_navn: dagKladde.ret_navn,
+    tilbehoer: dagKladde.tilbehoer
+  } : { tilbehoer: dagKladde.tilbehoer });
+
+  imRader = [];
+  kilder.forEach(kilde => {
+    ingredienserFor(kilde.retId).forEach(ing => {
+      imRader.push({ retId:kilde.retId, kilde:kilde.navn, tilbehoer:kilde.tilbehoer,
+                     navn:ing.navn, maengde:ing.maengde, enhed:ing.enhed });
+    });
+  });
+
+  blok.hidden = !imRader.length;
+  if(!imRader.length) return;
+
+  let h = "", sidsteKilde = null;
+  imRader.forEach((r, n) => {
+    if(r.kilde !== sidsteKilde){
+      h += '<div class="imkilde">' + esc(r.kilde) + (r.tilbehoer ? " (tilbeh\u00f8r)" : "") + '</div>';
+      sidsteKilde = r.kilde;
+    }
+    const mk = dagKladde.ingMark[r.retId + "\u0000" + r.navn] || {};
+    const maal = r.maengde != null
+      ? '<small>' + tal(r.maengde) + (r.enhed ? " " + esc(boejEnhed(r.enhed, r.maengde)) : "") + '</small>'
+      : "";
+    h += '<div class="imrad"><span class="n">' + esc(r.navn) + maal + '</span><span class="v">'
+       +   '<button type="button" class="pchip" data-im="' + n + '" data-imf="har" aria-pressed="'
+       +     (!!mk.har) + '">Har</button>'
+       +   (r.tilbehoer ? "" :
+             '<button type="button" class="pchip" data-im="' + n + '" data-imf="frost" aria-pressed="'
+             + (!!mk.frost) + '">Frost</button>')
+       + '</span></div>';
+  });
+  document.getElementById("dag-ingliste").innerHTML = h;
+  document.getElementById("dag-ingliste").style.display = imAaben ? "block" : "none";
+  document.getElementById("dag-ingfold").setAttribute("aria-expanded", String(imAaben));
+  document.getElementById("dag-ingfold-tegn").textContent = imAaben ? "\u25be" : "\u25b8";
+}
+
+document.getElementById("dag-ingfold").onclick = () => {
+  imAaben = !imAaben;
+  tegnIngMark();
+};
+document.getElementById("dag-ingliste").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-im]"); if(!b) return;
+  const r = imRader[Number(b.dataset.im)]; if(!r) return;
+  const noegle = r.retId + "\u0000" + r.navn;
+  const mk = dagKladde.ingMark[noegle] || { har:false, frost:false };
+  mk[b.dataset.imf] = !mk[b.dataset.imf];
+  if(!mk.har && !mk.frost) delete dagKladde.ingMark[noegle];
+  else dagKladde.ingMark[noegle] = mk;
+  tegnIngMark();
+});
+document.getElementById("dag-helfrost").onchange = ev => {
+  dagKladde.helret_frost = ev.target.checked;
+};
 
 function aabnVaelger(tilstand){
   vaelgTilstand = tilstand;
@@ -2751,6 +2902,7 @@ document.getElementById("fryser-ja").onclick    = () => {
   dagKladde.frost_reserveret = fryserAntal;
   dagKladde.portioner = fryserAntal;
   dagKladde.frost = true;
+  dagKladde.helret_frost = true;      /* den kom jo fra fryseren */
   hide("fryser-back");
   tegnDagArk();
 };
@@ -2777,6 +2929,38 @@ const tal = n => {
   const r = Math.round(n * 100) / 100;
   return String(r).replace(".", ",");
 };
+
+/* =======================================================================
+   Hvad vi har hjemme
+   To markeringer, og de er UAFHÆNGIGE:
+     har   = udelades fra indkøb
+     frost = skal tøs op dagen før
+   Kombinationen nej+frost er den vigtige nye: noget vi køber frossent
+   til formålet. Det skal stadig på listen, OG det skal tøs op.
+
+   Nøglen er dato + kilde-ret + navn. Ikke ingrediensens id: en ret får
+   alle sine ingredienser slettet og skrevet forfra hver gang den
+   redigeres, så id'erne skifter, og markeringerne ville forsvinde i
+   stilhed. ret_id skiller samtidig "løg til lasagnen" fra "løg til
+   salaten", så man kan have nok til den ene og ikke til den anden.
+   ======================================================================= */
+let madplanIng = [];
+
+/* Alle steder en dags ingredienser kommer fra. Hovedretten først, så
+   tilbehøret. Kun kilder der findes i kogebogen — noget tastet i hånden
+   har ingen ingredienser at markere. */
+function ingKilder(m){
+  if(!m) return [];
+  const ud = [];
+  if(m.ret_id) ud.push({ retId:m.ret_id, navn:m.ret_navn || "Retten", tilbehoer:false });
+  (m.tilbehoer || []).forEach(t => {
+    if(t.id) ud.push({ retId:t.id, navn:t.navn, tilbehoer:true });
+  });
+  return ud.filter(k => ingredienserFor(k.retId).length);
+}
+
+const ingMarkFor = (dato, retId, navn) =>
+  madplanIng.find(r => r.dato === dato && r.ret_id === retId && r.navn === navn) || null;
 
 function beregnIndkoeb(fredag){
   const koeb = new Map(), tjek = new Map(), dage = [];
@@ -2805,6 +2989,11 @@ function beregnIndkoeb(fredag){
     if(!kilder.length) continue;
     kilder.forEach(kilde => {
       ingredienserFor(kilde.id).forEach(ing => {
+        /* Har vi den hjemme, skal den ikke købes. Kun "har" udelader —
+           "frost" alene betyder at den skal tøs op, og noget vi køber
+           frossent skal jo stadig med på listen. */
+        const mk = ingMarkFor(ds, kilde.id, ing.navn);
+        if(mk && mk.har) return;
         const kort = ing.kategori === "tjek" ? tjek : koeb;
         const noegle = ing.navn.toLowerCase() + "|" + (ing.enhed || "");
         const post = kort.get(noegle) || { navn: ing.navn, enhed: ing.enhed || "", maengde: null, retter: new Set() };
@@ -3586,6 +3775,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"ferier" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"gentag_undtag" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"paamind_skjult" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"madplan_ingrediens" }, () => hentAlt())
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
