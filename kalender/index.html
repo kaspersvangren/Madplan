@@ -612,6 +612,19 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .row2{display:flex;gap:10px}
 .row2>*{flex:1}
 .people{display:flex;flex-wrap:wrap;gap:7px}
+/* Påmindelser om aftaler. Ligger nederst i dagskortet, under dagens
+   aftaler, i deres egen gruppe med en streg foroven — så gruppen ikke
+   lukker af mod kortets kant, sådan som .strip's egen streg ville. */
+.huskblok{border-top:1px solid var(--line)}
+.strip.paamind{border-bottom:none;padding:12px 15px 13px;gap:9px}
+.strip.paamind + .strip.paamind{padding-top:0}
+.paamind .ikon{flex:none;color:var(--muted)}
+.paamind .tekst{flex:1;min-width:0}
+.paamind .tekst b{font-weight:600}
+.paamind .naar{color:var(--muted)}
+.paamind .vaek{flex:none;width:30px;height:30px;border-radius:999px;
+  display:grid;place-items:center;color:var(--muted);margin-right:-6px}
+.paamind .vaek:hover{background:var(--chip);color:var(--ink)}
 .pchip{display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;border:1px solid var(--line);font-size:14px;background:var(--bg)}
 .pchip[aria-pressed="true"]{border-color:var(--line-strong);background:var(--chip);font-weight:600}
 .check{display:flex;align-items:center;gap:9px;font-size:15px;padding:6px 0}
@@ -875,6 +888,18 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <div class="actions">
       <button class="btn" id="retslet-nej">Behold</button>
       <button class="btn primary" id="retslet-ja">Slet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fjern en påmindelse -->
+<div class="backdrop" id="husk-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Fjern påmindelsen?</h2>
+    <div class="meta" id="husk-meta"></div>
+    <div class="actions">
+      <button class="btn" id="husk-nej">Behold</button>
+      <button class="btn primary" id="husk-ja">Fjern</button>
     </div>
   </div>
 </div>
@@ -1246,6 +1271,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       </div>
       <div class="gsum" id="f-gsum"></div>
     </div>
+    <div class="field" id="f-paamind-felt">
+      <label>Påmindelse</label>
+      <div class="people" id="f-paamind"></div>
+      <div class="gsum" id="f-paamind-sum"></div>
+    </div>
     <div class="row2" id="f-times">
       <div class="field"><label for="f-start" id="f-start-mrk">Start</label><input type="time" id="f-start"></div>
       <div class="field"><label for="f-end" id="f-end-mrk">Slut</label><input type="time" id="f-end"></div>
@@ -1265,7 +1295,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.21.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.22.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -1452,6 +1482,32 @@ function tidPaaDag(e, ds){
 function sorterTid(e, ds){
   const t = tidPaaDag(e, ds);
   return t.slags === "hel" ? (t.start || "") : (t.tid || "");
+}
+
+/* =======================================================================
+   Påmindelser om aftaler
+   En aftale kan bære et antal dage. Dagene op til vises en linje der
+   tæller ned. Aldrig på selve dagen — der står aftalen jo lige nedenfor.
+   ======================================================================= */
+const PAAMIND_MAX = 7;
+const paamindSkjult = new Set();          /* "aftale_id|forekomst_dato" */
+const paamindTekst = n => n === 1 ? "i morgen" : "om " + n + " dage";
+
+function paamindelserPaa(ds){
+  const ud = [];
+  for(let n = 1; n <= PAAMIND_MAX; n++){
+    const frem = iso(addDays(fromIso(ds), n));
+    eventsOn(frem).forEach(e => {
+      if(!e.paamindDage || e.paamindDage < n) return;
+      /* Kun starten tæller. En flerdags-aftale skal ikke minde om hver
+         eneste af sine dage — kun om den dag den begynder. Gentagne og
+         årlige aftaler er altid éndags, så dér ER frem forekomsten. */
+      if(!e.gentag && !e.yearly && frem !== e.date) return;
+      if(paamindSkjult.has(e.id + "|" + frem)) return;
+      ud.push({ e: e, forekomst: frem, om: n });
+    });
+  }
+  return ud.sort((a,b) => a.om - b.om || a.e.title.localeCompare(b.e.title,"da"));
 }
 
 function eventsOn(ds){
@@ -1718,14 +1774,16 @@ const fraRaekke = r => ({
   id: r.id, date: r.dato, endDate: r.slut_dato || "", allDay: r.heldags,
   start: hhmm(r.start_tid), end: hhmm(r.slut_tid),
   title: r.titel, desc: r.beskrivelse || "",
-  yearly: r.aarlig, gentag: r.gentag || "", people: r.personer || []
+  yearly: r.aarlig, gentag: r.gentag || "", people: r.personer || [],
+  paamindDage: r.paamind_dage || 0
 });
 const tilRaekke = e => ({
   dato: e.date, slut_dato: e.endDate || null, heldags: e.allDay,
   start_tid: e.allDay ? null : (e.start || null),
   slut_tid: (e.allDay || !e.end) ? null : e.end,
   titel: e.title, beskrivelse: e.desc || "",
-  aarlig: e.yearly, gentag: e.gentag || null, personer: e.people
+  aarlig: e.yearly, gentag: e.gentag || null, personer: e.people,
+  paamind_dage: e.paamindDage || null
 });
 
 /* =======================================================================
@@ -1743,7 +1801,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes, phRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
@@ -1754,7 +1812,8 @@ async function hentAlt(forsoeg){
     sb.from("opgaver").select("*"),
     sb.from("skraldedage").select("*"),
     sb.from("ferier").select("*"),
-    sb.from("gentag_undtag").select("*")
+    sb.from("gentag_undtag").select("*"),
+    sb.from("paamind_skjult").select("*")
   ]);
 
   const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
@@ -1770,6 +1829,17 @@ async function hentAlt(forsoeg){
   }
   undtagelser.clear();
   (gRes.data || []).forEach(r => undtagelser.add(r.aftale_id + "|" + r.dato));
+
+  /* Skjulte påmindelser hentes for sig, så appen stadig virker hvis
+     tabellen mangler — præcis som ferierne. */
+  paamindSkjult.clear();
+  if(phRes.error){
+    vis("Skjulte påmindelser kunne ikke hentes: " + phRes.error.message
+      + " — er SQL'en til påmindelser kørt?");
+  } else {
+    (phRes.data || []).forEach(r =>
+      paamindSkjult.add(r.aftale_id + "|" + r.forekomst_dato));
+  }
 
   sidsteHentning = Date.now();
   retter       = rRes.data || [];
@@ -3515,6 +3585,7 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"skraldedage" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"ferier" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"gentag_undtag" }, () => hentAlt())
+    .on("postgres_changes", { event:"*", schema:"public", table:"paamind_skjult" }, () => hentAlt())
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
@@ -3660,6 +3731,23 @@ function renderDay(){
     });
     h += '</div>';
   }
+
+  const paamind = paamindelserPaa(ds);
+  if(paamind.length){
+    h += '<div class="huskblok">';
+    paamind.forEach(pm => {
+      h += '<div class="strip paamind">'
+         +   '<span class="ikon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>'
+         +   '<span class="tekst">Husk <b>' + esc(pm.e.title) + '</b> '
+         +     '<span class="naar">' + paamindTekst(pm.om) + '</span></span>'
+         +   '<button class="vaek" data-husk="' + pm.e.id + '|' + pm.forekomst + '" aria-label="Fjern påmindelsen">'
+         +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+         +   '</button>'
+         + '</div>';
+    });
+    h += '</div>';
+  }
+
   return h + '</div>';
 }
 
@@ -3930,7 +4018,47 @@ document.getElementById("theme-btn").onclick = () => saetTema(erMoerk() ? "light
 /* =======================================================================
    Handlinger i visningen
    ======================================================================= */
+/* =======================================================================
+   Fjern en påmindelse
+   Fjernelsen hænger på FOREKOMSTEN, ikke på aftalen. Trykker man den væk
+   på en gentagen aftale, rammer det kun den ene gang — næste gang minder
+   den igen. Én række pr. forekomst er nok, for fjernelsen gælder alligevel
+   resten af den forekomsts optaktsdage.
+   ======================================================================= */
+let venterHusk = null;
+
+function spoergHusk(noegle){
+  const skille = noegle.lastIndexOf("|");
+  const id = noegle.slice(0, skille), forekomst = noegle.slice(skille + 1);
+  const e = events.find(x => x.id === id);
+  if(!e) return;
+  venterHusk = { id: id, forekomst: forekomst };
+  document.getElementById("husk-meta").textContent =
+    "Så forsvinder påmindelsen om " + e.title + " både i dag og de dage der er "
+    + "tilbage. Selve aftalen bliver stående."
+    + ((e.gentag || e.yearly) ? " Næste gang aftalen kommer, minder den igen." : "");
+  show("husk-back");
+}
+
+document.getElementById("husk-nej").onclick = () => {
+  venterHusk = null;
+  hide("husk-back");
+};
+document.getElementById("husk-ja").onclick = async () => {
+  if(!venterHusk) return;
+  const v = venterHusk;
+  venterHusk = null;
+  hide("husk-back");
+  const { error } = await sb.from("paamind_skjult")
+    .insert({ aftale_id: v.id, forekomst_dato: v.forekomst });
+  if(error){ vis("Kunne ikke fjerne påmindelsen: " + error.message); return; }
+  paamindSkjult.add(v.id + "|" + v.forekomst);
+  render();
+};
+
 document.getElementById("stage").addEventListener("click", async ev => {
+  const husk = ev.target.closest("[data-husk]");
+  if(husk){ spoergHusk(husk.dataset.husk); return; }
   const goto = ev.target.closest("[data-goto]");
   const week = ev.target.closest("[data-week]");
   const evb  = ev.target.closest("[data-ev]");
@@ -4106,6 +4234,26 @@ document.getElementById("f-allday").onchange = syncTimeFields;
 let formSlags = "aftale";
 let redigererFerieId = null;
 
+/* Faste valg frem for fri indtastning: syv dage er loftet, og så er der
+   ikke noget at taste forkert. 0 = ingen påmindelse. */
+let paamindValg = 0;
+function tegnPaamindChips(){
+  const kn = ["Ingen"];
+  for(let i = 1; i <= PAAMIND_MAX; i++) kn.push(String(i));
+  document.getElementById("f-paamind").innerHTML = kn.map((t,i) =>
+    '<button type="button" class="pchip" data-pm="' + i + '" aria-pressed="'
+    + (paamindValg === i) + '">' + t + '</button>').join("");
+  document.getElementById("f-paamind-sum").textContent = paamindValg
+    ? "Vises " + (paamindValg === 1 ? "dagen før" : "de " + paamindValg + " dage før")
+      + ", ikke på selve dagen."
+    : "";
+}
+document.getElementById("f-paamind").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-pm]"); if(!b) return;
+  paamindValg = Number(b.dataset.pm);
+  tegnPaamindChips();
+});
+
 function saetSlags(slags){
   formSlags = slags;
   const erFerie = slags === "ferie";
@@ -4114,6 +4262,7 @@ function saetSlags(slags){
   document.getElementById("f-people-felt").hidden = erFerie;
   document.getElementById("f-allday-felt").hidden = erFerie;
   document.getElementById("f-gentag-felt").hidden = erFerie;
+  document.getElementById("f-paamind-felt").hidden = erFerie;
   if(erFerie){
     document.getElementById("f-gentag-mere").hidden = true;
     document.getElementById("f-enddate-felt").hidden = false;
@@ -4181,6 +4330,8 @@ function openEditor(id){
   gAftale.saet(e ? (e.gentag || (e.yearly ? "FREQ=YEARLY;INTERVAL=1" : "")) : "");
   document.getElementById("f-start").value = e ? (e.start||"") : "";
   document.getElementById("f-end").value   = e ? (e.end||"") : "";
+  paamindValg = e ? (e.paamindDage || 0) : 0;
+  tegnPaamindChips();
   chosen = new Set(e ? e.people : []);
   drawPeopleChips();
   syncTimeFields();
@@ -4275,7 +4426,8 @@ document.getElementById("edit-save").onclick = async () => {
     end:    allDay ? "" : slut,
     yearly: false,
     gentag: "",
-    people: [...chosen]
+    people: [...chosen],
+    paamindDage: paamindValg
   };
 
   /* En ren årlig gentagelse sættes ogsaa som aarlig=true, saa en ældre
