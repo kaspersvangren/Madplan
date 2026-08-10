@@ -620,14 +620,15 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .ingmark{margin-top:12px;border-top:1px solid var(--line)}
 .ingmark .imkilde{font-size:12px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
-.imrad{display:flex;align-items:center;gap:10px;padding:6px 0;
+.imrad{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:7px 0;
   border-bottom:1px solid var(--line)}
 .imrad:last-child{border-bottom:none}
-.imrad .n{flex:1;min-width:0;font-size:15px}
+.imrad .n{flex:1 1 140px;min-width:0;font-size:15px}
 .imrad .n small{color:var(--muted);font-size:13px;margin-left:6px}
-.imrad .v{display:flex;gap:6px;flex:none}
+.imrad .v{display:flex;gap:6px;flex:none;margin-left:auto}
 .imrad .pchip{padding:5px 11px;font-size:13px}
 .ingmark .tom{color:var(--muted);font-size:14px;padding:10px 0;display:block}
+.imtal{color:var(--muted);font-weight:400}
 .huskblok{border-top:1px solid var(--line)}
 .strip.paamind{border-bottom:none;padding:12px 15px 13px;gap:9px}
 .strip.paamind + .strip.paamind{padding-top:0}
@@ -1005,11 +1006,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     <div class="frostinfo" id="dag-fryser-info" hidden></div>
 
     <label class="check"><input type="checkbox" id="dag-frost"> Frost eller rest — hovedretten udelades fra indkøb</label>
-    <label class="check" id="dag-helfrost-felt" hidden><input type="checkbox" id="dag-helfrost"> Den står i fryseren og skal tøs op</label>
+    <label class="check" id="dag-helfrost-felt" hidden><input type="checkbox" id="dag-helfrost"> Skal op af fryseren dagen før</label>
 
     <div class="ingmark" id="dag-ingmark" hidden>
       <button class="fold" id="dag-ingfold" aria-expanded="false">
-        <span>Har vi noget af det hjemme?</span>
+        <span>Hvad har vi, og hvad skal op af fryseren? <span class="imtal" id="dag-ingtal"></span></span>
         <span id="dag-ingfold-tegn">▸</span>
       </button>
       <div id="dag-ingliste" style="display:none"></div>
@@ -1317,7 +1318,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.23.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.23.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2733,9 +2734,20 @@ function tegnIngMark(){
        +     (!!mk.har) + '">Har</button>'
        +   (r.tilbehoer ? "" :
              '<button type="button" class="pchip" data-im="' + n + '" data-imf="frost" aria-pressed="'
-             + (!!mk.frost) + '">Frost</button>')
+             + (!!mk.frost) + '">Op af fryseren</button>')
        + '</span></div>';
   });
+  /* Der taelles kun markeringer der hoerer til en linje man faktisk kan
+     se. Skifter man ret paa dagen, bliver de gamle markeringer liggende
+     som doede raekker -- de skal ikke staa og paastaa noget.          */
+  const synlige = imRader.filter(r => {
+    const mk = dagKladde.ingMark[r.retId + "\u0000" + r.navn];
+    return mk && (mk.har || mk.frost);
+  }).length;
+  document.getElementById("dag-ingtal").textContent = synlige
+    ? "\u00b7 " + synlige + (synlige === 1 ? " ingrediens markeret" : " ingredienser markeret")
+    : "";
+
   document.getElementById("dag-ingliste").innerHTML = h;
   document.getElementById("dag-ingliste").style.display = imAaben ? "block" : "none";
   document.getElementById("dag-ingfold").setAttribute("aria-expanded", String(imAaben));
