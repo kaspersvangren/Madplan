@@ -25,6 +25,12 @@
   --muted:#71756F;
   --line:#D8D5CE;
   --line-strong:#1B1D1C;
+  /* Kategorifarver i dagsvisningen. Grøn = mad, blå = fryser,
+     dæmpet grøngrå = opgaver. Holdt væk fra --ferie (gul) og
+     --holiday (rust), som allerede betyder noget andet.        */
+  --mad:#4F7A55;   --mad-bg:#DDEADC;
+  --frost:#3F7595; --frost-bg:#D6E6F0;
+  --opgf:#4F6A66;  --opg-bg:#EDF2F1;
   --chip:#F2F1ED;
   --holiday:#B0503A;
   --rail:#CFCCC4;--nat:#2B3450;--sky:#8C9096;
@@ -44,6 +50,9 @@ html[data-theme="dark"]{
   --muted:#9B9E96;
   --line:#32362F;
   --line-strong:#ECEBE5;
+  --mad:#8FBE95;   --mad-bg:#27331F;
+  --frost:#8FB8D4; --frost-bg:#1E2D3B;
+  --opgf:#8FB3AD;  --opg-bg:#1B2624;
   --chip:#252821;
   --holiday:#E08A70;
   --rail:#3A3E36;--nat:#3D4870;
@@ -646,6 +655,34 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .imtal{display:block;color:var(--muted);font-weight:400;font-size:13px;margin-top:2px}
 /* Optøningen limes sammen med aftensmaden: madraden mister sin egen
    streg, så de to læses som ét. */
+/* Aftensmad og fryser side om side. To afrundede felter inde i
+   dagskortet, hver med sin farve, så øjet kan skille dem ad uden at
+   læse. Er der intet at tage op af fryseren — hvilket er de fleste
+   dage — breder maden sig over hele bredden i stedet for at efterlade
+   et tomt felt.                                                     */
+.duo{display:flex;gap:9px;padding:11px 12px;border-bottom:1px solid var(--line)}
+.duo > div{flex:1 1 0;min-width:0;border-radius:12px;padding:10px 12px 11px}
+.duo.alene > div{flex:1 1 100%}
+.duo .madfelt{background:var(--mad-bg)}
+.duo .frostfelt{background:var(--frost-bg)}
+.duo .mini{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.duo .madfelt .mini{color:var(--mad)}
+.duo .frostfelt .mini{color:var(--frost)}
+.duo .hoved{font-size:15px;font-weight:600;line-height:1.3;color:var(--ink)}
+.duo .til{font-size:13px;color:var(--muted);margin-top:1px}
+.duo .fting{display:flex;align-items:flex-start;gap:6px}
+.duo .fting .hoved{flex:1;min-width:0}
+.duo .fting .vaek{flex:none;width:24px;height:24px;border-radius:999px;
+  display:grid;place-items:center;color:var(--muted);margin:-2px -4px 0 0}
+.duo .fting .vaek:hover{background:var(--chip);color:var(--ink)}
+.sne{line-height:1;font-size:13px}
+
+/* Opgaverne får deres egen tone, så de tre slags kan kendes fra
+   hinanden på afstand — det er en vægtablet på to meters hold.     */
+.dagopg{background:var(--opg-bg);border-bottom:1px solid var(--line)}
+.dagopgtop{color:var(--opgf)}
+
 .madblok.medoptoen{border-bottom:1px solid var(--line)}
 .madblok.medoptoen > .strip{border-bottom:none}
 .huskblok{border-top:1px solid var(--line)}
@@ -1337,7 +1374,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.24.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.25.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3924,10 +3961,13 @@ function renderDay(){
        + '</div>';
   }
 
-  const mealText = mad
-    ? esc(mad.navn) + (mad.frost ? " ❄" : "") + (mad.portioner > 1 ? " ×" + mad.portioner : "")
-      + (mad.tilbehoer ? ' <span class="label">med ' + esc(mad.tilbehoer) + '</span>' : "")
-    : '<span class="label">ikke planlagt</span>';
+  /* Hovedret og tilbehør står under hinanden i hver sin størrelse.
+     Ordet "Aftensmad" er væk — den lille overskrift siger det.     */
+  const madIndhold = mad
+    ? '<div class="hoved">' + esc(mad.navn) + (mad.frost ? " ❄" : "")
+      + (mad.portioner > 1 ? " ×" + mad.portioner : "") + '</div>'
+      + (mad.tilbehoer ? '<div class="til">med ' + esc(mad.tilbehoer) + '</div>' : "")
+    : '<div class="hoved" style="color:var(--muted);font-weight:400">Ikke planlagt</div>';
 
   const stribe = renderVejrStribe(ds);
   if(stribe){
@@ -3937,21 +3977,24 @@ function renderDay(){
   /* Maden, og lige under den: hvad der skal op af fryseren til i morgen.
      Optøningen hører til maden, ikke til aftalerne, så den bor her.   */
   const optoen = optoeningTil(iso(addDays(d,1)));
-  h += '<div class="madblok' + (optoen.length ? " medoptoen" : "") + '">'
-     +   '<div class="strip">'
-     +     '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>'
-     +     '<span class="label">Aftensmad</span><span>'+mealText+'</span>'
+  h += '<div class="duo' + (optoen.length ? "" : " alene") + '">'
+     +   '<div class="madfelt">'
+     +     '<div class="mini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>I aften</div>'
+     +     madIndhold
      +   '</div>';
-  optoen.forEach(o => {
-    h += '<div class="strip paamind">'
-       +   '<span class="ikon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v20M4.9 6.5l14.2 11M19.1 6.5L4.9 17.5"/></svg></span>'
-       +   '<span class="tekst">Tag <b>' + esc(o.navn) + '</b> op af fryseren '
-       +     '<span class="naar">til i morgen</span></span>'
-       +   '<button class="vaek" data-optoen="' + esc(o.slags + "\u0001" + o.dato + "\u0001" + (o.retId || "") + "\u0001" + o.navn) + '" aria-label="Fjern p\u00e5mindelsen">'
-       +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
-       +   '</button>'
+  if(optoen.length){
+    /* Ét kryds pr. ting: man kan have taget den ene op og ikke den anden.
+       "til i morgen" står én gang nederst — det gælder dem alle.      */
+    h += '<div class="frostfelt">'
+       +   '<div class="mini"><span class="sne">❄</span>Op af fryseren</div>'
+       +   optoen.map(o =>
+             '<div class="fting"><span class="hoved">' + esc(o.navn) + '</span>'
+           +   '<button class="vaek" data-optoen="' + esc(o.slags + "\u0001" + o.dato + "\u0001" + (o.retId || "") + "\u0001" + o.navn) + '" aria-label="Fjern p\u00e5mindelsen">'
+           +     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+           +   '</button></div>').join("")
+       +   '<div class="til">til i morgen</div>'
        + '</div>';
-  });
+  }
   h += '</div>';
 
   if(hol){
