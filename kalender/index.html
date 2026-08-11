@@ -1374,7 +1374,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.25.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.25.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3979,7 +3979,7 @@ function renderDay(){
   const optoen = optoeningTil(iso(addDays(d,1)));
   h += '<div class="duo' + (optoen.length ? "" : " alene") + '">'
      +   '<div class="madfelt">'
-     +     '<div class="mini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>I aften</div>'
+     +     '<div class="mini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>Aftensmad</div>'
      +     madIndhold
      +   '</div>';
   if(optoen.length){
