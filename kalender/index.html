@@ -602,13 +602,19 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
    negative topmargen får det op under arkets afrundede hjørner.
    object-fit:cover skalerer billedet til at dække; object-position
    flytter udsnittet lodret efter det tal der er gemt på retten.     */
-.retbaand{display:block;height:150px;object-fit:cover;
-  /* Et billede er et "replaced element": width:auto regner bredden ud af
-     hoejden og billedets format i stedet for at fylde ud, som en almindelig
-     kasse ville. Bredden skal derfor siges direkte — 100% af arkets
-     indhold plus de to gange 18px polstring, som margenerne traekker ud. */
+/* Baandet er en almindelig kasse med billedet som baggrund — IKKE et
+   <img>. Grunden: krydset til at lukke er float:right, og et billede er
+   et "replaced element", som efter CSS-reglerne ikke maa ligge oven i en
+   float. Et <img> blev derfor skubbet ned under krydset og efterlod et
+   hvidt hul foroven. En almindelig kasse maa gerne ligge under en float.
+   background-size:cover og background-position goer praecis det samme
+   som object-fit og object-position ville have gjort.               */
+.retbaand{display:block;height:150px;
   width:calc(100% + 36px);max-width:none;
-  margin:-20px -18px 14px;border-radius:20px 20px 0 0;background:var(--chip)}
+  margin:-20px -18px 14px;border-radius:20px 20px 0 0;
+  background:var(--chip) center/cover no-repeat}
+/* display:block ovenfor slaar hidden-attributten ud, saa den skal siges. */
+.retbaand[hidden]{display:none}
 
 /* Samme bånd i redigeringen, men trykbart og med et træk til at flytte
    udsnittet. touch-action:none, ellers ruller arket i stedet.        */
@@ -970,7 +976,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <div class="backdrop" id="ret-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ret-titel">
     <button class="lukkryds" id="ret-kryds" aria-label="Luk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-    <img class="retbaand" id="ret-baand" alt="" hidden>
+    <div class="retbaand" id="ret-baand" role="img" aria-label="" hidden></div>
     <h2 id="ret-titel"></h2>
     <div class="meta" id="ret-meta"></div>
     <div id="ret-krop"></div>
@@ -1420,7 +1426,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.26.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2293,10 +2299,12 @@ function aabnRet(id){
   const baand = document.getElementById("ret-baand");
   baand.hidden = !r.billede_sti;
   if(r.billede_sti){
-    baand.src = billedUrl(r.billede_sti);
-    baand.style.objectPosition = "50% " + (r.billede_pos == null ? 50 : r.billede_pos) + "%";
+    baand.style.backgroundImage = 'url("' + billedUrl(r.billede_sti) + '")';
+    baand.style.backgroundPosition = "50% " + (r.billede_pos == null ? 50 : r.billede_pos) + "%";
+    baand.setAttribute("aria-label", "Billede af " + r.navn);
   } else {
-    baand.removeAttribute("src");
+    baand.style.backgroundImage = "";
+    baand.setAttribute("aria-label", "");
   }
 
   document.getElementById("ret-titel").textContent = r.navn;
