@@ -602,7 +602,12 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
    negative topmargen får det op under arkets afrundede hjørner.
    object-fit:cover skalerer billedet til at dække; object-position
    flytter udsnittet lodret efter det tal der er gemt på retten.     */
-.retbaand{display:block;width:auto;height:150px;object-fit:cover;
+.retbaand{display:block;height:150px;object-fit:cover;
+  /* Et billede er et "replaced element": width:auto regner bredden ud af
+     hoejden og billedets format i stedet for at fylde ud, som en almindelig
+     kasse ville. Bredden skal derfor siges direkte — 100% af arkets
+     indhold plus de to gange 18px polstring, som margenerne traekker ud. */
+  width:calc(100% + 36px);max-width:none;
   margin:-20px -18px 14px;border-radius:20px 20px 0 0;background:var(--chip)}
 
 /* Samme bånd i redigeringen, men trykbart og med et træk til at flytte
@@ -632,6 +637,8 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
   background:var(--chip);color:var(--muted)
 }
 .sheet .lukkryds:hover{color:var(--ink)}
+/* Ligger krydset oven paa et billede, skal det stadig kunne ses. */
+.sheet .lukkryds{box-shadow:0 1px 4px rgba(0,0,0,.16)}
 .sheet h2{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0 0 4px}
 .sheet .meta{font-size:13px;color:var(--muted);margin-bottom:14px}
 .field{margin-bottom:13px}
@@ -1413,7 +1420,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.26.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
