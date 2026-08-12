@@ -1426,7 +1426,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.26.3";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4674,7 +4674,22 @@ async function vendAgnesDag(){
 /* ---------- Detaljer ---------- */
 let openEventId = null;
 let openEventDato = "";
-const show = id => document.getElementById(id).classList.add("open");
+/* Et ark ruller i sig selv (.sheet har overflow-y:auto), og rulningen
+   bliver staaende naar det lukkes. Lukkede man en lang opskrift i bunden
+   og aabnede en anden, startede den derfor ogsaa i bunden. Der rulles op
+   hver gang et ark aabnes — det er nyt indhold, saa den gamle position
+   betyder ingenting.
+   Foerst efter klassen er sat: et skjult element kan ikke rulles. rAF'en
+   er en sikkerhedsline, hvis noget indhold foerst faar hoejde bagefter. */
+const show = id => {
+  const back = document.getElementById(id);
+  back.classList.add("open");
+  const ark = back.querySelector(".sheet");
+  if(ark){
+    ark.scrollTop = 0;
+    requestAnimationFrame(() => { ark.scrollTop = 0; });
+  }
+};
 const hide = id => document.getElementById(id).classList.remove("open");
 
 function openDetail(id, ds){
