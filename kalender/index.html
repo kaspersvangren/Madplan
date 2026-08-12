@@ -597,6 +597,30 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 .backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
 .backdrop.open{display:flex}
 .sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:calc(92dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain}
+/* Billedbånd øverst i en opskrift. De negative margener trækker det ud
+   gennem arkets polstring, så det går helt ud til kanterne, og den
+   negative topmargen får det op under arkets afrundede hjørner.
+   object-fit:cover skalerer billedet til at dække; object-position
+   flytter udsnittet lodret efter det tal der er gemt på retten.     */
+.retbaand{display:block;width:auto;height:150px;object-fit:cover;
+  margin:-20px -18px 14px;border-radius:20px 20px 0 0;background:var(--chip)}
+
+/* Samme bånd i redigeringen, men trykbart og med et træk til at flytte
+   udsnittet. touch-action:none, ellers ruller arket i stedet.        */
+.billedfelt{margin-bottom:4px}
+.billedramme{position:relative;height:130px;border-radius:12px;overflow:hidden;
+  background:var(--chip);border:1px solid var(--line)}
+.billedramme img{width:100%;height:100%;object-fit:cover;display:block;
+  touch-action:none;cursor:ns-resize;user-select:none;-webkit-user-drag:none}
+.billedramme .tom{position:absolute;inset:0;display:grid;place-items:center;
+  color:var(--muted);font-size:14px;text-align:center;padding:0 20px}
+.billedhint{font-size:12.5px;color:var(--muted);margin-top:5px}
+.billedknapper{display:flex;gap:8px;margin-top:8px}
+.billedknapper button{border:1px solid var(--line);border-radius:10px;
+  padding:8px 13px;font-size:14px}
+.billedknapper button:hover{border-color:var(--line-strong)}
+.billedknapper .fjern{color:var(--holiday)}
+
 /* Kryds til at lukke oppe i højre hjørne. Nødvendigt fordi knapperne
    nederst i arket havner under skærmkanten på lange opskrifter.
    position:sticky, så det bliver hængende øverst mens man ruller;
@@ -939,6 +963,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 <div class="backdrop" id="ret-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ret-titel">
     <button class="lukkryds" id="ret-kryds" aria-label="Luk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <img class="retbaand" id="ret-baand" alt="" hidden>
     <h2 id="ret-titel"></h2>
     <div class="meta" id="ret-meta"></div>
     <div id="ret-krop"></div>
@@ -1005,7 +1030,21 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       Tilføj ingrediens
     </button>
 
-    <div class="field" style="margin-top:18px">
+    <div class="field billedfelt" style="margin-top:18px">
+      <label>Billede</label>
+      <div class="billedramme" id="r-billedramme">
+        <img id="r-billede" alt="" hidden>
+        <span class="tom" id="r-billede-tom">Intet billede</span>
+      </div>
+      <div class="billedhint" id="r-billede-hint"></div>
+      <div class="billedknapper">
+        <button type="button" id="r-billede-vaelg">Vælg billede</button>
+        <button type="button" class="fjern" id="r-billede-fjern" hidden>Fjern</button>
+      </div>
+      <input type="file" id="r-billede-fil" accept="image/*" hidden>
+    </div>
+
+    <div class="field">
       <label for="r-url">Link til opskrift</label>
       <input type="text" id="r-url" autocomplete="off" placeholder="https://…">
     </div>
@@ -1374,7 +1413,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.25.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.26.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2199,11 +2238,59 @@ function renderKogebog(){
 
 /* ---------- Ret: detaljer ---------- */
 let aabenRetId = null;
+/* =======================================================================
+   Billeder på opskrifterne
+   Selve filerne ligger i Supabase Storage, ikke i databasen — en base64
+   i retter-tabellen ville gøre hver eneste opstart tungere for alle.
+   På retten gemmes kun stien plus ét tal for hvor motivet sidder.
+   ======================================================================= */
+const BILLED_BUCKET = "retbilleder";
+const BILLED_BREDDE = 1400;   /* px. Rigeligt til et bånd i fuld bredde,
+                                 også på en skærm med dobbelt opløsning */
+const BILLED_KVALITET = 0.82;
+
+const billedUrl = sti => sti
+  ? sb.storage.from(BILLED_BUCKET).getPublicUrl(sti).data.publicUrl : "";
+
+/* Skrumper i browseren FØR der lægges op. Et pressefoto på 4000 px
+   fylder flere megabyte, og med tres opskrifter ville kogebogen blive
+   tung at åbne på vægtabletten. */
+function skrumpBillede(fil){
+  return new Promise((klar, fejl) => {
+    const url = URL.createObjectURL(fil);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const skala = Math.min(1, BILLED_BREDDE / img.naturalWidth);
+      const c = document.createElement("canvas");
+      c.width  = Math.round(img.naturalWidth  * skala);
+      c.height = Math.round(img.naturalHeight * skala);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      /* webp fylder omtrent det halve af jpeg ved samme kvalitet.
+         Kan browseren ikke webp, kommer der en jpeg tilbage i stedet,
+         og så retter vi endelsen efter det vi faktisk fik. */
+      c.toBlob(b => b ? klar(b) : fejl(new Error("Billedet kunne ikke omdannes")),
+        "image/webp", BILLED_KVALITET);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fejl(new Error("Filen kunne ikke læses som et billede")); };
+    img.src = url;
+  });
+}
+
 function aabnRet(id){
   const r = retter.find(x => x.id === id); if(!r) return;
   aabenRetId = id;
   const ing = ingredienserFor(id);
   const sidst = sidstSpist(id);
+
+  const baand = document.getElementById("ret-baand");
+  baand.hidden = !r.billede_sti;
+  if(r.billede_sti){
+    baand.src = billedUrl(r.billede_sti);
+    baand.style.objectPosition = "50% " + (r.billede_pos == null ? 50 : r.billede_pos) + "%";
+  } else {
+    baand.removeAttribute("src");
+  }
 
   document.getElementById("ret-titel").textContent = r.navn;
   const marker = [r.vegetar && "vegetar", r.nem && "nem ret", r.agnes_kan_lide && "Agnes kan lide",
@@ -2322,8 +2409,13 @@ document.getElementById("ret-slet").onclick = () => {
 };
 document.getElementById("retslet-nej").onclick = () => hide("retslet-back");
 document.getElementById("retslet-ja").onclick = async () => {
+  /* Stien hentes FOER raekken forsvinder — bagefter er der intet at
+     slaa den op i, og billedet ville blive liggende for evigt. */
+  const slettesRet = retter.find(r => r.id === aabenRetId);
+  const gammeltBillede = slettesRet ? slettesRet.billede_sti : null;
   const { error } = await sb.from("retter").delete().eq("id", aabenRetId);
   if(error){ vis("Kunne ikke slette: " + error.message); return; }
+  if(gammeltBillede) await sletBillede(gammeltBillede);
   retter = retter.filter(r => r.id !== aabenRetId);
   ingredienser = ingredienser.filter(i => i.ret_id !== aabenRetId);
   hide("retslet-back"); hide("ret-back"); render();
@@ -2407,12 +2499,111 @@ function aabnRetRed(id){
   kladdeIng = r ? ingredienserFor(id).map(i => ({navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori}))
                 : [{navn:"", maengde:null, enhed:null, kategori:"koeb"}];
   tegnIngRaekker();
+  kladdeBillede = { sti: r ? (r.billede_sti || "") : "", pos: r ? (r.billede_pos == null ? 50 : r.billede_pos) : 50,
+                    nySti: "", gammelSti: r ? (r.billede_sti || "") : "" };
+  tegnKladdeBillede();
   document.getElementById("r-navn-err").classList.remove("show");
   document.getElementById("r-fejl").classList.remove("show");
   show("retred-back");
 }
+
+/* ---------- billedet i redigeringen ----------
+   nySti holder styr på en fil der er lagt op i denne omgang. Fortryder
+   man, skal den ryddes op igen, ellers samler mappen sig fuld af
+   billeder som ingen ret peger på.                                   */
+let kladdeBillede = { sti:"", pos:50, nySti:"", gammelSti:"" };
+
+function tegnKladdeBillede(){
+  const img  = document.getElementById("r-billede");
+  const tom  = document.getElementById("r-billede-tom");
+  const hint = document.getElementById("r-billede-hint");
+  const fjern= document.getElementById("r-billede-fjern");
+  if(kladdeBillede.sti){
+    img.hidden = false; tom.hidden = true; fjern.hidden = false;
+    img.src = billedUrl(kladdeBillede.sti);
+    img.style.objectPosition = "50% " + kladdeBillede.pos + "%";
+    hint.textContent = "Træk op og ned i billedet for at flytte udsnittet.";
+  } else {
+    img.hidden = true; img.removeAttribute("src");
+    tom.hidden = false; fjern.hidden = true;
+    hint.textContent = "Et liggende billede virker bedst. Det skrumpes automatisk.";
+  }
+}
+
+document.getElementById("r-billede-vaelg").onclick = () =>
+  document.getElementById("r-billede-fil").click();
+
+document.getElementById("r-billede-fil").onchange = async ev => {
+  const fil = ev.target.files && ev.target.files[0];
+  ev.target.value = "";                 /* så samme fil kan vælges igen */
+  if(!fil) return;
+  const hint = document.getElementById("r-billede-hint");
+  hint.textContent = "Lægger billedet op \u2026";
+  try{
+    const blob = await skrumpBillede(fil);
+    const endelse = blob.type === "image/webp" ? "webp" : "jpg";
+    const sti = "retter/" + Date.now().toString(36) + "-"
+              + Math.random().toString(36).slice(2, 8) + "." + endelse;
+    const { error } = await sb.storage.from(BILLED_BUCKET)
+      .upload(sti, blob, { contentType: blob.type, upsert: false });
+    if(error) throw error;
+    /* Blev der lagt et op tidligere i denne omgang, som nu er afløst,
+       ryddes det væk med det samme. */
+    if(kladdeBillede.nySti) await sletBillede(kladdeBillede.nySti);
+    kladdeBillede.sti = sti;
+    kladdeBillede.nySti = sti;
+    kladdeBillede.pos = 50;
+    tegnKladdeBillede();
+  }catch(err){
+    hint.textContent = "Billedet kunne ikke lægges op: " + (err.message || err);
+  }
+};
+
+document.getElementById("r-billede-fjern").onclick = async () => {
+  if(kladdeBillede.nySti){ await sletBillede(kladdeBillede.nySti); kladdeBillede.nySti = ""; }
+  kladdeBillede.sti = "";
+  kladdeBillede.pos = 50;
+  tegnKladdeBillede();
+};
+
+async function sletBillede(sti){
+  if(!sti) return;
+  await sb.storage.from(BILLED_BUCKET).remove([sti]);
+}
+
+/* Trækket. Båndet er meget bredere end det er højt, så billedet
+   beskæres kun lodret — derfor er ét tal nok, og trækket er lodret.
+   Der regnes i procent af rammens højde, ganget op så en kort strækning
+   dækker hele spændet fra top til bund.                              */
+(function(){
+  const img = document.getElementById("r-billede");
+  let traekker = false, startY = 0, startPos = 50;
+  img.addEventListener("pointerdown", ev => {
+    if(!kladdeBillede.sti) return;
+    traekker = true; startY = ev.clientY; startPos = kladdeBillede.pos;
+    img.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  img.addEventListener("pointermove", ev => {
+    if(!traekker) return;
+    const hoejde = img.getBoundingClientRect().height || 130;
+    /* Ned med fingeren = se længere op i billedet, som når man flytter
+       et ark papir bag et vindue. */
+    const ny = startPos - ((ev.clientY - startY) / hoejde) * 100;
+    kladdeBillede.pos = Math.max(0, Math.min(100, Math.round(ny)));
+    img.style.objectPosition = "50% " + kladdeBillede.pos + "%";
+  });
+  const slut = () => { traekker = false; };
+  img.addEventListener("pointerup", slut);
+  img.addEventListener("pointercancel", slut);
+})();
 document.getElementById("ret-rediger").onclick = () => { hide("ret-back"); aabnRetRed(aabenRetId); };
-document.getElementById("retred-fortryd").onclick = () => hide("retred-back");
+document.getElementById("retred-fortryd").onclick = async () => {
+  /* Blev der lagt et billede op og derefter fortrudt, ville filen blive
+     liggende uden at nogen ret peger på den. */
+  if(kladdeBillede.nySti){ await sletBillede(kladdeBillede.nySti); kladdeBillede.nySti = ""; }
+  hide("retred-back");
+};
 
 document.getElementById("retred-gem").onclick = async () => {
   const navn = document.getElementById("r-navn").value.trim();
@@ -2430,7 +2621,9 @@ document.getElementById("retred-gem").onclick = async () => {
     frost_lager:    kladdeFrost,
     opskrift_url:   document.getElementById("r-url").value.trim(),
     opskrift_ingredienser: document.getElementById("r-opskrift-ing").value.trim(),
-    fremgangsmaade: document.getElementById("r-fremgang").value.trim()
+    fremgangsmaade: document.getElementById("r-fremgang").value.trim(),
+    billede_sti:    kladdeBillede.sti || null,
+    billede_pos:    kladdeBillede.pos
   };
 
   const knap = document.getElementById("retred-gem");
@@ -2456,6 +2649,15 @@ document.getElementById("retred-gem").onclick = async () => {
     retId = raekker[0].id;
     retter.push(raekker[0]);
   }
+
+  /* Er billedet skiftet ud eller fjernet, ryddes det gamle væk nu — men
+     først når retten er gemt, så et fejlet gem ikke efterlader en ret
+     der peger på en fil der ikke findes mere. */
+  if(kladdeBillede.gammelSti && kladdeBillede.gammelSti !== kladdeBillede.sti){
+    await sletBillede(kladdeBillede.gammelSti);
+  }
+  kladdeBillede.nySti = "";
+  kladdeBillede.gammelSti = kladdeBillede.sti;
 
   // Ingredienserne skrives forfra — enklere og altid i takt med det du ser
   const { error: f2 } = await sb.from("ingredienser").delete().eq("ret_id", retId);
