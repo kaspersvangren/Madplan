@@ -600,9 +600,22 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 /* Kun opskriftsarket glider op i stedet for at poppe frem — de andre ark
    roeres ikke. En keyframe-animation virker ogsaa naar elementet gaar
    fra display:none til flex (en transition kraever en synlig startvaerdi
-   og virker ikke her). */
-@keyframes retSheetInd{ from{ transform:translateY(48px); opacity:.5 } to{ transform:translateY(0); opacity:1 } }
-#ret-back.open .sheet{ animation:retSheetInd .26s ease-out }
+   og virker ikke her).
+   Arket starter HELT under skaermen (100% af sin egen hoejde) og glider
+   op. Ingen opacity paa selve arket — en samtidig indfadning goer
+   bevaegelsen utydelig. I stedet toner det moerke lag bagved op, saa
+   overgangen stadig er blid.
+   overflow:hidden paa laget klipper arket vaek mens det staar udenfor,
+   saa det ikke kan give en rullebjaelke undervejs.
+   Kurven bremser haardt til sidst — det er den samme slags kurve
+   telefonens egne bundark bruger, og den er det der faar bevaegelsen til
+   at foeles som en bevaegelse og ikke som en overblaending.
+   prefers-reduced-motion slaar den fra via den generelle regel oeverst. */
+@keyframes retSheetInd{ from{ transform:translateY(100%) } to{ transform:translateY(0) } }
+@keyframes retBackInd{ from{ background-color:rgba(20,22,20,0) } to{ background-color:rgba(20,22,20,.45) } }
+#ret-back{ overflow:hidden }
+#ret-back.open{ animation:retBackInd .3s ease-out }
+#ret-back.open .sheet{ animation:retSheetInd .34s cubic-bezier(.32,.72,0,1) }
 /* Billedbånd øverst i en opskrift. De negative margener trækker det ud
    gennem arkets polstring, så det går helt ud til kanterne, og den
    negative topmargen får det op under arkets afrundede hjørner.
@@ -1432,7 +1445,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.4";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.26.5";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
