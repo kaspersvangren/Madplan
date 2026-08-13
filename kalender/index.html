@@ -264,6 +264,40 @@ body{zoom:var(--z,1)}
 .retkort.valgt{border-color:var(--line-strong);background:var(--chip)}
 .retkort .navn{font-weight:600;font-size:16px}
 .retkort .under{font-size:13px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* Foto paa kortene i kogebogen. Det ligger BAG teksten i hoejre side og
+   toner vaek ind mod midten, saa navnet altid staar paa ren bund.
+   position+overflow staar i deres egen regel, saa den oprindelige
+   .retkort ovenfor er urort — kortene i vaelgeren faar det samme, men
+   der laegges ingen billeder ind, saa de ser ud praecis som foer.
+   Maskens tre stop: usynligt ved kortets midte, meget svagt paa vejen,
+   fuldt i hoejre kant. Er den kun to stop, bliver overgangen en tydelig
+   skraa kant midt paa kortet i stedet for en udtoning.
+   Billedet beskaeres med samme tal som baandet i opskriften
+   (object-position 50% N%), saa det er det samme udsnit af motivet man
+   ser begge steder. */
+.retkort{position:relative;overflow:hidden}
+.retkort > span{position:relative;z-index:1}
+/* height siges DIREKTE. Et <img> er et replaced element: med height:auto
+   og baade top og bottom sat, regner browseren hoejden ud af billedets
+   eget format og ser bort fra bottom — samme faelde som baandet faldt i
+   i 2.26.1. Kortet er lavt, saa fotoet ville blive kaempestort. */
+.kortfoto{
+  position:absolute;top:0;right:0;width:72%;height:100%;
+  object-fit:cover;opacity:.9;pointer-events:none;user-select:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.28) 42%,#000 100%);
+          mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.28) 42%,#000 100%);
+}
+/* Et foto lyser mere op i moerk tilstand, end det daemper i lys. */
+html[data-theme="dark"] .kortfoto{opacity:.72}
+/* "Sidst spist" staar i hoejre kant, hvor billedet er kraftigst, og skal
+   have sin egen bund for at kunne laeses. align-self, fordi kortet
+   straekker sine born i fuld hoejde — uden den blev pillen lige saa hoej
+   som kortet. Kun paa kort MED foto. */
+.retkort.medfoto .naar{
+  align-self:flex-end;background:var(--surface);
+  border:1px solid var(--line);border-radius:999px;padding:2px 9px;
+}
 .mark{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);font-weight:600}
 .mark.tilbehoer{background:transparent;border:1px solid var(--line)}
 .mark.frost{background:rgba(70,140,210,.16);color:#2f6fa8;font-variant-numeric:tabular-nums}
@@ -1445,7 +1479,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.5";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.27.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2259,7 +2293,17 @@ function renderKogebog(){
     const sidstTekst = sidst
       ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
       : "Aldrig spist";
-    return '<button class="retkort" data-ret="'+r.id+'"><span style="flex:1;min-width:0">'
+    /* loading="lazy": kogebogen kan indeholde tres retter, og uden den
+       ville alle billeder blive hentet i det oejeblik fanen aabnes.
+       alt="" fordi billedet er pynt — rettens navn staar lige ved siden af. */
+    const foto = r.billede_sti
+      ? '<img class="kortfoto" alt="" loading="lazy" decoding="async"'
+        + ' src="' + esc(billedUrl(r.billede_sti)) + '"'
+        + ' style="object-position:50% ' + (r.billede_pos == null ? 50 : r.billede_pos) + '%">'
+      : "";
+    return '<button class="retkort'+(foto ? " medfoto" : "")+'" data-ret="'+r.id+'">'
+         + foto
+         +   '<span style="flex:1;min-width:0">'
          +   '<span class="navn">'+esc(r.navn)+'</span>'
          +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span></span>'
          + '</span>'
