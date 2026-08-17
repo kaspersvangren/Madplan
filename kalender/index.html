@@ -302,6 +302,11 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 }
 .linkknap span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .linkknap:hover{border-color:var(--line-strong)}
+.bskrk{display:flex;width:100%;align-items:center;gap:11px;padding:12px 2px;font-size:14px;border-bottom:1px solid var(--line);text-align:left}
+.bskrk .stand{margin-left:auto;font-size:13px;color:var(--muted);font-weight:600}
+.bskrk[aria-pressed="true"] .stand{color:var(--ink)}
+.bskgrp{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:17px 0 6px}
+.bsksum{font-size:12.5px;color:var(--muted);margin-top:13px;line-height:1.45}
 .menu-row .stand{margin-left:auto;font-size:13px;color:var(--muted);font-weight:600}
 .slor{
   position:fixed;inset:0;z-index:50;background:#000;
@@ -1220,6 +1225,42 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 </div>
 
 <!-- Menu -->
+<div class="backdrop" id="besk-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Beskeder på denne enhed</h2>
+    <div class="meta" id="besk-meta">—</div>
+    <div id="besk-krop" hidden>
+      <div class="field">
+        <label for="besk-navn">Navn på enheden</label>
+        <input type="text" id="besk-navn" placeholder="Fx Kaspers telefon" maxlength="40">
+      </div>
+      <div class="field">
+        <label>Hvem er du?</label>
+        <div class="people" id="besk-person"></div>
+      </div>
+
+      <div class="bskgrp">Om morgenen</div>
+      <div class="field"><div class="people" id="besk-mtid"></div></div>
+      <button type="button" class="bskrk" data-kt="m_aftaler">Dagens aftaler<span class="stand">til</span></button>
+      <button type="button" class="bskrk" data-kt="m_opgaver">Dagens og overskredne opgaver<span class="stand">til</span></button>
+      <button type="button" class="bskrk" data-kt="m_nyt">Nye opgaver siden sidst<span class="stand">til</span></button>
+
+      <div class="bskgrp">Om aftenen</div>
+      <div class="field"><div class="people" id="besk-atid"></div></div>
+      <button type="button" class="bskrk" data-kt="a_aftaler">Morgendagens aftaler<span class="stand">til</span></button>
+      <button type="button" class="bskrk" data-kt="a_opgaver">Dagens og overskredne opgaver<span class="stand">til</span></button>
+      <button type="button" class="bskrk" data-kt="a_optoening">❄ Op af fryseren<span class="stand">til</span></button>
+      <button type="button" class="bskrk" data-kt="a_nyt">Nye opgaver siden sidst<span class="stand">til</span></button>
+
+      <div class="bsksum" id="besk-sum"></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="besk-luk">Luk</button>
+      <button class="btn primary" id="besk-gem">Gem</button>
+    </div>
+    <div class="actions"><button class="btn danger" id="besk-fra" hidden>Slå beskeder fra her</button></div>
+  </div>
+</div>
 <div class="backdrop" id="menu-back">
   <div class="sheet" role="dialog" aria-modal="true">
     <h2>Indstillinger</h2>
@@ -1248,6 +1289,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M12 18V11M9 14l3 3 3-3"/></svg>
       Hent skraldedatoer ind
       <span class="stand" id="skrald-stand">—</span>
+    </button>
+    <button class="menu-row" id="menu-besked">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      Beskeder på denne enhed
+      <span class="stand" id="besked-stand">—</span>
     </button>
     <button class="menu-row" id="menu-reload">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>
@@ -1445,7 +1491,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.26.5";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.27.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3684,7 +3730,7 @@ function aabnOpgave(id){
   gOpgave.saet(o ? (o.gentag || "") : "");
   opdaterFristMaerkat();
   document.getElementById("o-fraudf").checked = o ? !!o.gentag_fra_udfoert : false;
-  opgValgte = new Set(o ? (o.personer || []) : ["familie"]);
+  opgValgte = new Set(o ? (o.personer || []) : []);
   tegnOpgChips();
   document.getElementById("o-titel-err").classList.remove("show");
   document.getElementById("o-people-err").classList.remove("show");
@@ -3722,7 +3768,8 @@ document.getElementById("opg-gem").onclick = async () => {
     personer: [...opgValgte],
     gentag: regel || null,
     gentag_fra_udfoert: !!(rr && rr.freq === "DAILY"
-      && document.getElementById("o-fraudf").checked)
+      && document.getElementById("o-fraudf").checked),
+    kilde_enhed: ENHED_ID
   };
   const knap = document.getElementById("opg-gem");
   knap.disabled = true; knap.textContent = "Gemmer …";
@@ -6235,9 +6282,301 @@ async function start(){
 })();
 </script>
 <script>
+/* =======================================================================
+   Beskeder paa denne enhed (web push)
+   Selve UDSENDELSEN sker ude i GitHub Actions - se push.mjs. Appen her
+   registrerer kun enheden og gemmer dens valg. Noeglen nedenfor er den
+   OFFENTLIGE halvdel af VAPID-parret; den maa gerne staa i filen.
+   Skiftes den, doer alle abonnementer og hver enhed skal til igen.
+   ======================================================================= */
+const VAPID_PUBLIC = "BGcw78W7qtwM3Xd-jQEvwU7nYy0tylI4BQutOvSvLhx-GFbARn-OQ1gq8zRLIK0k32_I1yKB09rk6tAm3NYg2XI";
+
+const ENHED_ID = (() => {
+  let v = "";
+  try { v = localStorage.getItem("vh-enhed") || ""; } catch(e){}
+  if(!v){
+    v = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : "e" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    try { localStorage.setItem("vh-enhed", v); } catch(e){}
+  }
+  return v;
+})();
+
+const M_TIDER = ["06:30","07:00","07:30","08:00","08:30"];
+const A_TIDER = ["18:30","19:00","19:30","20:00","20:30"];
+const BESK_KONTAKTER = ["m_aftaler","m_opgaver","m_nyt",
+                        "a_aftaler","a_opgaver","a_optoening","a_nyt"];
+
+let beskRaekke = null;      /* rakken i push_enheder for DENNE enhed */
+let beskKladde = null;      /* det man er ved at rette, saa Luk fortryder */
+
+const pushMulig = () => "serviceWorker" in navigator
+  && "PushManager" in window && "Notification" in window;
+
+/* Den offentlige noegle staar url-sikker og skal vaere raa bytes. */
+function b64tilBytes(s){
+  const pad = "=".repeat((4 - s.length % 4) % 4);
+  const raa = atob((s + pad).replace(/-/g,"+").replace(/_/g,"/"));
+  const ud = new Uint8Array(raa.length);
+  for(let i = 0; i < raa.length; i++) ud[i] = raa.charCodeAt(i);
+  return ud;
+}
+
+/* Alle kontakter slaaet fra = enheden siger alligevel intet. Saa skal
+   menuen ikke paastaa at beskeder er til. */
+const beskTavs = r => !!r && BESK_KONTAKTER.every(k => !r[k]);
+
+function saetBeskStand(){
+  const el = document.getElementById("besked-stand");
+  if(!el) return;
+  if(!pushMulig() || !VAPID_PUBLIC) el.textContent = "—";
+  else if(!beskRaekke)              el.textContent = "fra";
+  else if(beskTavs(beskRaekke))     el.textContent = "intet valgt";
+  else                              el.textContent = "til";
+}
+
+async function hentBeskRaekke(){
+  const { data, error } = await sb.from("push_enheder")
+    .select("*").eq("enhed_id", ENHED_ID).limit(1);
+  if(error){ beskRaekke = null; return error; }
+  beskRaekke = (data && data[0]) || null;
+  return null;
+}
+
+/* Navnet paa personen, men "Familie" hedder "Alle" her - ellers ville man
+   tro det var det samme som markeringen paa aftalen. */
+const beskPersonNavn = id => id === "familie" ? "Alle" :
+  ((PEOPLE.find(p => p.id === id) || {}).navn || id);
+
+function tegnBesk(){
+  if(!beskKladde) return;
+  document.getElementById("besk-navn").value = beskKladde.navn || "";
+
+  document.getElementById("besk-person").innerHTML = PEOPLE.map(p =>
+    '<button type="button" class="pchip" data-bp="' + p.id + '" aria-pressed="'
+    + (beskKladde.person === p.id) + '">' + esc(beskPersonNavn(p.id))
+    + '</button>').join("");
+
+  const tider = (id, liste, felt) =>
+    document.getElementById(id).innerHTML = liste.map(t =>
+      '<button type="button" class="pchip" data-bt="' + felt + '|' + t
+      + '" aria-pressed="' + (beskKladde[felt] === t) + '">'
+      + t.replace(":",".") + '</button>').join("");
+  tider("besk-mtid", M_TIDER, "morgen_tid");
+  tider("besk-atid", A_TIDER, "aften_tid");
+
+  BESK_KONTAKTER.forEach(k => {
+    const b = document.querySelector('[data-kt="' + k + '"]');
+    if(!b) return;
+    const paa = !!beskKladde[k];
+    b.setAttribute("aria-pressed", paa);
+    b.querySelector(".stand").textContent = paa ? "til" : "fra";
+  });
+
+  document.getElementById("besk-sum").textContent = beskTavs(beskKladde)
+    ? "Alt er slaaet fra, saa denne enhed faar ingen beskeder overhovedet."
+    : "Der sendes kun besked naar der rent faktisk er noget at sige. "
+      + "Vil du have prikken uden lyd, kan telefonens egne indstillinger "
+      + "for siden saette beskederne paa lydloes.";
+}
+
+async function visBeskLog(){
+  const el = document.getElementById("besk-meta");
+  const { data, error } = await sb.from("besked_log")
+    .select("*").order("tidspunkt", { ascending:false }).limit(1);
+  if(error || !data || !data[0]){ el.textContent = ""; return; }
+  const d = new Date(data[0].tidspunkt);
+  el.textContent = "Sidste udsendelse: " + d.toLocaleString("da-DK",
+    { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })
+    + " (" + data[0].slags + ", " + data[0].sendt + " sendt)";
+}
+
+async function aabnBeskeder(){
+  hide("menu-back");
+  show("besk-back");
+  const meta = document.getElementById("besk-meta");
+  const krop = document.getElementById("besk-krop");
+  const gem  = document.getElementById("besk-gem");
+  const fra  = document.getElementById("besk-fra");
+  krop.hidden = true; fra.hidden = true; gem.hidden = true;
+  meta.textContent = "Henter …";
+
+  if(!pushMulig()){
+    meta.textContent = "Denne browser kan ikke tage imod beskeder."; return;
+  }
+  if(!VAPID_PUBLIC){
+    meta.textContent = "Beskeder er ikke sat op endnu — den offentlige "
+      + "noegle mangler i filen."; return;
+  }
+  if(Notification.permission === "denied"){
+    meta.textContent = "Telefonen har sagt nej til beskeder fra siden. "
+      + "Appen kan ikke spoerge igen — det skal slaas til i telefonens "
+      + "indstillinger for denne side."; return;
+  }
+
+  const fejl = await hentBeskRaekke();
+  if(fejl){
+    meta.textContent = "Kunne ikke hente enhedens indstillinger: "
+      + fejl.message + " — er notifikationer.sql koert?";
+    return;
+  }
+  saetBeskStand();
+
+  if(!beskRaekke){
+    beskKladde = null;
+    meta.textContent = "Beskeder er slaaet fra her. Slaar du dem til, "
+      + "spoerger telefonen om lov. Siger du nej, kan appen ikke spoerge "
+      + "igen — saa skal det rettes i telefonens indstillinger for siden.";
+    gem.hidden = false; gem.textContent = "Slå beskeder til";
+    return;
+  }
+  beskKladde = Object.assign({}, beskRaekke);
+  krop.hidden = false; fra.hidden = false; gem.hidden = false;
+  gem.textContent = "Gem";
+  tegnBesk();
+  visBeskLog();
+}
+
+async function beskTilmeld(){
+  const gem = document.getElementById("besk-gem");
+  const meta = document.getElementById("besk-meta");
+  gem.disabled = true; gem.textContent = "Spoerger …";
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const lov = await Notification.requestPermission();
+    if(lov !== "granted"){
+      meta.textContent = lov === "denied"
+        ? "Telefonen sagde nej. Det kan kun laves om i telefonens "
+          + "indstillinger for denne side."
+        : "Der blev ikke taget stilling, saa der er ikke slaaet noget til.";
+      return;
+    }
+    let sub = await reg.pushManager.getSubscription();
+    if(sub){
+      /* Er noeglen skiftet, passer et gammelt abonnement ikke laengere. */
+      const gl = sub.options && sub.options.applicationServerKey;
+      if(gl && new Uint8Array(gl).join(",") !== b64tilBytes(VAPID_PUBLIC).join(",")){
+        await sub.unsubscribe(); sub = null;
+      }
+    }
+    if(!sub) sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: b64tilBytes(VAPID_PUBLIC)
+    });
+    const n = sub.toJSON();
+    const raekke = {
+      enhed_id: ENHED_ID,
+      navn: "Telefon",
+      endpoint: sub.endpoint,
+      p256dh: n.keys.p256dh,
+      auth:   n.keys.auth,
+      person: "familie",
+      morgen_tid: "07:00",
+      aften_tid: "19:00",
+      fejl_i_traek: 0
+    };
+    const { data, error } = await sb.from("push_enheder")
+      .upsert(raekke, { onConflict: "endpoint" }).select();
+    if(error){ meta.textContent = "Kunne ikke gemme: " + error.message; return; }
+    beskRaekke = (data && data[0]) || null;
+    beskKladde = beskRaekke ? Object.assign({}, beskRaekke) : null;
+    saetBeskStand();
+    meta.textContent = "";
+    document.getElementById("besk-krop").hidden = false;
+    document.getElementById("besk-fra").hidden = false;
+    tegnBesk();
+    visBeskLog();
+  } catch(e){
+    meta.textContent = "Kunne ikke slaa beskeder til: " + (e && e.message ? e.message : e);
+  } finally {
+    gem.disabled = false;
+    gem.textContent = beskRaekke ? "Gem" : "Slå beskeder til";
+  }
+}
+
+async function beskGem(){
+  if(!beskKladde) return;
+  const gem = document.getElementById("besk-gem");
+  gem.disabled = true; gem.textContent = "Gemmer …";
+  const felter = {
+    navn: (document.getElementById("besk-navn").value.trim() || "Telefon"),
+    person: beskKladde.person,
+    morgen_tid: beskKladde.morgen_tid,
+    aften_tid: beskKladde.aften_tid
+  };
+  BESK_KONTAKTER.forEach(k => felter[k] = !!beskKladde[k]);
+  const { data, error } = await sb.from("push_enheder")
+    .update(felter).eq("id", beskKladde.id).select();
+  gem.disabled = false; gem.textContent = "Gem";
+  if(error){
+    document.getElementById("besk-meta").textContent =
+      "Kunne ikke gemme: " + error.message;
+    return;
+  }
+  beskRaekke = (data && data[0]) || beskRaekke;
+  saetBeskStand();
+  hide("besk-back");
+}
+
+async function beskSlaaFra(){
+  const meta = document.getElementById("besk-meta");
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub) await sub.unsubscribe();
+  } catch(e){ /* selve rakken skal vak uanset hvad */ }
+  if(beskRaekke){
+    const { error } = await sb.from("push_enheder").delete().eq("id", beskRaekke.id);
+    if(error){ meta.textContent = "Kunne ikke slaa fra: " + error.message; return; }
+  }
+  beskRaekke = null; beskKladde = null;
+  saetBeskStand();
+  hide("besk-back");
+}
+
+document.getElementById("menu-besked").onclick = aabnBeskeder;
+document.getElementById("besk-luk").onclick = () => hide("besk-back");
+document.getElementById("besk-gem").onclick = () =>
+  beskRaekke ? beskGem() : beskTilmeld();
+document.getElementById("besk-fra").onclick = beskSlaaFra;
+
+document.getElementById("besk-person").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-bp]"); if(!b || !beskKladde) return;
+  beskKladde.person = b.dataset.bp; tegnBesk();
+});
+["besk-mtid","besk-atid"].forEach(id =>
+  document.getElementById(id).addEventListener("click", ev => {
+    const b = ev.target.closest("[data-bt]"); if(!b || !beskKladde) return;
+    const [felt, tid] = b.dataset.bt.split("|");
+    beskKladde[felt] = tid; tegnBesk();
+  }));
+document.getElementById("besk-krop").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-kt]"); if(!b || !beskKladde) return;
+  beskKladde[b.dataset.kt] = !beskKladde[b.dataset.kt]; tegnBesk();
+});
+
+/* Stilles ved opstart, saa menuen kan sige til eller fra uden at man
+   skal aabne arket. En fejl her maa ikke vaelte noget. */
+async function beskInit(){
+  if(!pushMulig() || !VAPID_PUBLIC){ saetBeskStand(); return; }
+  try { await hentBeskRaekke(); } catch(e){}
+  saetBeskStand();
+}
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker:', err));
 }
+beskInit();
+
+/* Trykker man paa en besked, skal appen aabne det rigtige sted.
+   #todo aabner opgavelisten - baade ved indlaesning og hvis appen
+   allerede stod aaben og bare faar en ny hash. */
+function faneFraHash(){
+  const h = (location.hash || "").replace("#","");
+  if(h && document.querySelector('.tabbar [data-fane="' + h + '"]')) saetFane(h);
+}
+window.addEventListener("hashchange", faneFraHash);
+faneFraHash();
 </script>
 </body>
 </html>
