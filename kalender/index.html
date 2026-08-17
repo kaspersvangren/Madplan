@@ -1491,7 +1491,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.27.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.27.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6283,11 +6283,11 @@ async function start(){
 </script>
 <script>
 /* =======================================================================
-   Beskeder paa denne enhed (web push)
+   Beskeder på denne enhed (web push)
    Selve UDSENDELSEN sker ude i GitHub Actions - se push.mjs. Appen her
-   registrerer kun enheden og gemmer dens valg. Noeglen nedenfor er den
-   OFFENTLIGE halvdel af VAPID-parret; den maa gerne staa i filen.
-   Skiftes den, doer alle abonnementer og hver enhed skal til igen.
+   registrerer kun enheden og gemmer dens valg. Nøglen nedenfor er den
+   OFFENTLIGE halvdel af VAPID-parret; den må gerne stå i filen.
+   Skiftes den, dør alle abonnementer og hver enhed skal til igen.
    ======================================================================= */
 const VAPID_PUBLIC = "BGcw78W7qtwM3Xd-jQEvwU7nYy0tylI4BQutOvSvLhx-GFbARn-OQ1gq8zRLIK0k32_I1yKB09rk6tAm3NYg2XI";
 
@@ -6307,13 +6307,13 @@ const A_TIDER = ["18:30","19:00","19:30","20:00","20:30"];
 const BESK_KONTAKTER = ["m_aftaler","m_opgaver","m_nyt",
                         "a_aftaler","a_opgaver","a_optoening","a_nyt"];
 
-let beskRaekke = null;      /* rakken i push_enheder for DENNE enhed */
-let beskKladde = null;      /* det man er ved at rette, saa Luk fortryder */
+let beskRaekke = null;      /* rækken i push_enheder for DENNE enhed */
+let beskKladde = null;      /* det man er ved at rette, så Luk fortryder */
 
 const pushMulig = () => "serviceWorker" in navigator
   && "PushManager" in window && "Notification" in window;
 
-/* Den offentlige noegle staar url-sikker og skal vaere raa bytes. */
+/* Den offentlige nøgle står url-sikker og skal være rå bytes. */
 function b64tilBytes(s){
   const pad = "=".repeat((4 - s.length % 4) % 4);
   const raa = atob((s + pad).replace(/-/g,"+").replace(/_/g,"/"));
@@ -6322,8 +6322,8 @@ function b64tilBytes(s){
   return ud;
 }
 
-/* Alle kontakter slaaet fra = enheden siger alligevel intet. Saa skal
-   menuen ikke paastaa at beskeder er til. */
+/* Alle kontakter slået fra = enheden siger alligevel intet. Så skal
+   menuen ikke påstå at beskeder er til. */
 const beskTavs = r => !!r && BESK_KONTAKTER.every(k => !r[k]);
 
 function saetBeskStand(){
@@ -6343,8 +6343,8 @@ async function hentBeskRaekke(){
   return null;
 }
 
-/* Navnet paa personen, men "Familie" hedder "Alle" her - ellers ville man
-   tro det var det samme som markeringen paa aftalen. */
+/* Navnet på personen, men "Familie" hedder "Alle" her — ellers ville man
+   tro det var det samme som markeringen på aftalen. */
 const beskPersonNavn = id => id === "familie" ? "Alle" :
   ((PEOPLE.find(p => p.id === id) || {}).navn || id);
 
@@ -6374,10 +6374,10 @@ function tegnBesk(){
   });
 
   document.getElementById("besk-sum").textContent = beskTavs(beskKladde)
-    ? "Alt er slaaet fra, saa denne enhed faar ingen beskeder overhovedet."
-    : "Der sendes kun besked naar der rent faktisk er noget at sige. "
+    ? "Alt er slået fra, så denne enhed får ingen beskeder overhovedet."
+    : "Der sendes kun besked når der rent faktisk er noget at sige. "
       + "Vil du have prikken uden lyd, kan telefonens egne indstillinger "
-      + "for siden saette beskederne paa lydloes.";
+      + "for siden sætte beskederne på lydløs.";
 }
 
 async function visBeskLog(){
@@ -6406,27 +6406,27 @@ async function aabnBeskeder(){
   }
   if(!VAPID_PUBLIC){
     meta.textContent = "Beskeder er ikke sat op endnu — den offentlige "
-      + "noegle mangler i filen."; return;
+      + "nøgle mangler i filen."; return;
   }
   if(Notification.permission === "denied"){
     meta.textContent = "Telefonen har sagt nej til beskeder fra siden. "
-      + "Appen kan ikke spoerge igen — det skal slaas til i telefonens "
+      + "Appen kan ikke spørge igen — det skal slås til i telefonens "
       + "indstillinger for denne side."; return;
   }
 
   const fejl = await hentBeskRaekke();
   if(fejl){
     meta.textContent = "Kunne ikke hente enhedens indstillinger: "
-      + fejl.message + " — er notifikationer.sql koert?";
+      + fejl.message + " — er notifikationer.sql kørt?";
     return;
   }
   saetBeskStand();
 
   if(!beskRaekke){
     beskKladde = null;
-    meta.textContent = "Beskeder er slaaet fra her. Slaar du dem til, "
-      + "spoerger telefonen om lov. Siger du nej, kan appen ikke spoerge "
-      + "igen — saa skal det rettes i telefonens indstillinger for siden.";
+    meta.textContent = "Beskeder er slået fra her. Slår du dem til, "
+      + "spørger telefonen om lov. Siger du nej, kan appen ikke spørge "
+      + "igen — så skal det rettes i telefonens indstillinger for siden.";
     gem.hidden = false; gem.textContent = "Slå beskeder til";
     return;
   }
@@ -6440,7 +6440,7 @@ async function aabnBeskeder(){
 async function beskTilmeld(){
   const gem = document.getElementById("besk-gem");
   const meta = document.getElementById("besk-meta");
-  gem.disabled = true; gem.textContent = "Spoerger …";
+  gem.disabled = true; gem.textContent = "Spørger …";
   try{
     const reg = await navigator.serviceWorker.ready;
     const lov = await Notification.requestPermission();
@@ -6448,12 +6448,12 @@ async function beskTilmeld(){
       meta.textContent = lov === "denied"
         ? "Telefonen sagde nej. Det kan kun laves om i telefonens "
           + "indstillinger for denne side."
-        : "Der blev ikke taget stilling, saa der er ikke slaaet noget til.";
+        : "Der blev ikke taget stilling, så der er ikke slået noget til.";
       return;
     }
     let sub = await reg.pushManager.getSubscription();
     if(sub){
-      /* Er noeglen skiftet, passer et gammelt abonnement ikke laengere. */
+      /* Er nøglen skiftet, passer et gammelt abonnement ikke længere. */
       const gl = sub.options && sub.options.applicationServerKey;
       if(gl && new Uint8Array(gl).join(",") !== b64tilBytes(VAPID_PUBLIC).join(",")){
         await sub.unsubscribe(); sub = null;
@@ -6487,7 +6487,7 @@ async function beskTilmeld(){
     tegnBesk();
     visBeskLog();
   } catch(e){
-    meta.textContent = "Kunne ikke slaa beskeder til: " + (e && e.message ? e.message : e);
+    meta.textContent = "Kunne ikke slå beskeder til: " + (e && e.message ? e.message : e);
   } finally {
     gem.disabled = false;
     gem.textContent = beskRaekke ? "Gem" : "Slå beskeder til";
@@ -6524,10 +6524,10 @@ async function beskSlaaFra(){
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if(sub) await sub.unsubscribe();
-  } catch(e){ /* selve rakken skal vak uanset hvad */ }
+  } catch(e){ /* selve rækken skal væk uanset hvad */ }
   if(beskRaekke){
     const { error } = await sb.from("push_enheder").delete().eq("id", beskRaekke.id);
-    if(error){ meta.textContent = "Kunne ikke slaa fra: " + error.message; return; }
+    if(error){ meta.textContent = "Kunne ikke slå fra: " + error.message; return; }
   }
   beskRaekke = null; beskKladde = null;
   saetBeskStand();
@@ -6555,8 +6555,8 @@ document.getElementById("besk-krop").addEventListener("click", ev => {
   beskKladde[b.dataset.kt] = !beskKladde[b.dataset.kt]; tegnBesk();
 });
 
-/* Stilles ved opstart, saa menuen kan sige til eller fra uden at man
-   skal aabne arket. En fejl her maa ikke vaelte noget. */
+/* Stilles ved opstart, så menuen kan sige til eller fra uden at man
+   skal åbne arket. En fejl her må ikke vælte noget. */
 async function beskInit(){
   if(!pushMulig() || !VAPID_PUBLIC){ saetBeskStand(); return; }
   try { await hentBeskRaekke(); } catch(e){}
@@ -6568,9 +6568,9 @@ if ('serviceWorker' in navigator) {
 }
 beskInit();
 
-/* Trykker man paa en besked, skal appen aabne det rigtige sted.
-   #todo aabner opgavelisten - baade ved indlaesning og hvis appen
-   allerede stod aaben og bare faar en ny hash. */
+/* Trykker man på en besked, skal appen åbne det rigtige sted.
+   #todo åbner opgavelisten — både ved indlæsning og hvis appen
+   allerede stod åben og bare får en ny hash. */
 function faneFraHash(){
   const h = (location.hash || "").replace("#","");
   if(h && document.querySelector('.tabbar [data-fane="' + h + '"]')) saetFane(h);
