@@ -24,11 +24,11 @@ self.addEventListener('fetch', event => {
   );
 });
 /* =====================================================================
-   INDSAETTES NEDERST I sw.js - roer ikke det der staar i forvejen.
+   INDSAETTES NEDERST I sw.js - rør ikke det der står i forvejen.
 
-   Jeg har ikke set din sw.js, saa den her blok staar helt for sig selv
-   og bruger ingen af dens variabler. To hendelser: push viser beskeden,
-   notificationclick aabner appen det rigtige sted.
+   Jeg har ikke set din sw.js, så den her blok står helt for sig selv
+   og bruger ingen af dens variabler. To hændelser: push viser beskeden,
+   notificationclick åbner appen det rigtige sted.
    ===================================================================== */
 
 self.addEventListener("push", event => {
@@ -41,7 +41,7 @@ self.addEventListener("push", event => {
     icon: "./icon-192.png",
     badge: "./icon-192.png",
     lang: "da",
-    /* Samme tag = en ny besked afloeser den gamle i stedet for at
+    /* Samme tag = en ny besked afløser den gamle i stedet for at
        stable sig op. Morgen og aften har hver sit. */
     tag: d.slags === "aften" ? "vh-aften" : "vh-morgen",
     renotify: true,
@@ -56,7 +56,7 @@ self.addEventListener("notificationclick", event => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true })
       .then(vinduer => {
-        /* Staar appen allerede aaben, saa brug den frem for at aabne en til. */
+        /* Står appen allerede aaben, så brug den frem for at åbne en til. */
         for (const v of vinduer) {
           if ("focus" in v) {
             if (v.navigate && maal !== "./") { v.navigate(maal).catch(() => {}); }
