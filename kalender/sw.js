@@ -23,3 +23,47 @@ self.addEventListener('fetch', event => {
       .catch(() => fetch(event.request))
   );
 });
+/* =====================================================================
+   INDSAETTES NEDERST I sw.js - roer ikke det der staar i forvejen.
+
+   Jeg har ikke set din sw.js, saa den her blok staar helt for sig selv
+   og bruger ingen af dens variabler. To hendelser: push viser beskeden,
+   notificationclick aabner appen det rigtige sted.
+   ===================================================================== */
+
+self.addEventListener("push", event => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = {}; }
+
+  const titel = d.titel || "Vores Hverdag";
+  const valg = {
+    body: d.tekst || "",
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    lang: "da",
+    /* Samme tag = en ny besked afloeser den gamle i stedet for at
+       stable sig op. Morgen og aften har hver sit. */
+    tag: d.slags === "aften" ? "vh-aften" : "vh-morgen",
+    renotify: true,
+    data: { url: d.url || "./" }
+  };
+  event.waitUntil(self.registration.showNotification(titel, valg));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const maal = (event.notification.data && event.notification.data.url) || "./";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true })
+      .then(vinduer => {
+        /* Staar appen allerede aaben, saa brug den frem for at aabne en til. */
+        for (const v of vinduer) {
+          if ("focus" in v) {
+            if (v.navigate && maal !== "./") { v.navigate(maal).catch(() => {}); }
+            return v.focus();
+          }
+        }
+        if (self.clients.openWindow) return self.clients.openWindow(maal);
+      })
+  );
+});
