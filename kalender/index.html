@@ -1491,7 +1491,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.27.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.27.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2165,12 +2165,62 @@ function ingredienserFor(retId){
   return ingredienser.filter(i => i.ret_id === retId)
                      .sort((a,b) => a.sortering - b.sortering);
 }
-function sidstSpist(retId){
+/* Aftensmaden regnes for spist fra 18.30. Før da står en ret der er
+   planlagt til i dag stadig som planlagt — ellers ville listen sige
+   "Spist i dag" om noget der ikke er lavet endnu. Skiftet sker ved
+   næste optegning, ikke af sig selv mens appen står åben. */
+const SPISE_TIME = 18.5;
+
+function erSpist(ds){
   const idag = iso(new Date());
+  if(ds < idag) return true;
+  if(ds > idag) return false;
+  const n = new Date();
+  return n.getHours() + n.getMinutes() / 60 >= SPISE_TIME;
+}
+
+function sidstSpist(retId){
   const dage = madplanDage
-    .filter(m => m.dato <= idag && m.ret_id === retId)
+    .filter(m => m.ret_id === retId && erSpist(m.dato))
     .map(m => m.dato).sort();
   return dage.length ? dage[dage.length-1] : null;
+}
+
+/* Den nærmeste dag frem i tiden hvor retten allerede står på planen.
+   "undtagen" er den dag man står og redigerer — der giver det ingen
+   mening at få at vide at retten er planlagt netop dér. */
+function planlagtTil(retId, undtagen){
+  const dage = madplanDage
+    .filter(m => m.ret_id === retId && !erSpist(m.dato) && m.dato !== undtagen)
+    .map(m => m.dato).sort();
+  return dage.length ? dage[0] : null;
+}
+
+function naerDagTekst(ds){
+  const d = dageSiden(ds);                    /* negativt = frem i tiden */
+  if(d === 0)  return "i dag";
+  if(d === -1) return "i morgen";
+  if(d > -7)   return "på " + UGEDAGE[ugeIndex(fromIso(ds))];
+  return "d. " + Number(ds.slice(8,10)) + "." + Number(ds.slice(5,7)) + ".";
+}
+
+/* En ret siger enten hvornår den står for tur, eller hvornår den sidst
+   blev spist. Planlagt vinder — men begge dele regnes ud hver gang ud
+   fra madplanen, så intet gemmes og intet kan gå tabt. Ændrer man dagen
+   igen, står "sidst spist" der som før. */
+/* Linjen under rettens titel starter midt i en sætning, så det store
+   begyndelsesbogstav skal væk der — men kun der. */
+const lilleStart = t => t.charAt(0).toLowerCase() + t.slice(1);
+
+function retNaar(retId, undtagen){
+  const p = planlagtTil(retId, undtagen);
+  if(p) return "Planlagt " + naerDagTekst(p);
+  const sidst = sidstSpist(retId);
+  if(!sidst) return "Aldrig spist";
+  const dage = dageSiden(sidst);
+  return dage === 0 ? "Spist i dag"
+       : dage === 1 ? "Spist i går"
+       : "Sidst spist for " + dage + " dage siden";
 }
 function dageSiden(ds){
   return Math.round((fromIso(iso(new Date())) - fromIso(ds)) / 86400000);
@@ -2293,8 +2343,6 @@ function renderKogebog(){
   }
   return '<div class="retliste">' + liste.map(r => {
     const ing = ingredienserFor(r.id);
-    const sidst = sidstSpist(r.id);
-    const dage = sidst ? dageSiden(sidst) : null;
     const marker = [
       r.vegetar && '<span class="mark">vegetar</span>',
       r.nem && '<span class="mark">nem</span>',
@@ -2302,9 +2350,7 @@ function renderKogebog(){
       r.er_tilbehoer && '<span class="mark tilbehoer">tilbehør</span>',
       frostMaerke(r.id)
     ].filter(Boolean).join(" ");
-    const sidstTekst = sidst
-      ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
-      : "Aldrig spist";
+    const sidstTekst = retNaar(r.id);
     return '<button class="retkort" data-ret="'+r.id+'"><span style="flex:1;min-width:0">'
          +   '<span class="navn">'+esc(r.navn)+'</span>'
          +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span></span>'
@@ -2359,7 +2405,6 @@ function aabnRet(id){
   const r = retter.find(x => x.id === id); if(!r) return;
   aabenRetId = id;
   const ing = ingredienserFor(id);
-  const sidst = sidstSpist(id);
 
   const baand = document.getElementById("ret-baand");
   baand.hidden = !r.billede_sti;
@@ -2376,7 +2421,7 @@ function aabnRet(id){
   const marker = [r.vegetar && "vegetar", r.nem && "nem ret", r.agnes_kan_lide && "Agnes kan lide",
                   r.er_tilbehoer && "tilbehør"].filter(Boolean).join(" · ");
   document.getElementById("ret-meta").textContent =
-    (marker ? marker + " · " : "") + (sidst ? "sidst spist " + sidst : "aldrig spist");
+    (marker ? marker + " · " : "") + lilleStart(retNaar(id));
 
   const gruppe = (titel, k) => {
     const d = ing.filter(i => i.kategori === k);
@@ -3185,11 +3230,7 @@ function tegnVaelgListe(){
   if(!liste.length && !fri){ el.innerHTML = '<div class="empty">Ingen retter passer.</div>'; return; }
 
   el.innerHTML = fri + liste.map(r => {
-    const sidst = sidstSpist(r.id);
-    const dage = sidst ? dageSiden(sidst) : null;
-    const naar = sidst
-      ? (dage === 0 ? "Spist i dag" : dage === 1 ? "Spist i går" : "Sidst spist for " + dage + " dage siden")
-      : "Aldrig spist";
+    const naar = retNaar(r.id, aabenDag);
     const marker = [r.vegetar && "vegetar", r.nem && "nem", r.agnes_kan_lide && "Agnes"]
       .filter(Boolean).map(t => '<span class="mark">'+t+'</span>').concat(frostMaerke(r.id) || [])
       .join(" ");
