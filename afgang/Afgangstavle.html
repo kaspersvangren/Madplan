@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hjem</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e1620">
+<link rel="icon" type="image/png" href="ikon-192.png">
+<link rel="apple-touch-icon" href="ikon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   RET HER — og kun her.
+   Der er INGEN nøgle i denne fil. Kaldene går til din egen
+   funktion hos Supabase, som holder nøglen og videresender.
+   Filen kan derfor godt ligge et offentligt sted.
+   ══════════════════════════════════════════════════════════════ */
+
+const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
+
+const BUDDINGE_TORV   = "A=1@O=Buddinge Torv (Gladsaxe Ringvej)@X=12491752@Y=55741939@U=86@L=11@";
+const GLADSAXE_RÅDHUS = "A=1@O=Gladsaxe Rådhus (Letbane)@X=12493487@Y=55743026@U=86@L=8603420@";
+const HERLEV_ST       = "A=1@O=Herlev St.@X=12443678@Y=55718917@U=86@L=8600706@";
+const HUSUM_ST        = "A=1@O=Husum St.@X=12464029@Y=55709407@U=86@L=8600705@";
+const ØLSTYKKE_ST     = "A=1@O=Ølstykke St.@X=12159708@Y=55795640@U=86@L=8600712@";
+
+const S_BUS = 64, LETBANE = 2048, S_TOG = 16;
+
+/* gangtid = hvor lang tid DU er om skiftet, fra bussen holder ved
+             stoppestedet til du står på perronen. Rejser med mindre
+             end det vises slet ikke.
+   varsel  = din tid hjemmefra kontoret ned til stoppestedet.
+             Afgange tidligere end det vises ikke.              */
+
+const RUTER = [
+  { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
+    skiftId: HERLEV_ST,       skiftNavn: "Herlev",
+    produkter: S_BUS,   gangtid: 6, varsel: 6, til: "2026-08-22" },
+
+  { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
+    skiftId: HUSUM_ST,        skiftNavn: "Husum",
+    produkter: S_BUS,   gangtid: 2, varsel: 6 },
+
+  { lokalId: GLADSAXE_RÅDHUS, lokalNavn: "Gladsaxe Rådhus",
+    skiftId: HERLEV_ST,       skiftNavn: "Herlev",
+    produkter: LETBANE, gangtid: 4, varsel: 4, fra: "2026-08-22" }
+];
+
+const HJEM = { id: ØLSTYKKE_ST, navn: "Ølstykke" };
+
+/* Når du vender rejsen: din tid hjemmefra ned til Ølstykke St. */
+const VARSEL_HJEMMEFRA = 7;
+
+/* Driftsmeddelelser skal nævne BÅDE en af dine linjer OG et af dine
+   steder — ellers fanger man vejarbejde i Ishøj og på Bellahøj.
+   Ord i DRIFT_BANE tæller alene, fordi de rammer hele strækningen. */
+
+const DRIFT_LINJER = ["200S","300S","Letbane","linje L","linje C","linje H"];
+const DRIFT_STEDER = ["Buddinge Torv","Buddinge St","Gladsaxe Rådhus","Gladsaxe Ringvej",
+                      "Herlev St","Husum St","Ølstykke","Ballerup","Måløv","Skovlunde","Islev"];
+const DRIFT_BANE   = ["Frederikssundbanen","Frederikssundsbanen","Hovedstadens Letbane"];
+const DRIFT_MAKS_DAGE = 30;   // længerevarende vejarbejde vises ikke
+
+const OPDATER_SEKUNDER = 60;
+const DVALE_MINUTTER   = 30;
+const RÆKKER_KORT      = 6;
+const RÆKKER_LANGT     = 16;
+const PER_SØGNING      = 6;
+const EKSTRA_SIDER     = 1;
+</script>
+
+<style>
+:root{
+  --luft:#e9edf1; --flade:#fff; --blæk:#0e1620; --dæmpet:#5a6673;
+  --hårfin:#d3dae1; --sbus:#ffd400; --letbane:#32ac5c; --stog:#b7202e;
+  --forsinket:#a35400; --stram:#8a6a1f; --aflyst:#c1121f; --god:#1f7a44; --radius:3px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--luft);color:var(--blæk);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;padding:18px 16px 40px;}
+.ramme{max-width:880px;margin:0 auto;}
+
+.hoved{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:2px solid var(--blæk);}
+.hoved h1{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;
+  font-size:29px;letter-spacing:.03em;text-transform:uppercase;margin:0;}
+.ur{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:22px;
+  font-variant-numeric:tabular-nums;margin-left:auto;}
+.dato{color:var(--dæmpet);font-size:13px;}
+.puls{width:8px;height:8px;border-radius:50%;background:var(--letbane);
+  display:inline-block;vertical-align:middle;margin-right:6px;}
+.puls.arbejder{animation:blink 1s ease-in-out infinite;}
+.puls.sover{background:var(--dæmpet);}
+.puls.gal{background:var(--aflyst);}
+@keyframes blink{50%{opacity:.25}}
+
+.knapper{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;}
+button{font-family:inherit;font-size:13px;font-weight:500;background:var(--flade);
+  color:var(--blæk);border:1px solid var(--hårfin);border-radius:var(--radius);
+  padding:7px 13px;cursor:pointer;}
+button:hover{border-color:var(--blæk);}
+button[aria-pressed="true"]{background:var(--blæk);color:#fff;border-color:var(--blæk);}
+button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
+#knapVend{font-weight:600;}
+.forklar{font-size:12.5px;color:var(--dæmpet);margin:0 0 16px;}
+
+/* ── driftsinformation ─────────────────────────────────── */
+.drift{background:var(--flade);border:1px solid var(--hårfin);
+  border-left:3px solid var(--forsinket);border-radius:var(--radius);
+  padding:11px 14px;margin-bottom:14px;font-size:13.5px;}
+.drift p{margin:0;}
+.drift p + p{margin-top:7px;padding-top:7px;border-top:1px solid #eef1f4;}
+.drift b{font-weight:600;}
+.drift span{color:var(--dæmpet);}
+
+/* ── tabellen ──────────────────────────────────────────── */
+.kort{background:var(--flade);border:1px solid var(--hårfin);
+  border-radius:var(--radius);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead th{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dæmpet);
+  text-align:left;padding:9px 10px;border-bottom:1px solid var(--hårfin);
+  white-space:nowrap;}
+thead th:first-child{padding-left:16px;}
+thead th:last-child{padding-right:16px;text-align:right;}
+
+tbody td{padding:11px 10px;border-top:1px solid #eef1f4;vertical-align:middle;}
+tbody tr:first-child td{border-top:none;}
+td:first-child{padding-left:16px;}
+td:last-child{padding-right:16px;}
+
+.afg{width:1%;white-space:nowrap;font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;}
+.afg b{font-size:18px;font-weight:600;display:block;line-height:1.15;}
+.afg span{font-size:11.5px;color:var(--dæmpet);}
+.afg em{font-style:normal;color:var(--forsinket);font-weight:600;margin-left:4px;}
+tr.sen .afg b{color:var(--forsinket);}
+
+.linje{width:1%;white-space:nowrap;}
+.mærke{display:inline-block;min-width:46px;text-align:center;
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;font-size:12.5px;
+  padding:2px 6px;border-radius:var(--radius);background:var(--blæk);color:#fff;}
+.mærke.bus{background:var(--sbus);color:#1a1a00;}
+.mærke.letbane{background:var(--letbane);color:#fff;}
+.mærke.stog{background:var(--stog);color:#fff;}
+
+.sted{font-size:13.5px;white-space:nowrap;}
+.skift{font-size:13px;color:var(--dæmpet);white-space:nowrap;}
+.vent{font-family:"IBM Plex Mono",monospace;font-weight:600;}
+.vent.ok{color:var(--god);}
+.vent.stram{color:var(--stram);}
+
+.ank{width:1%;white-space:nowrap;text-align:right;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
+.ank b{font-size:18px;font-weight:600;display:block;line-height:1.15;}
+.ank span{font-size:11.5px;color:var(--dæmpet);}
+
+@media(max-width:680px){
+  thead{display:none;}
+  table,tbody{display:block;}
+  tbody tr{
+    display:grid;
+    grid-template-columns:auto auto 1fr auto;
+    grid-template-areas:
+      "afg  afg  afg   ank"
+      "l1   sted skift l2";
+    align-items:center;
+    gap:5px 8px;
+    padding:12px 14px;
+    border-top:1px solid #eef1f4;
+  }
+  tbody tr:first-child{border-top:none;}
+
+  /* tabellens "så smal som muligt" må ikke gælde her — det var den,
+     der klemte mærkerne ind over stednavnet */
+  td.afg,td.linje,td.sted,td.skift,td.ank{
+    display:block;width:auto;border:none;padding:0;min-width:0;}
+
+  td.afg{grid-area:afg;}
+  td:nth-child(2){grid-area:l1;}
+  td.sted{grid-area:sted;}
+  td.skift{grid-area:skift;}
+  td:nth-child(5){grid-area:l2;}
+  td.ank{grid-area:ank;justify-self:end;text-align:right;}
+
+  td.afg b,td.afg span,td.ank b,td.ank span{display:inline;}
+  td.afg span{margin-left:8px;}
+  td.ank span{margin-left:6px;}
+
+  td.sted,td.skift{font-size:13px;}
+  td.skift::before,td:nth-child(5)::before{
+    content:"› ";color:var(--hårfin);}
+
+  td.tom{grid-column:1 / -1;}
+}
+
+.tom{padding:20px 16px;font-size:13.5px;color:var(--dæmpet);}
+.besked{background:var(--flade);border:1px solid var(--hårfin);
+  border-left:3px solid var(--aflyst);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:16px;font-size:14px;}
+.besked h3{margin:0 0 5px;font-size:14px;font-weight:600;}
+.besked code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+  background:#eef1f4;padding:1px 5px;border-radius:2px;}
+.fod{margin-top:20px;font-size:12px;color:var(--dæmpet);}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;}}
+</style>
+</head>
+<body>
+<div class="ramme">
+  <header class="hoved">
+    <h1 id="titel">Hjem</h1>
+    <span class="dato" id="dato"></span>
+    <span class="ur"><span class="puls" id="puls"></span><span id="ur">--:--</span></span>
+  </header>
+
+  <div class="knapper">
+    <button id="knapVend">Vend rejsen</button>
+    <button id="knapOpdater">Opdater nu</button>
+    <button id="knapFlere" aria-pressed="false">Flere rejser</button>
+  </div>
+  <p class="forklar" id="forklar"></p>
+
+  <div id="drift"></div>
+  <div id="beskeder"></div>
+
+  <div class="kort">
+    <table>
+      <thead>
+        <tr>
+          <th>Afgang</th><th>Med</th><th>Fra</th><th>Skift</th><th>Videre</th><th>Fremme</th>
+        </tr>
+      </thead>
+      <tbody id="krop"></tbody>
+    </table>
+  </div>
+
+  <p class="fod" id="fod">Data fra Rejseplanen.</p>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $  = s => document.querySelector(s);
+const el = (t,k) => { const n=document.createElement(t); if(k) n.className=k; return n; };
+
+let hjemad=true, visFlere=false, sover=false, timer=null, sidsteAktivitet=Date.now();
+
+const to = n => String(n).padStart(2,"0");
+const urTekst = d => to(d.getHours())+":"+to(d.getMinutes());
+function datoTekst(d){
+  const uge=["søndag","mandag","tirsdag","onsdag","torsdag","fredag","lørdag"];
+  const mdr=["jan.","feb.","mar.","apr.","maj","jun.","jul.","aug.","sep.","okt.","nov.","dec."];
+  return uge[d.getDay()]+" "+d.getDate()+". "+mdr[d.getMonth()];
+}
+function idag(){ const d=new Date(); return d.getFullYear()+"-"+to(d.getMonth()+1)+"-"+to(d.getDate()); }
+function tilDato(dato,tid){
+  if(!dato||!tid) return null;
+  const d=dato.split("-").map(Number), t=tid.split(":").map(Number);
+  return new Date(d[0],d[1]-1,d[2],t[0],t[1],t[2]||0);
+}
+const minutter=(a,b)=>Math.round((b-a)/60000);
+const varighedTekst = m => m>=60 ? Math.floor(m/60)+" t "+(m%60)+" m" : m+" min";
+
+/* ── hentning ──────────────────────────────────────────── */
+const kurv = {};
+async function kald(url){
+  const svar = await fetch(url);
+  const data = await svar.json().catch(()=>null);
+  if(!data) throw new Error("Uforståeligt svar fra Rejseplanen.");
+  if(data.errorCode) throw new Error(data.errorText||data.errorCode);
+  return data;
+}
+function bygBen(fra,til,produkter,sammenhæng){
+  let u = FUNKTION + "?sti=trip"
+    + "&rtMode=REALTIME"
+    + "&originId=" + encodeURIComponent(fra)
+    + "&destId="   + encodeURIComponent(til)
+    + "&products=" + produkter + "&maxChange=0&numF=" + PER_SØGNING;
+  if(sammenhæng) u += "&context=" + encodeURIComponent(sammenhæng);
+  return u;
+}
+async function hentBen(fra,til,produkter,sider){
+  const n = fra+"|"+til+"|"+produkter+"|"+sider;
+  if(kurv[n]) return kurv[n];
+  kurv[n] = (async () => {
+    const f = await kald(bygBen(fra,til,produkter,null));
+    let ture = Array.isArray(f.Trip)?f.Trip.slice():(f.Trip?[f.Trip]:[]);
+    let s = f.scrF;
+    for(let i=1;i<sider && s;i++){
+      try{
+        const x = await kald(bygBen(fra,til,produkter,s));
+        ture = ture.concat(Array.isArray(x.Trip)?x.Trip:(x.Trip?[x.Trip]:[]));
+        s = x.scrF;
+      }catch(e){ break; }
+    }
+    return ture.map(tolkBen).filter(Boolean);
+  })();
+  return kurv[n];
+}
+
+/* ── tolkning ──────────────────────────────────────────── */
+function artAf(p){
+  const k=((p&&(p.catOutL||p.catOut))||"").toLowerCase();
+  if(k.indexOf("letbane")>-1) return "letbane";
+  if(k.indexOf("tog")>-1) return "stog";
+  return "bus";
+}
+const produktAf = b => Array.isArray(b.Product)?(b.Product[0]||{}):(b.Product||{});
+const tidAf = (p,rt) => rt ? tilDato(p.rtDate||p.date,p.rtTime||p.time) : tilDato(p.date,p.time);
+
+function tolkBen(trip){
+  const alle=(trip.LegList&&trip.LegList.Leg)||[];
+  const ben=(Array.isArray(alle)?alle:[alle]).filter(b => b.type!=="WALK" && b.Product);
+  if(ben.length!==1) return null;
+  const b=ben[0], p=produktAf(b);
+
+  /* Tiderne måles på selve bussen eller toget: hvornår den kører fra
+     stoppestedet, og hvornår den er fremme ved stoppestedet i den
+     anden ende. Ikke rejsens tider — de indeholder gangstykket,
+     og gangtiden er noget DU sætter nedenfor.                     */
+  const planlagt=tidAf(b.Origin,false);
+  const afgang  =tidAf(b.Origin,true) || planlagt;
+  const ankomst =tidAf(b.Destination,true) || tidAf(b.Destination,false);
+  if(!afgang||!ankomst) return null;
+  return {
+    linje: p.line || (b.name||"").replace(/^(Bus|S-tog|Letbane)\s+/i,"").trim(),
+    art: artAf(p), planlagt: planlagt, afgang: afgang, ankomst: ankomst,
+    forsinkelse: minutter(planlagt,afgang),
+    aflyst: b.cancelled === true
+  };
+}
+
+/* ── sammenkobling ─────────────────────────────────────── */
+function kobl(rute, et, to_, tidligstAfgang){
+  const ud=[];
+  et.forEach(a => {
+    if(a.aflyst) return;
+    if(a.afgang < tidligstAfgang) return;              // du kan ikke nå den
+    const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
+    let b=null;
+    for(let i=0;i<to_.length;i++){
+      if(!to_[i].aflyst && to_[i].afgang >= grænse){ b=to_[i]; break; }
+    }
+    if(!b) return;
+    const vent = minutter(a.ankomst, b.afgang);
+    ud.push({
+      et:a, to:b, rute:rute, vent:vent,
+      rummelig: vent >= rute.gangtid + 3,
+      afgang:a.afgang, planlagt:a.planlagt, forsinkelse:a.forsinkelse,
+      ankomst:b.ankomst, samlet:minutter(a.afgang,b.ankomst)
+    });
+  });
+  return ud;
+}
+
+/* En rejse er overflødig, hvis en anden med SAMME linje kører senere
+   og er fremme lige så tidligt. Det dækker både to afgange op til
+   samme tog, og samme afgang koblet til to forskellige tog.        */
+function fjernOverflødige(liste){
+  const perLinje = {};
+  liste.forEach(r => {
+    const n = r.et.linje;
+    (perLinje[n] = perLinje[n] || []).push(r);
+  });
+  const ud = [];
+  Object.keys(perLinje).forEach(n => {
+    const r = perLinje[n].slice().sort((a,b) =>
+      (b.afgang - a.afgang) || (a.ankomst - b.ankomst));
+    let bedste = null;
+    r.forEach(x => {
+      if(bedste === null || x.ankomst < bedste){ ud.push(x); bedste = x.ankomst; }
+    });
+  });
+  return ud;
+}
+
+/* ── driftsinformation ─────────────────────────────────── */
+async function hentDrift(){
+  try{
+    const data = await kald(FUNKTION + "?sti=himsearch");
+    const rå = data.Message;
+    const liste = Array.isArray(rå) ? rå : (rå ? [rå] : []);
+    return liste.filter(vedkommer).slice(0,3);
+  }catch(e){ return []; }
+}
+
+function vedkommer(m){
+  const tekst = [m.head, m.lead, m.text].filter(Boolean).join(" ");
+  if(!tekst) return false;
+
+  /* for langvarigt til at være drift — det er vejarbejde */
+  const start = tilDato(m.sDate, m.sTime || "00:00:00");
+  const slut  = tilDato(m.eDate, m.eTime || "23:59:00");
+  if(start && slut && (slut - start) > DRIFT_MAKS_DAGE*86400000) return false;
+
+  if(DRIFT_BANE.some(o => tekst.indexOf(o) > -1)) return true;
+
+  const linje = DRIFT_LINJER.some(o => tekst.indexOf(o) > -1);
+  const sted  = DRIFT_STEDER.some(o => tekst.indexOf(o) > -1);
+  return linje && sted;
+}
+function tegnDrift(beskeder){
+  const holder = $("#drift");
+  holder.textContent = "";
+  if(!beskeder.length) return;
+  const boks = el("div","drift");
+  beskeder.forEach(m => {
+    const p = el("p");
+    const b = el("b"); b.textContent = m.head || "Driftsinformation";
+    p.appendChild(b);
+    let t = (m.lead || m.text || "").trim();
+    if(t.length > 180) t = t.slice(0,177).replace(/\s+\S*$/,"") + "…";
+    if(t){
+      p.appendChild(document.createElement("br"));
+      const s = el("span"); s.textContent = t;
+      p.appendChild(s);
+    }
+    boks.appendChild(p);
+  });
+  holder.appendChild(boks);
+}
+
+/* ── tegning ───────────────────────────────────────────── */
+function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m; }
+
+function tegnRække(r, nu){
+  const tr = el("tr");
+  if(r.forsinkelse >= 1) tr.classList.add("sen");
+
+  const t1 = el("td","afg");
+  const b1 = el("b"); b1.textContent = urTekst(r.afgang);
+  const s1 = el("span");
+  const m = minutter(nu, r.afgang);
+  s1.textContent = m <= 0 ? "nu" : "om "+m+" min";
+  if(r.forsinkelse >= 1){
+    const e = el("em"); e.textContent = "+"+r.forsinkelse;
+    s1.appendChild(e);
+  }
+  t1.appendChild(b1); t1.appendChild(s1);
+  tr.appendChild(t1);
+
+  const t2 = el("td","linje"); t2.appendChild(mærke(r.et.linje, r.et.art));
+  tr.appendChild(t2);
+
+  const t3 = el("td","sted");
+  t3.textContent = hjemad ? r.rute.lokalNavn : HJEM.navn;
+  tr.appendChild(t3);
+
+  const t4 = el("td","skift");
+  t4.appendChild(document.createTextNode(r.rute.skiftNavn+", "));
+  const v = el("em","vent "+(r.rummelig?"ok":"stram"));
+  v.textContent = r.vent+" min";
+  t4.appendChild(v);
+  tr.appendChild(t4);
+
+  const t5 = el("td","linje"); t5.appendChild(mærke(r.to.linje, r.to.art));
+  tr.appendChild(t5);
+
+  const t6 = el("td","ank");
+  const b6 = el("b"); b6.textContent = urTekst(r.ankomst);
+  const s6 = el("span"); s6.textContent = varighedTekst(r.samlet);
+  t6.appendChild(b6); t6.appendChild(s6);
+  tr.appendChild(t6);
+
+  return tr;
+}
+
+/* ── beskeder og kredsløb ──────────────────────────────── */
+function visBesked(o,t,k){
+  const d=el("div","besked");
+  const h=el("h3"); h.textContent=o;
+  const p=el("p"); p.style.margin="0"; p.textContent=t;
+  d.appendChild(h); d.appendChild(p);
+  if(k){ const c=el("code"); c.textContent=k;
+    const w=el("p"); w.style.margin="6px 0 0"; w.appendChild(c); d.appendChild(w); }
+  $("#beskeder").appendChild(d);
+}
+const ryd = () => { $("#beskeder").textContent=""; };
+const sætPuls = t => { $("#puls").className="puls"+(t?" "+t:""); };
+
+function aktiv(rute){
+  const d=idag();
+  if(rute.fra && d < rute.fra) return false;
+  if(rute.til && d >= rute.til) return false;
+  return true;
+}
+function sætOverskrift(){
+  $("#titel").textContent = hjemad ? "Hjem" : "På arbejde";
+  $("#forklar").textContent = hjemad
+    ? "Fra Gladsaxe til Ølstykke. Sorteret efter hvornår du er fremme."
+    : "Fra Ølstykke til Gladsaxe. Sorteret efter hvornår du er fremme.";
+}
+
+async function opdater(){
+  sætPuls("arbejder");
+  Object.keys(kurv).forEach(k => delete kurv[k]);
+  const brug = RUTER.filter(aktiv);
+  const nu = new Date();
+
+  try{
+    const alle = [];
+    await Promise.all(brug.map(async rute => {
+      const varsel = hjemad ? rute.varsel : VARSEL_HJEMMEFRA;
+      const tidligst = new Date(nu.getTime() + varsel*60000);
+      let et, to_;
+      if(hjemad){
+        et  = await hentBen(rute.lokalId, rute.skiftId, rute.produkter, 1);
+        to_ = await hentBen(rute.skiftId, HJEM.id,      S_TOG,          1+EKSTRA_SIDER);
+      }else{
+        et  = await hentBen(HJEM.id,      rute.skiftId, S_TOG,          1);
+        to_ = await hentBen(rute.skiftId, rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
+      }
+      kobl(rute, et, to_, tidligst).forEach(r => alle.push(r));
+    }));
+
+    const rene = fjernOverflødige(alle);
+    rene.sort((x,y) => (x.ankomst - y.ankomst) || (y.afgang - x.afgang));
+    const vist = rene.slice(0, visFlere ? RÆKKER_LANGT : RÆKKER_KORT);
+
+    ryd();
+    const krop = $("#krop");
+    krop.textContent = "";
+    if(!vist.length){
+      const tr = el("tr"), td = el("td","tom");
+      td.colSpan = 6;
+      td.textContent = "Ingen rejser du kan nå lige nu.";
+      tr.appendChild(td); krop.appendChild(tr);
+    }else{
+      vist.forEach(r => krop.appendChild(tegnRække(r, nu)));
+    }
+    $("#fod").textContent = "Opdateret "+urTekst(nu)+". Data fra Rejseplanen.";
+    sætPuls("");
+
+    tegnDrift(await hentDrift());
+  }catch(e){
+    sætPuls("gal"); ryd();
+    visBesked("Kunne ikke hente rejser",
+      "Rejseplanen svarede ikke som forventet. Tjek forbindelsen og prøv igen om lidt.",
+      String(e.message||e));
+  }
+}
+
+function tikUr(){
+  const nu=new Date();
+  $("#ur").textContent=urTekst(nu);
+  $("#dato").textContent=datoTekst(nu);
+  if(!sover && (Date.now()-sidsteAktivitet) > DVALE_MINUTTER*60000){
+    sover=true; clearInterval(timer); sætPuls("sover");
+    visBesked("Tavlen er gået i dvale","Den holdt op med at hente nyt for at spare på kvoten. Tryk Opdater nu for at vække den.");
+  }
+}
+function start(){
+  clearInterval(timer);
+  timer=setInterval(()=>{ if(!document.hidden) opdater(); }, OPDATER_SEKUNDER*1000);
+}
+function vågn(){ sidsteAktivitet=Date.now(); if(sover){ sover=false; start(); } }
+
+$("#knapVend").addEventListener("click", ()=>{ hjemad=!hjemad; sætOverskrift(); vågn(); opdater(); });
+$("#knapOpdater").addEventListener("click", ()=>{ vågn(); opdater(); });
+$("#knapFlere").addEventListener("click", e=>{
+  visFlere=!visFlere;
+  e.currentTarget.setAttribute("aria-pressed",String(visFlere));
+  vågn(); opdater();
+});
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && !sover){ vågn(); opdater(); } });
+
+sætOverskrift(); tikUr(); setInterval(tikUr,1000); opdater(); start();
+})();
+</script>
+</body>
+</html>

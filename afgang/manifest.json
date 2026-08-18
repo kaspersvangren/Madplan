@@ -1,0 +1,24 @@
+{
+  "name": "Hjem — afgangstavle",
+  "short_name": "Hjem",
+  "start_url": "./Afgangstavle.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e9edf1",
+  "theme_color": "#0e1620",
+  "lang": "da",
+  "icons": [
+    {
+      "src": "ikon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "ikon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
