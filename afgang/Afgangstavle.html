@@ -33,8 +33,8 @@ const S_BUS = 64, LETBANE = 2048, S_TOG = 16;
 /* gangtid = hvor lang tid DU er om skiftet, fra bussen holder ved
              stoppestedet til du står på perronen. Rejser med mindre
              end det vises slet ikke.
-   varsel  = din tid hjemmefra kontoret ned til stoppestedet.
-             Afgange tidligere end det vises ikke.              */
+   varsel  = din tid hjemmefra kontoret ned til stoppestedet. Afgange
+             inden for det vindue vises dæmpet, men de vises.              */
 
 const RUTER = [
   { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
@@ -67,8 +67,8 @@ const DRIFT_MAKS_DAGE = 30;   // længerevarende vejarbejde vises ikke
 
 const OPDATER_SEKUNDER = 60;
 const DVALE_MINUTTER   = 30;
-const RÆKKER_KORT      = 6;
-const RÆKKER_LANGT     = 16;
+const GRUPPER_KORT     = 5;   // hvor mange ankomsttider vises normalt
+const GRUPPER_LANGT    = 12;
 const PER_SØGNING      = 6;
 const EKSTRA_SIDER     = 1;
 </script>
@@ -132,6 +132,12 @@ thead th:first-child{padding-left:16px;}
 thead th:last-child{padding-right:16px;text-align:right;}
 
 tbody td{padding:11px 10px;border-top:1px solid #eef1f4;vertical-align:middle;}
+tbody.kasse td{border-top:1px solid #eef1f4;}
+tbody.kasse + tbody.kasse td{border-top:1px solid var(--hårfin);}
+tbody.kasse tr:not(:first-child) td{border-top:1px dotted #e4e9ee;}
+tbody.kasse td.ank{vertical-align:middle;}
+tr.knap{opacity:.55;}
+tr.knap .afg span{color:var(--stram);}
 tbody tr:first-child td{border-top:none;}
 td:first-child{padding-left:16px;}
 td:last-child{padding-right:16px;}
@@ -231,13 +237,12 @@ tr.sen .afg b{color:var(--forsinket);}
   <div id="beskeder"></div>
 
   <div class="kort">
-    <table>
+    <table id="tabel">
       <thead>
         <tr>
           <th>Afgang</th><th>Med</th><th>Fra</th><th>Skift</th><th>Videre</th><th>Fremme</th>
         </tr>
       </thead>
-      <tbody id="krop"></tbody>
     </table>
   </div>
 
@@ -338,11 +343,11 @@ function tolkBen(trip){
 }
 
 /* ── sammenkobling ─────────────────────────────────────── */
-function kobl(rute, et, to_, tidligstAfgang){
+function kobl(rute, et, to_, nu, varsel){
   const ud=[];
   et.forEach(a => {
     if(a.aflyst) return;
-    if(a.afgang < tidligstAfgang) return;              // du kan ikke nå den
+    if(a.afgang < nu) return;                          // den er kørt
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
     let b=null;
     for(let i=0;i<to_.length;i++){
@@ -353,6 +358,7 @@ function kobl(rute, et, to_, tidligstAfgang){
     ud.push({
       et:a, to:b, rute:rute, vent:vent,
       rummelig: vent >= rute.gangtid + 3,
+      knap: minutter(nu, a.afgang) < varsel,           // næppe til at nå hjemmefra
       afgang:a.afgang, planlagt:a.planlagt, forsinkelse:a.forsinkelse,
       ankomst:b.ankomst, samlet:minutter(a.afgang,b.ankomst)
     });
@@ -360,25 +366,24 @@ function kobl(rute, et, to_, tidligstAfgang){
   return ud;
 }
 
-/* En rejse er overflødig, hvis en anden med SAMME linje kører senere
-   og er fremme lige så tidligt. Det dækker både to afgange op til
-   samme tog, og samme afgang koblet til to forskellige tog.        */
-function fjernOverflødige(liste){
-  const perLinje = {};
+/* Rejser der lander i Ølstykke på samme tid hører sammen. De vises
+   som én blok med ankomsten skrevet én gang — så kan du se alle dine
+   muligheder for at nå netop det tog, og vælge den første der kører. */
+function grupper(liste){
+  const set = {}, rene = [];
   liste.forEach(r => {
-    const n = r.et.linje;
-    (perLinje[n] = perLinje[n] || []).push(r);
+    const n = r.et.linje+"|"+r.afgang.getTime()+"|"+r.ankomst.getTime();
+    if(set[n]) return;
+    set[n] = true; rene.push(r);
   });
-  const ud = [];
-  Object.keys(perLinje).forEach(n => {
-    const r = perLinje[n].slice().sort((a,b) =>
-      (b.afgang - a.afgang) || (a.ankomst - b.ankomst));
-    let bedste = null;
-    r.forEach(x => {
-      if(bedste === null || x.ankomst < bedste){ ud.push(x); bedste = x.ankomst; }
-    });
+  const kasser = {};
+  rene.forEach(r => {
+    const n = r.ankomst.getTime();
+    (kasser[n] = kasser[n] || []).push(r);
   });
-  return ud;
+  return Object.keys(kasser)
+    .map(k => kasser[k].sort((a,b) => a.afgang - b.afgang))
+    .sort((a,b) => a[0].ankomst - b[0].ankomst);
 }
 
 /* ── driftsinformation ─────────────────────────────────── */
@@ -430,9 +435,10 @@ function tegnDrift(beskeder){
 /* ── tegning ───────────────────────────────────────────── */
 function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m; }
 
-function tegnRække(r, nu){
+function tegnRække(r, nu, højde){
   const tr = el("tr");
   if(r.forsinkelse >= 1) tr.classList.add("sen");
+  if(r.knap) tr.classList.add("knap");
 
   const t1 = el("td","afg");
   const b1 = el("b"); b1.textContent = urTekst(r.afgang);
@@ -463,11 +469,15 @@ function tegnRække(r, nu){
   const t5 = el("td","linje"); t5.appendChild(mærke(r.to.linje, r.to.art));
   tr.appendChild(t5);
 
-  const t6 = el("td","ank");
-  const b6 = el("b"); b6.textContent = urTekst(r.ankomst);
-  const s6 = el("span"); s6.textContent = varighedTekst(r.samlet);
-  t6.appendChild(b6); t6.appendChild(s6);
-  tr.appendChild(t6);
+  if(højde){
+    const t6 = el("td","ank");
+    if(højde > 1) t6.rowSpan = højde;
+    const b6 = el("b"); b6.textContent = urTekst(r.ankomst);
+    const s6 = el("span");
+    s6.textContent = højde > 1 ? højde + " veje" : varighedTekst(r.samlet);
+    t6.appendChild(b6); t6.appendChild(s6);
+    tr.appendChild(t6);
+  }
 
   return tr;
 }
@@ -508,7 +518,6 @@ async function opdater(){
     const alle = [];
     await Promise.all(brug.map(async rute => {
       const varsel = hjemad ? rute.varsel : VARSEL_HJEMMEFRA;
-      const tidligst = new Date(nu.getTime() + varsel*60000);
       let et, to_;
       if(hjemad){
         et  = await hentBen(rute.lokalId, rute.skiftId, rute.produkter, 1);
@@ -517,23 +526,29 @@ async function opdater(){
         et  = await hentBen(HJEM.id,      rute.skiftId, S_TOG,          1);
         to_ = await hentBen(rute.skiftId, rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
       }
-      kobl(rute, et, to_, tidligst).forEach(r => alle.push(r));
+      kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
     }));
 
-    const rene = fjernOverflødige(alle);
-    rene.sort((x,y) => (x.ankomst - y.ankomst) || (y.afgang - x.afgang));
-    const vist = rene.slice(0, visFlere ? RÆKKER_LANGT : RÆKKER_KORT);
+    const kasser = grupper(alle)
+      .slice(0, visFlere ? GRUPPER_LANGT : GRUPPER_KORT);
 
     ryd();
-    const krop = $("#krop");
-    krop.textContent = "";
-    if(!vist.length){
-      const tr = el("tr"), td = el("td","tom");
+    const tabel = $("#tabel");
+    Array.prototype.slice.call(tabel.querySelectorAll("tbody"))
+      .forEach(t => t.parentNode.removeChild(t));
+
+    if(!kasser.length){
+      const krop = el("tbody"), tr = el("tr"), td = el("td","tom");
       td.colSpan = 6;
-      td.textContent = "Ingen rejser du kan nå lige nu.";
-      tr.appendChild(td); krop.appendChild(tr);
+      td.textContent = "Ingen rejser lige nu.";
+      tr.appendChild(td); krop.appendChild(tr); tabel.appendChild(krop);
     }else{
-      vist.forEach(r => krop.appendChild(tegnRække(r, nu)));
+      kasser.forEach(kasse => {
+        const krop = el("tbody","kasse");
+        kasse.forEach((r,i) => krop.appendChild(
+          tegnRække(r, nu, i === 0 ? kasse.length : 0)));
+        tabel.appendChild(krop);
+      });
     }
     $("#fod").textContent = "Opdateret "+urTekst(nu)+". Data fra Rejseplanen.";
     sætPuls("");
