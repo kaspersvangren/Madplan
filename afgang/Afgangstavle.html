@@ -132,10 +132,21 @@ thead th:first-child{padding-left:16px;}
 thead th:last-child{padding-right:16px;text-align:right;}
 
 tbody td{padding:11px 10px;border-top:1px solid #eef1f4;vertical-align:middle;}
-tbody.kasse td{border-top:1px solid #eef1f4;}
-tbody.kasse + tbody.kasse td{border-top:1px solid var(--hårfin);}
-tbody.kasse tr:not(:first-child) td{border-top:1px dotted #e4e9ee;}
-tbody.kasse td.ank{vertical-align:middle;}
+/* hver gruppe indledes af et bånd med ankomsttiden */
+tr.bånd td{
+  background:#eaeef2;border-top:1px solid var(--hårfin);
+  padding:7px 16px;}
+tbody.kasse + tbody.kasse tr.bånd td{border-top:9px solid var(--luft);}
+tr.bånd .etiket{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dæmpet);
+  margin-right:9px;}
+tr.bånd b{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:17px;font-weight:600;}
+tr.bånd .antal{font-size:12px;color:var(--dæmpet);margin-left:9px;}
+tbody.kasse tr:not(.bånd) + tr td{border-top:1px dotted #e7ecf1;}
+tbody.kasse tr.bånd + tr td{border-top:none;}
 tr.knap{opacity:.55;}
 tr.knap .afg span{color:var(--stram);}
 tbody tr:first-child td{border-top:none;}
@@ -163,11 +174,6 @@ tr.sen .afg b{color:var(--forsinket);}
 .vent.ok{color:var(--god);}
 .vent.stram{color:var(--stram);}
 
-.ank{width:1%;white-space:nowrap;text-align:right;
-  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
-.ank b{font-size:18px;font-weight:600;display:block;line-height:1.15;}
-.ank span{font-size:11.5px;color:var(--dæmpet);}
-
 @media(max-width:680px){
   thead{display:none;}
   table,tbody{display:block;}
@@ -175,7 +181,7 @@ tr.sen .afg b{color:var(--forsinket);}
     display:grid;
     grid-template-columns:auto auto 1fr auto;
     grid-template-areas:
-      "afg  afg  afg   ank"
+      "afg  afg  afg   afg"
       "l1   sted skift l2";
     align-items:center;
     gap:5px 8px;
@@ -186,19 +192,18 @@ tr.sen .afg b{color:var(--forsinket);}
 
   /* tabellens "så smal som muligt" må ikke gælde her — det var den,
      der klemte mærkerne ind over stednavnet */
-  td.afg,td.linje,td.sted,td.skift,td.ank{
+  td.afg,td.linje,td.sted,td.skift{
     display:block;width:auto;border:none;padding:0;min-width:0;}
+  tr.bånd{display:block;padding:0;}
+  tr.bånd td{display:block;width:auto;padding:7px 14px;}
 
   td.afg{grid-area:afg;}
   td:nth-child(2){grid-area:l1;}
   td.sted{grid-area:sted;}
   td.skift{grid-area:skift;}
   td:nth-child(5){grid-area:l2;}
-  td.ank{grid-area:ank;justify-self:end;text-align:right;}
-
-  td.afg b,td.afg span,td.ank b,td.ank span{display:inline;}
+  td.afg b,td.afg span{display:inline;}
   td.afg span{margin-left:8px;}
-  td.ank span{margin-left:6px;}
 
   td.sted,td.skift{font-size:13px;}
   td.skift::before,td:nth-child(5)::before{
@@ -240,7 +245,7 @@ tr.sen .afg b{color:var(--forsinket);}
     <table id="tabel">
       <thead>
         <tr>
-          <th>Afgang</th><th>Med</th><th>Fra</th><th>Skift</th><th>Videre</th><th>Fremme</th>
+          <th>Afgang</th><th>Med</th><th>Fra</th><th>Skift</th><th>Videre</th>
         </tr>
       </thead>
     </table>
@@ -435,7 +440,7 @@ function tegnDrift(beskeder){
 /* ── tegning ───────────────────────────────────────────── */
 function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m; }
 
-function tegnRække(r, nu, højde){
+function tegnRække(r, nu){
   const tr = el("tr");
   if(r.forsinkelse >= 1) tr.classList.add("sen");
   if(r.knap) tr.classList.add("knap");
@@ -469,16 +474,21 @@ function tegnRække(r, nu, højde){
   const t5 = el("td","linje"); t5.appendChild(mærke(r.to.linje, r.to.art));
   tr.appendChild(t5);
 
-  if(højde){
-    const t6 = el("td","ank");
-    if(højde > 1) t6.rowSpan = højde;
-    const b6 = el("b"); b6.textContent = urTekst(r.ankomst);
-    const s6 = el("span");
-    s6.textContent = højde > 1 ? højde + " veje" : varighedTekst(r.samlet);
-    t6.appendChild(b6); t6.appendChild(s6);
-    tr.appendChild(t6);
-  }
 
+
+  return tr;
+}
+
+function tegnBånd(kasse){
+  const tr = el("tr","bånd");
+  const td = el("td"); td.colSpan = 5;
+  const e = el("span","etiket"); e.textContent = "Fremme";
+  const b = el("b"); b.textContent = urTekst(kasse[0].ankomst);
+  const n = el("span","antal");
+  n.textContent = kasse.length > 1
+    ? kasse.length + " veje" : varighedTekst(kasse[0].samlet);
+  td.appendChild(e); td.appendChild(b); td.appendChild(n);
+  tr.appendChild(td);
   return tr;
 }
 
@@ -539,14 +549,14 @@ async function opdater(){
 
     if(!kasser.length){
       const krop = el("tbody"), tr = el("tr"), td = el("td","tom");
-      td.colSpan = 6;
+      td.colSpan = 5;
       td.textContent = "Ingen rejser lige nu.";
       tr.appendChild(td); krop.appendChild(tr); tabel.appendChild(krop);
     }else{
       kasser.forEach(kasse => {
         const krop = el("tbody","kasse");
-        kasse.forEach((r,i) => krop.appendChild(
-          tegnRække(r, nu, i === 0 ? kasse.length : 0)));
+        krop.appendChild(tegnBånd(kasse));
+        kasse.forEach(r => krop.appendChild(tegnRække(r, nu)));
         tabel.appendChild(krop);
       });
     }
