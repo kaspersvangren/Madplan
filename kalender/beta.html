@@ -1620,7 +1620,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.28.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.28.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4901,6 +4901,20 @@ function nemFind(navn){
 /* Prisen skrives med komma og to decimaler, som hos Nemlig. */
 const nemKr = n => (n == null ? "" : Number(n).toFixed(2).replace(".", ","));
 
+/* Nemligs kampagner findes i flere slags, og CampaignPrice betyder ikke
+   det samme i dem. Serveren har allerede oversat dem til to former:
+   "mange" (2 stk. for 16 kr) og "nedsat" (nu/før). Her skrives de ud. */
+function nemTilbudTekst(k){
+  if(!k) return "";
+  const hale = (k.slutter && k.visSlut !== false) ? " · " + nemDato(k.slutter) : "";
+  if(k.slags === "mange"){
+    return k.antal + " for " + nemKr(k.samletPris)
+      + (k.spar ? " · spar " + nemKr(k.spar) : "") + hale;
+  }
+  return "nu " + nemKr(k.nu) + " · før " + nemKr(k.foer)
+    + (k.procent ? " · " + k.procent + "%" : k.spar ? " · spar " + nemKr(k.spar) : "") + hale;
+}
+
 function nemDato(iso8601){
   if(!iso8601) return "";
   const d = new Date(iso8601);
@@ -5052,14 +5066,7 @@ function nemTegn(){
     const pakke = l.kort.pakke_maengde
       ? tal(Number(l.kort.pakke_maengde)) + (l.kort.pakke_enhed || "") : "";
 
-    let tilbud = "";
-    if(p && p.kampagne){
-      tilbud = "spar " + nemKr(p.kampagne.spar) + " · før " + nemKr(p.kampagne.foer)
-        + (p.kampagne.slutter ? " · " + nemDato(p.kampagne.slutter) : "");
-    } else if(p && p.mixtilbud){
-      tilbud = p.mixtilbud + (p.kampagne && p.kampagne.mindsteAntal
-        ? " ved " + p.kampagne.mindsteAntal + " stk" : "");
-    }
+    const tilbud = p ? nemTilbudTekst(p.kampagne) : "";
 
     const vaelges = gruppe === "faste" || gruppe === "tjek";
     return '<div class="nemrad">'
@@ -5290,20 +5297,13 @@ function nemValgTegnFund(){
     const linje2 = [v.maerke, besk].filter(Boolean).join(" · ");
 
     // Tilbuddet står for sig, så prisen ikke drukner i beskrivelsen.
-    let tilbud = "";
-    if(v.kampagne){
-      tilbud = "spar " + nemKr(v.kampagne.spar) + " · før " + nemKr(v.kampagne.foer)
-        + (v.kampagne.slutter ? " · " + nemDato(v.kampagne.slutter) : "");
-    } else if(v.mixtilbud){
-      tilbud = v.mixtilbud + (v.kampagne && v.kampagne.mindsteAntal
-        ? " ved " + v.kampagne.mindsteAntal + " stk" : "");
-    }
+    const tilbud = nemTilbudTekst(v.kampagne);
     const kilo = v.enhedspris ? nemKr(v.enhedspris) + " " + (v.enhedsmaal || "") : "";
 
     return '<button class="nemfund' + (valgt ? " valgt" : "") + '" data-nemfund="' + i + '">'
       + '<input type="radio" ' + (valgt ? "checked" : "") + ' tabindex="-1">'
       + '<span class="v"><span>' + esc(v.navn)
-      + (v.favorit ? ' <span class="favorit">★ favorit</span>' : "") + '</span>'
+      + (v.favorit ? ' <span class="favorit">★</span>' : "") + '</span>'
       + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
       + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
