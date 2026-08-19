@@ -876,6 +876,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemstatus{font-size:13px;color:var(--muted);margin-top:10px}
 .nemstatus.fejl{color:var(--holiday)}
 .nemstatus.ok{color:var(--mad)}
+.nemkurv{background:var(--chip);border-radius:12px;padding:4px 12px 10px;margin-bottom:6px}
+.nemkurv .nemrad{border-top-color:var(--line)}
+.nemkurv .nemrad:first-of-type{border-top:0}
+.nemkurv .sum{display:flex;justify-content:space-between;padding:9px 2px 2px;font-size:13px;
+  color:var(--muted);border-top:1px solid var(--line)}
+.nemkurv .sum b{color:var(--ink)}
+.nemfjern{width:32px;height:32px;flex:none;display:grid;place-items:center;color:var(--muted);
+  border-radius:9px;margin:-4px -4px -4px 0}
+.nemfjern:hover{color:var(--holiday);background:var(--surface)}
+.nemikurv{font-size:12px;color:var(--mad);font-weight:600;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1620,7 +1630,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.28.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.29.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5065,6 +5075,7 @@ function nemTegn(){
     }
     const pakke = l.kort.pakke_maengde
       ? tal(Number(l.kort.pakke_maengde)) + (l.kort.pakke_enhed || "") : "";
+    const alt = nemIKurv(l.kort.produkt_id);
 
     const tilbud = p ? nemTilbudTekst(p.kampagne) : "";
 
@@ -5075,6 +5086,7 @@ function nemTegn(){
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(l.navn) + '</span>'
       + (under ? '<span class="under' + (l.gaet ? " gaet" : "") + '">' + esc(under) + '</span>' : "")
+      + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
       + '</span>'
       + '<span class="trin">' + trin(gruppe, i, l.antal)
@@ -5088,7 +5100,7 @@ function nemTegn(){
       + liste.map((l, i) => linje(l, gruppe, i)).join("");
   };
 
-  let h = "";
+  let h = nemKurvAfsnit();
   h += afsnit("Fra madplanen", nemArk.plan, "plan");
   h += afsnit("Tjek om vi har", nemArk.tjek, "tjek");
   h += afsnit("Faste varer", nemArk.faste, "faste");
@@ -5123,6 +5135,40 @@ function nemTegn(){
   status.textContent = nemArk.fejl || "";
 }
 
+/* Kurvens nuværende indhold, med et kryds til at fjerne hver vare.
+   Står øverst, så man altid kan se hvad der allerede er sendt — også
+   varer som en anden i familien har lagt i fra sin egen telefon. */
+function nemKurvAfsnit(){
+  if(!nemArk.kurv || !nemArk.kurv.linjer.length){
+    return nemArk.kurvFejl
+      ? '<div class="nemgruppe"><span class="t">I kurven hos Nemlig</span></div>'
+        + '<div class="nemtom">' + esc(nemArk.kurvFejl) + '</div>'
+      : "";
+  }
+  const k = nemArk.kurv;
+  const kryds = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
+  let h = '<div class="nemgruppe"><span class="t">I kurven hos Nemlig</span></div>'
+    + '<div class="nemkurv">';
+  h += k.linjer.map(l =>
+    '<div class="nemrad"><span class="v"><span class="navn">' + esc(l.navn) + '</span>'
+    + '<span class="under">' + l.antal + ' stk'
+    + (l.pris != null ? " · " + nemKr(l.pris * l.antal) + " kr" : "") + '</span></span>'
+    + '<button class="nemfjern" data-nemfjernid="' + esc(l.id) + '" aria-label="Fjern">'
+    + kryds + '</button></div>').join("");
+
+  h += '<div class="sum"><span>'
+    + (k.antalVarer != null ? k.antalVarer + " varer" : "")
+    + (k.leveringstid ? " · " + esc(k.leveringstid) : "") + '</span>'
+    + '<b>' + nemKr(k.varepris) + ' kr</b></div>';
+  if(k.mindstekoeb && !k.naaetMindstekoeb){
+    h += '<div class="sum"><span>mangler '
+      + nemKr(k.mindstekoeb - (k.varepris || 0)) + ' kr for at kunne bestille</span><span></span></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 /* Det der faktisk sendes: alt fra madplanen plus det der er sat flueben ved. */
 function nemSendeliste(){
   const ud = new Map();
@@ -5140,12 +5186,35 @@ function nemLinje(sti){
   return { gruppe, i: Number(i), l: (nemArk[gruppe] || [])[Number(i)] };
 }
 
+/* Henter hvad der ligger i kurven hos Nemlig lige nu. Uden det ville
+   arket starte forfra hver gang og ikke vide, at noget allerede er sendt. */
+async function nemHentKurv(){
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-kurv", { body: { hent: true } });
+    if(error) throw error;
+    if(data && data.fejl === "login_mangler"){ nemArk.kurvFejl = data.besked; return; }
+    nemArk.kurv = data.kurv || null;
+    if(nemArk.kurv && !nemArk.kurv.loggetInd){
+      nemArk.kurvFejl = "Loginnet hos Nemlig virker ikke længere og skal fornyes.";
+    }
+  }catch(err){
+    nemArk.kurvFejl = "Kunne ikke hente kurven: " + (err.message || err);
+  }
+}
+
+/* Hvor mange af varen ligger der allerede i kurven? */
+function nemIKurv(produktId){
+  if(!nemArk || !nemArk.kurv) return 0;
+  const l = nemArk.kurv.linjer.find(x => String(x.id) === String(produktId));
+  return l ? l.antal : 0;
+}
+
 /* ---------- Åbn og luk ---------- */
 async function nemAabn(){
   nemByg();
   show("nem-back");
   nemTegn();
-  await nemHentPriser();
+  await Promise.all([nemHentPriser(), nemHentKurv()]);
   nemTegn();
 }
 
@@ -5158,9 +5227,8 @@ function nemTegnKvittering(){
   let h = '<div class="nemgruppe"><span class="t">Resultat</span></div>';
   h += '<div class="nemrad"><span class="v"><span class="navn">'
     + (s.antalLykkedes === 1 ? "1 vare lagt i kurven" : s.antalLykkedes + " varer lagt i kurven")
-    + '</span>' + (s.kurv && s.kurv.varepris != null
-        ? '<span class="under">kurven er nu på ' + nemKr(s.kurv.varepris) + ' kr</span>' : "")
-    + '</span></div>';
+    + '</span></span></div>';
+  h += nemKurvAfsnit();
 
   const fejl = (s.resultater || []).filter(r => !r.ok);
   if(fejl.length){
@@ -5199,6 +5267,25 @@ function nemNavnFor(produktId){
 }
 
 /* ---------- Send ---------- */
+/* Fjerner én vare fra kurven ved at sætte antallet til nul. */
+async function nemFjernFraKurv(produktId){
+  const status = document.getElementById("nem-status");
+  status.className = "nemstatus";
+  status.textContent = "Fjerner…";
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-kurv",
+      { body: { varer: [{ produktId: String(produktId), antal: 0 }] } });
+    if(error) throw error;
+    if(data && data.kurv) nemArk.kurv = data.kurv;
+    else await nemHentKurv();
+    status.textContent = "";
+    nemTegn();
+  }catch(err){
+    status.className = "nemstatus fejl";
+    status.textContent = "Kunne ikke fjerne: " + (err.message || err);
+  }
+}
+
 async function nemSend(){
   const varer = nemSendeliste();
   if(!varer.length) return;
@@ -5217,6 +5304,7 @@ async function nemSend(){
       return;
     }
     nemArk.sendt = data;
+    if(data.kurv) nemArk.kurv = data.kurv; else await nemHentKurv();
     nemTegn();
   }catch(err){
     document.getElementById("nem-status").className = "nemstatus fejl";
@@ -5457,6 +5545,8 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
     }
     return;
   }
+  const fjernid = ev.target.closest("[data-nemfjernid]");
+  if(fjernid){ await nemFjernFraKurv(fjernid.dataset.nemfjernid); return; }
   const spring = ev.target.closest("[data-nemspring]");
   if(spring){
     const { l } = nemLinje(spring.dataset.nemspring);
