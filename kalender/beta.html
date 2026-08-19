@@ -874,6 +874,25 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemvalgrad{display:flex;gap:9px;align-items:flex-start;padding:9px 2px;font-size:14px}
 .nemvalgrad input{width:19px;height:19px;flex:none;margin-top:2px;accent-color:var(--ink)}
 .nemvalgrad small{display:block;color:var(--muted);font-size:12px}
+.nemnavn{margin:16px 0 0}
+.nemnavn .etiket{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);font-weight:700;margin-bottom:5px}
+.nemnavn input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);font:inherit}
+.nemnavn .noegle{display:block;font-size:12px;color:var(--holiday);margin-top:5px}
+.nemvarergruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  font-weight:700;margin:20px 0 4px}
+.nemvarergruppe:first-child{margin-top:4px}
+.nemvarergruppe .antal{float:right;font-weight:600;color:var(--muted);
+  text-transform:none;letter-spacing:0}
+.nemsort{display:flex;gap:6px;margin:2px 0 10px}
+.nemsort button{flex:1;padding:8px;border:1px solid var(--line);border-radius:9px;
+  font-size:13px;color:var(--muted);background:var(--surface)}
+.nemsort button.valgt{border-color:var(--line-strong);color:var(--ink);font-weight:600;
+  background:var(--chip)}
+.nemretter{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.nemmangler{color:var(--holiday);font-weight:600}
+.nemtaeller{font-size:13px;color:var(--muted);margin:-4px 0 10px}
 .nemliste .nemrad{cursor:pointer}
 .nemstatus{font-size:13px;color:var(--muted);margin-top:10px}
 .nemstatus.fejl{color:var(--holiday)}
@@ -1433,6 +1452,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
     </div>
     <div id="nemvalg-fund"></div>
     <div id="nemvalg-detalje" hidden>
+      <div class="nemnavn">
+        <span class="etiket">Navn i appen</span>
+        <input type="text" id="nemvalg-navn" autocomplete="off" spellcheck="false">
+        <span class="noegle" id="nemvalg-noegle" hidden>Navnet kommer fra opskriften
+          og kan ikke ændres her.</span>
+      </div>
       <div class="nempakke">
         <span class="etiket" style="flex:1">Pakkestørrelse</span>
         <input type="number" id="nemvalg-maengde" step="any" min="0" inputmode="decimal">
@@ -1475,6 +1500,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
       <input type="text" id="nemvarer-filter" placeholder="Find i listen" autocomplete="off">
       <button id="nemvarer-ny">Ny fast vare</button>
     </div>
+    <div class="nemsort">
+      <button data-nemsort="mangler" class="valgt">Ikke kortlagt først</button>
+      <button data-nemsort="antal">Flest retter</button>
+      <button data-nemsort="navn">Alfabetisk</button>
+    </div>
+    <div class="nemtaeller" id="nemvarer-taeller"></div>
     <div id="nemvarer-krop" class="nemliste"></div>
     <div class="actions">
       <button class="btn" id="nemvarer-luk">Luk</button>
@@ -1665,7 +1696,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.30.2";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.32.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5455,9 +5486,11 @@ function nemValgAaben(opsaet){
   document.getElementById("nemvalg-meta").textContent =
     nemValg.navn ? "til \u201c" + nemValg.navn + "\u201d" : "";
   document.getElementById("nemvalg-tekst").value = nemValg.navn || "";
+  document.getElementById("nemvalg-navn").value = nemValg.navn || "";
   document.getElementById("nemvalg-status").textContent = "";
   document.getElementById("nemvalg-slet").hidden = !nemValg.raekke;
   document.getElementById("nemvalg-fastvare").hidden = !nemValg.fastVare;
+  if(!nemValg.fastVare) document.getElementById("nemvalg-erfast").checked = false;
 
   const enh = document.getElementById("nemvalg-enhed");
   if(!enh.options.length){
@@ -5476,6 +5509,7 @@ function nemValgAaben(opsaet){
     document.querySelector('input[name="nemfast"][value="' + (r.fast_valg ? "1" : "0") + '"]').checked = true;
     document.getElementById("nemvalg-erfast").checked = r.slags === "fast";
     document.getElementById("nemvalg-detalje").hidden = false;
+    nemNavneVarsel();
   } else {
     document.getElementById("nemvalg-maengde").value = "";
     document.getElementById("nemvalg-detalje").hidden = true;
@@ -5483,8 +5517,20 @@ function nemValgAaben(opsaet){
   }
 
   document.getElementById("nemvalg-fund").innerHTML = "";
+  nemNavneVarsel();
   show("nemvalg-back");
   if(nemValg.navn) nemValgSoeg();
+}
+
+/* Navnet er nøglen mod opskrifterne. En ingrediens hedder allerede noget —
+   det navn står i kogebogen, og appen må ikke lave om på det. Kun faste
+   indkøb har et frit kaldenavn, for de kommer ikke fra nogen opskrift. */
+function nemNavneVarsel(){
+  const fast = document.getElementById("nemvalg-erfast").checked;
+  const felt = document.getElementById("nemvalg-navn");
+  felt.readOnly = !fast;
+  felt.style.opacity = fast ? "" : ".6";
+  document.getElementById("nemvalg-noegle").hidden = fast;
 }
 
 async function nemValgSoeg(){
@@ -5544,7 +5590,10 @@ function nemValgVaelg(i){
     m.value = v.pakkeGaet.maengde;
     if(v.pakkeGaet.enhed && ENHEDER.includes(v.pakkeGaet.enhed)) e.value = v.pakkeGaet.enhed;
   }
+  const navnFelt = document.getElementById("nemvalg-navn");
+  if(!navnFelt.value.trim()) navnFelt.value = v.navn || "";
   document.getElementById("nemvalg-detalje").hidden = false;
+  nemNavneVarsel();
   nemValgTegnFund();
 }
 
@@ -5553,7 +5602,13 @@ async function nemValgGem(){
     document.getElementById("nemvalg-status").textContent = "Vælg en vare først.";
     return;
   }
-  const navn = (nemValg.navn || nemValg.valgt.navn).trim();
+  const navn = (document.getElementById("nemvalg-navn").value || nemValg.navn
+                || nemValg.valgt.navn).trim();
+  if(!navn){
+    document.getElementById("nemvalg-status").className = "nemstatus fejl";
+    document.getElementById("nemvalg-status").textContent = "Varen skal have et navn.";
+    return;
+  }
   const maengde = document.getElementById("nemvalg-maengde").value;
   const raekke = {
     navn,
@@ -5594,6 +5649,7 @@ async function nemValgGem(){
     const { l } = nemLinje(nemValg.sti);
     if(l){
       l.kort = gemt;
+      l.navn = gemt.navn;
       const a = nemAntal(l.behov, l.enhed, Number(gemt.pakke_maengde), gemt.pakke_enhed);
       l.antal = a.antal; l.gaet = a.gaet; l.spring = false;
     }
@@ -5622,36 +5678,140 @@ async function nemValgSlet(){
 /* ==================================================================
    Nemlig-varer — hele kortlægningen
    ================================================================== */
+/* Alle ingredienser fra kogebogen, med de retter der bruger dem.
+   Navnet ejes af opskriften — derfor kan det ikke redigeres, og
+   ingredienser kan ikke oprettes i hånden. */
+function nemIngredienser(){
+  const kort = new Map();   // navn med små bogstaver -> { navn, retter:Set }
+  for(const i of ingredienser){
+    const n = nemNoegle(i.navn);
+    if(!n) continue;
+    if(!kort.has(n)) kort.set(n, { navn: i.navn.trim(), retter: new Set() });
+    const ret = retter.find(r => r.id === i.ret_id);
+    if(ret) kort.get(n).retter.add(ret.navn);
+  }
+  return [...kort.values()].map(x => ({
+    navn: x.navn,
+    retter: [...x.retter].sort((a, b) => a.localeCompare(b, "da")),
+    kort: nemFind(x.navn)
+  }));
+}
+
+let nemVarerSort = "mangler";
+
 function nemVarerTegn(){
   const krop = document.getElementById("nemvarer-krop");
   const f = nemVarerFilter.trim().toLowerCase();
-  const liste = nemligVarer
-    .filter(v => !f || nemNoegle(v.navn).includes(f)
-                    || String(v.produkt_navn || "").toLowerCase().includes(f))
-    .sort((a, b) => (a.slags === b.slags ? 0 : a.slags === "fast" ? -1 : 1)
-                 || a.navn.localeCompare(b.navn, "da"));
+  const passer = (navn, produkt) => !f || nemNoegle(navn).includes(f)
+    || String(produkt || "").toLowerCase().includes(f);
 
-  if(!liste.length){
+  const faste = nemligVarer
+    .filter(v => v.slags === "fast" && passer(v.navn, v.produkt_navn))
+    .sort((a, b) => a.navn.localeCompare(b.navn, "da"));
+
+  let ing = nemIngredienser()
+    .filter(x => passer(x.navn, x.kort && x.kort.produkt_navn));
+
+  if(nemVarerSort === "antal"){
+    ing.sort((a, b) => b.retter.length - a.retter.length
+                    || a.navn.localeCompare(b.navn, "da"));
+  } else {
+    ing.sort((a, b) => a.navn.localeCompare(b.navn, "da"));
+  }
+
+  if(!faste.length && !ing.length){
     krop.innerHTML = '<div class="nemtom">'
-      + (nemligVarer.length ? "Ingen varer passer på det." :
-         "Der er ikke kortlagt nogen varer endnu. De kommer af sig selv, "
-         + "efterhånden som du møder dem i indkøbslisten.") + '</div>';
+      + (f ? "Ingen varer passer på det."
+           : "Der er hverken faste indkøb eller ingredienser endnu.") + '</div>';
+    document.getElementById("nemvarer-taeller").textContent = "";
     return;
   }
 
-  krop.innerHTML = liste.map(v => {
-    const pakke = v.pakke_maengde ? tal(Number(v.pakke_maengde)) + (v.pakke_enhed || "") : "—";
+  /* En kortlagt vare: billede, kaldenavn, Nemlig-varen og pakkestørrelsen. */
+  const raekkeKort = (navn, v, ekstra) => {
+    const pakke = v.pakke_maengde ? tal(Number(v.pakke_maengde)) + " " + (v.pakke_enhed || "") : "—";
     const maerker = [
-      v.slags === "fast" ? "fast vare" : null,
       v.fast_valg ? "fast valg" : "åben",
       v.koeb_aldrig ? "købes aldrig" : null
     ].filter(Boolean).join(" · ");
-    return '<div class="nemrad" data-nemvare="' + v.id + '"><span class="v">'
-      + '<span class="navn">' + esc(v.navn) + '</span>'
-      + '<span class="under">' + esc(v.produkt_navn || "ingen vare valgt")
-      + '</span><span class="under">' + esc(pakke + " pr. pakke · " + maerker) + '</span>'
+    return '<div class="nemrad" data-nemvare="' + v.id + '">'
+      + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
+                     + '" alt="" loading="lazy">' : "")
+      + '<span class="v">'
+      + '<span class="navn">' + esc(navn) + '</span>'
+      + '<span class="under">' + esc(v.produkt_navn || "ingen vare valgt") + '</span>'
+      + '<span class="under">' + esc(pakke + " pr. pakke · " + maerker) + '</span>'
+      + (ekstra || "")
       + '</span></div>';
-  }).join("");
+  };
+
+  /* En ingrediens uden kortlægning. Der er ingen række i basen endnu,
+     så knappen bærer navnet i stedet for et id. */
+  const raekkeTom = (navn, ekstra) =>
+    '<div class="nemrad" data-nemnyt="' + esc(navn) + '">'
+    + '<span class="v"><span class="navn">' + esc(navn) + '</span>'
+    + '<span class="under nemmangler">ikke kortlagt endnu</span>'
+    + (ekstra || "") + '</span>'
+    + '<button class="loes" data-nemnyt="' + esc(navn) + '">find vare</button></div>';
+
+  const retterTekst = r => {
+    if(!r || !r.length) return "";
+    const vis = r.length > 3 ? r.slice(0, 3).join(", ") + " +" + (r.length - 3) : r.join(", ");
+    return '<span class="nemretter">' + esc(vis) + '</span>';
+  };
+
+  /* Faste indkøb: inddelt efter hovedgruppe, som i arket. */
+  const blokFaste = varer => {
+    if(!varer.length) return "";
+    const kasser = new Map();
+    varer.forEach(v => {
+      const g = v.hovedgruppe || "Øvrigt";
+      if(!kasser.has(g)) kasser.set(g, []);
+      kasser.get(g).push(v);
+    });
+    const orden = [...kasser.keys()].sort((a, b) =>
+      (a === "Øvrigt") - (b === "Øvrigt") || a.localeCompare(b, "da"));
+
+    let ud = '<div class="nemvarergruppe">Faste indkøb'
+      + '<span class="antal">' + varer.length + '</span></div>';
+    for(const g of orden){
+      if(kasser.size > 1) ud += '<div class="nemundergruppe">' + esc(g) + '</div>';
+      ud += kasser.get(g).map(v => raekkeKort(v.navn, v)).join("");
+    }
+    return ud;
+  };
+
+  /* Ingredienser: alle fra kogebogen, kortlagte som ukortlagte. */
+  const blokIngred = ing => {
+    if(!ing.length) return "";
+    const kortlagt = ing.filter(x => x.kort).length;
+    let ud = '<div class="nemvarergruppe">Ingredienser'
+      + '<span class="antal">' + kortlagt + ' af ' + ing.length + '</span></div>';
+
+    if(nemVarerSort === "mangler"){
+      const mangler = ing.filter(x => !x.kort);
+      const har = ing.filter(x => x.kort);
+      if(mangler.length){
+        ud += '<div class="nemundergruppe">Mangler kortlægning</div>';
+        ud += mangler.map(x => raekkeTom(x.navn, retterTekst(x.retter))).join("");
+      }
+      if(har.length){
+        ud += '<div class="nemundergruppe">Kortlagt</div>';
+        ud += har.map(x => raekkeKort(x.navn, x.kort, retterTekst(x.retter))).join("");
+      }
+      return ud;
+    }
+    return ud + ing.map(x => x.kort
+      ? raekkeKort(x.navn, x.kort, retterTekst(x.retter))
+      : raekkeTom(x.navn, retterTekst(x.retter))).join("");
+  };
+
+  krop.innerHTML = blokFaste(faste) + blokIngred(ing);
+
+  const kortlagt = ing.filter(x => x.kort).length;
+  document.getElementById("nemvarer-taeller").textContent = ing.length
+    ? kortlagt + " af " + ing.length + " ingredienser er kortlagt"
+    : "Der er ingen ingredienser i kogebogen endnu.";
 }
 
 function nemStandOpdater(){
@@ -5726,6 +5886,7 @@ document.getElementById("nem-krop").addEventListener("change", ev => {
   if(l){ l.medtaget = v.checked; nemTegn(); }
 });
 
+document.getElementById("nemvalg-erfast").addEventListener("change", nemNavneVarsel);
 document.getElementById("nemvalg-fortryd").onclick = () => { hide("nemvalg-back"); nemValg = null; };
 document.getElementById("nemvalg-soeg").onclick    = () => nemValgSoeg();
 document.getElementById("nemvalg-gem").onclick     = () => nemValgGem();
@@ -5762,10 +5923,25 @@ document.getElementById("nemvarer-ny").onclick = () => {
   nemValgAaben({ navn: "", sti: null, fastVare: true });
 };
 document.getElementById("nemvarer-krop").addEventListener("click", ev => {
+  const nyt = ev.target.closest("[data-nemnyt]");
+  if(nyt){
+    // En ingrediens fra kogebogen: navnet er givet, kun varen skal vælges.
+    nemValgAaben({ navn: nyt.dataset.nemnyt, sti: null, fastVare: false });
+    return;
+  }
   const r = ev.target.closest("[data-nemvare]");
   if(!r) return;
   const v = nemligVarer.find(x => x.id === r.dataset.nemvare);
-  if(v) nemValgAaben({ navn: v.navn, sti: null, raekke: v, fastVare: true });
+  if(v) nemValgAaben({ navn: v.navn, sti: null, raekke: v, fastVare: v.slags === "fast" });
+});
+
+document.querySelector(".nemsort").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-nemsort]");
+  if(!b) return;
+  nemVarerSort = b.dataset.nemsort;
+  document.querySelectorAll("[data-nemsort]").forEach(x =>
+    x.classList.toggle("valgt", x === b));
+  nemVarerTegn();
 });
 
 document.getElementById("husk-nej").onclick = () => {
