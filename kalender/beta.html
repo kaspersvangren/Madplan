@@ -862,6 +862,8 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemfund .pris{flex:none;font-variant-numeric:tabular-nums;font-weight:600}
 .nemfund .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemfund .udsolgt{color:var(--holiday);font-weight:600}
+.nemfund .tilbud{display:block;font-size:12px;color:var(--mad);margin-top:3px;font-weight:600}
+.nemfund .favorit{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
 .nempakke{display:flex;gap:8px;align-items:center;margin:14px 0 4px}
 .nempakke input{width:90px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;
   background:var(--bg);color:var(--ink);font:inherit}
@@ -1618,7 +1620,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.28.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.28.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5052,8 +5054,7 @@ function nemTegn(){
 
     let tilbud = "";
     if(p && p.kampagne){
-      tilbud = nemKr(p.kampagne.foer) + " → " + nemKr(p.pris)
-        + (p.kampagne.spar ? " · spar " + nemKr(p.kampagne.spar) : "")
+      tilbud = "spar " + nemKr(p.kampagne.spar) + " · før " + nemKr(p.kampagne.foer)
         + (p.kampagne.slutter ? " · " + nemDato(p.kampagne.slutter) : "");
     } else if(p && p.mixtilbud){
       tilbud = p.mixtilbud + (p.kampagne && p.kampagne.mindsteAntal
@@ -5280,14 +5281,33 @@ function nemValgTegnFund(){
 
   ud.innerHTML = nemValg.fund.map((v, i) => {
     const valgt = nemValg.valgt && String(nemValg.valgt.id) === String(v.id);
-    const linje2 = [v.maerke, v.beskrivelse].filter(Boolean).join(" · ");
-    const tilbud = v.kampagne
-      ? " · " + nemKr(v.kampagne.foer) + " → " + nemKr(v.pris) : "";
+
+    // Mærke og Nemligs egen varebeskrivelse. Beskrivelsen gentager tit
+    // mærket til sidst — det klippes væk, så linjen bliver til at læse.
+    let besk = v.beskrivelse || "";
+    if(v.maerke) besk = besk.split("/").map(d => d.trim())
+      .filter(d => d && d.toLowerCase() !== v.maerke.toLowerCase()).join(" · ");
+    const linje2 = [v.maerke, besk].filter(Boolean).join(" · ");
+
+    // Tilbuddet står for sig, så prisen ikke drukner i beskrivelsen.
+    let tilbud = "";
+    if(v.kampagne){
+      tilbud = "spar " + nemKr(v.kampagne.spar) + " · før " + nemKr(v.kampagne.foer)
+        + (v.kampagne.slutter ? " · " + nemDato(v.kampagne.slutter) : "");
+    } else if(v.mixtilbud){
+      tilbud = v.mixtilbud + (v.kampagne && v.kampagne.mindsteAntal
+        ? " ved " + v.kampagne.mindsteAntal + " stk" : "");
+    }
+    const kilo = v.enhedspris ? nemKr(v.enhedspris) + " " + (v.enhedsmaal || "") : "";
+
     return '<button class="nemfund' + (valgt ? " valgt" : "") + '" data-nemfund="' + i + '">'
       + '<input type="radio" ' + (valgt ? "checked" : "") + ' tabindex="-1">'
-      + '<span class="v"><span>' + esc(v.navn) + (v.favorit ? " ★" : "") + '</span>'
-      + '<span class="under">' + esc(linje2) + esc(tilbud)
-      + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span></span>'
+      + '<span class="v"><span>' + esc(v.navn)
+      + (v.favorit ? ' <span class="favorit">★ favorit</span>' : "") + '</span>'
+      + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
+      + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
+      + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
+      + '</span>'
       + '<span class="pris">' + nemKr(v.pris) + '</span></button>';
   }).join("");
 }
