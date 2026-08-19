@@ -876,6 +876,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemstatus{font-size:13px;color:var(--muted);margin-top:10px}
 .nemstatus.fejl{color:var(--holiday)}
 .nemstatus.ok{color:var(--mad)}
+/* Vælg vare kan åbnes oven på Nemlig-varer og oven på indkøbsarket.
+   Uden det her lander den bagved, fordi alle ark deler samme lag. */
+#nemvalg-back{z-index:60}
+#nemkort-back{z-index:70}
 .nemkurv{background:var(--chip);border-radius:12px;padding:4px 12px 10px;margin-bottom:6px}
 .nemkurv .nemrad{border-top-color:var(--line)}
 .nemkurv .nemrad:first-of-type{border-top:0}
@@ -886,6 +890,23 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   border-radius:9px;margin:-4px -4px -4px 0}
 .nemfjern:hover{color:var(--holiday);background:var(--surface)}
 .nemikurv{font-size:12px;color:var(--mad);font-weight:600;white-space:nowrap}
+.nemundergruppe{font-size:12px;color:var(--muted);font-weight:600;margin:14px 0 2px;
+  padding-left:2px;letter-spacing:.02em}
+.nembil{width:38px;height:38px;flex:none;border-radius:8px;object-fit:contain;
+  background:var(--surface);border:1px solid var(--line)}
+.nemfund .nembil{width:44px;height:44px}
+.nemkortbil{width:100%;max-width:260px;height:200px;object-fit:contain;display:block;
+  margin:0 auto 14px;background:var(--surface);border-radius:12px;border:1px solid var(--line)}
+.nemkortrk{display:flex;justify-content:space-between;gap:14px;padding:8px 2px;
+  border-top:1px solid var(--line);font-size:14px}
+.nemkortrk span:first-child{color:var(--muted)}
+.nemkortrk b{text-align:right}
+.nemkorttilbud{margin-top:12px;padding:10px 12px;border-radius:10px;
+  background:var(--mad-bg);color:var(--mad);font-weight:600;font-size:14px}
+.nemmaerker{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.nemmaerker span{font-size:12px;padding:3px 9px;border-radius:99px;
+  background:var(--chip);color:var(--muted)}
+.nembilknap{padding:0;border:0;background:none}
 </style>
 </head>
 <body>
@@ -1431,6 +1452,18 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   </div>
 </div>
 
+<!-- Nemlig: produktkort -->
+<div class="backdrop" id="nemkort-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="nemkort-titel">Vare</h2>
+    <div class="meta" id="nemkort-meta"></div>
+    <div id="nemkort-krop"></div>
+    <div class="actions">
+      <button class="btn primary" id="nemkort-luk">Luk</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: hele kortlægningen -->
 <div class="backdrop" id="nemvarer-back">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -1630,7 +1663,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.29.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.30.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5080,9 +5113,13 @@ function nemTegn(){
     const tilbud = p ? nemTilbudTekst(p.kampagne) : "";
 
     const vaelges = gruppe === "faste" || gruppe === "tjek";
+    const bil = (p && p.billede) || (l.kort && l.kort.billede) || null;
     return '<div class="nemrad">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
                    + (l.medtaget ? " checked" : "") + '>' : "")
+      + (bil ? '<button class="nembilknap" data-nemkort="' + gruppe + ':' + i + '">'
+               + '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
+               + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(l.navn) + '</span>'
       + (under ? '<span class="under' + (l.gaet ? " gaet" : "") + '">' + esc(under) + '</span>' : "")
@@ -5094,17 +5131,39 @@ function nemTegn(){
       + '</span></div>';
   };
 
-  const afsnit = (titel, liste, gruppe, tom) => {
+  const afsnit = (titel, liste, gruppe) => {
     if(!liste.length) return '';
     return '<div class="nemgruppe"><span class="t">' + titel + '</span></div>'
       + liste.map((l, i) => linje(l, gruppe, i)).join("");
   };
 
+  /* De faste indkøb inddeles efter Nemligs egen hovedgruppe — Brød, Drikke,
+     Frugt og grønt. Vi sorterer ikke selv; grupperingen følger med varen. */
+  const afsnitDelt = (titel, liste, gruppe) => {
+    if(!liste.length) return '';
+    const kasser = new Map();
+    liste.forEach((l, i) => {
+      const g = (l.kort && l.kort.hovedgruppe) || "Øvrigt";
+      if(!kasser.has(g)) kasser.set(g, []);
+      kasser.get(g).push([l, i]);
+    });
+    // Øvrigt nederst, resten alfabetisk.
+    const orden = [...kasser.keys()].sort((a, b) =>
+      (a === "Øvrigt") - (b === "Øvrigt") || a.localeCompare(b, "da"));
+
+    let ud = '<div class="nemgruppe"><span class="t">' + titel + '</span></div>';
+    for(const g of orden){
+      if(kasser.size > 1) ud += '<div class="nemundergruppe">' + esc(g) + '</div>';
+      ud += kasser.get(g).map(([l, i]) => linje(l, gruppe, i)).join("");
+    }
+    return ud;
+  };
+
   let h = nemKurvAfsnit();
   h += afsnit("Fra madplanen", nemArk.plan, "plan");
   h += afsnit("Tjek om vi har", nemArk.tjek, "tjek");
-  h += afsnit("Faste varer", nemArk.faste, "faste");
-  h += afsnit("Tilføjet nu", nemArk.ekstra, "ekstra");
+  h += afsnitDelt("Faste indkøb", nemArk.faste, "faste");
+  h += afsnit("Øvrigt", nemArk.ekstra, "ekstra");
 
   if(!nemAlleLinjer().length){
     h += '<div class="nemtom">Der er ikke noget at købe i denne uge.</div>';
@@ -5133,6 +5192,44 @@ function nemTegn(){
   const status = document.getElementById("nem-status");
   status.className = "nemstatus" + (nemArk.fejl ? " fejl" : "");
   status.textContent = nemArk.fejl || "";
+}
+
+/* Nemligs billeder er 110 kB i fuld størrelse. Med w= bliver de 4 kB,
+   og det er rigeligt til en miniature. Kun det store kort henter mere. */
+function nemBillede(adresse, bredde){
+  if(!adresse) return "";
+  return adresse + (adresse.includes("?") ? "&" : "?") + "w=" + bredde;
+}
+
+/* Produktkortet — til når man er i tvivl om hvilken vare man vil have. */
+function nemKortVis(v, overskrift){
+  if(!v) return;
+  document.getElementById("nemkort-titel").textContent = v.navn || "Vare";
+  document.getElementById("nemkort-meta").textContent = overskrift || "";
+
+  const rk = (navn, vaerdi) => vaerdi
+    ? '<div class="nemkortrk"><span>' + esc(navn) + '</span><b>' + esc(vaerdi) + '</b></div>' : "";
+
+  let h = "";
+  if(v.billede){
+    h += '<img class="nemkortbil" src="' + esc(nemBillede(v.billede, 600)) + '" alt="">';
+  }
+  const tilbud = nemTilbudTekst(v.kampagne);
+  if(tilbud) h += '<div class="nemkorttilbud">' + esc(tilbud) + '</div>';
+
+  h += rk("Pris", v.pris != null ? nemKr(v.pris) + " kr" : null);
+  h += rk("Pr. enhed", v.enhedspris ? nemKr(v.enhedspris) + " " + (v.enhedsmaal || "") : null);
+  h += rk("Mærke", v.maerke);
+  h += rk("Beskrivelse", v.beskrivelse);
+  h += rk("Varegruppe", v.undergruppeNavn || v.hovedgruppe);
+  h += rk("Varenummer", v.id);
+  h += rk("På lager", v.paaLager === false ? "nej — udsolgt" : "ja");
+
+  if(Array.isArray(v.maerkater) && v.maerkater.length){
+    h += '<div class="nemmaerker">' + v.maerkater.map(m => '<span>' + esc(m) + '</span>').join("") + '</div>';
+  }
+  document.getElementById("nemkort-krop").innerHTML = h;
+  show("nemkort-back");
 }
 
 /* Kurvens nuværende indhold, med et kryds til at fjerne hver vare.
@@ -5224,9 +5321,14 @@ function nemTegnKvittering(){
   const meta = document.getElementById("nem-meta");
   meta.textContent = "Sendt " + new Date().toLocaleTimeString("da-DK", { hour:"2-digit", minute:"2-digit" });
 
+  /* Tælles ud fra kurven, ikke fra hvad der skete ved afsendelsen —
+     ellers bliver tallet stående, når man fjerner noget bagefter. */
+  const iKurven = nemArk.kurv ? nemArk.kurv.linjer.length : s.antalLykkedes;
   let h = '<div class="nemgruppe"><span class="t">Resultat</span></div>';
   h += '<div class="nemrad"><span class="v"><span class="navn">'
-    + (s.antalLykkedes === 1 ? "1 vare lagt i kurven" : s.antalLykkedes + " varer lagt i kurven")
+    + (iKurven === 1 ? "1 vare i kurven" : iKurven + " varer i kurven")
+    + '</span>' + (s.antalLykkedes !== iKurven
+        ? '<span class="under">' + s.antalLykkedes + " blev sendt</span>" : "")
     + '</span></span></div>';
   h += nemKurvAfsnit();
 
@@ -5390,6 +5492,8 @@ function nemValgTegnFund(){
 
     return '<button class="nemfund' + (valgt ? " valgt" : "") + '" data-nemfund="' + i + '">'
       + '<input type="radio" ' + (valgt ? "checked" : "") + ' tabindex="-1">'
+      + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
+                     + '" alt="" loading="lazy">' : "")
       + '<span class="v"><span>' + esc(v.navn)
       + (v.favorit ? ' <span class="favorit">★</span>' : "") + '</span>'
       + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
@@ -5429,6 +5533,8 @@ async function nemValgGem(){
     pakke_maengde: maengde === "" ? null : Number(String(maengde).replace(",", ".")),
     pakke_enhed: document.getElementById("nemvalg-enhed").value,
     undergruppe: nemValg.valgt.undergruppe || null,
+    hovedgruppe: nemValg.valgt.hovedgruppe || null,
+    billede: nemValg.valgt.billede || null,
     fast_valg: document.querySelector('input[name="nemfast"]:checked').value === "1",
     aendret: new Date().toISOString()
   };
@@ -5547,6 +5653,17 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
   }
   const fjernid = ev.target.closest("[data-nemfjernid]");
   if(fjernid){ await nemFjernFraKurv(fjernid.dataset.nemfjernid); return; }
+  const kort = ev.target.closest("[data-nemkort]");
+  if(kort){
+    const { l } = nemLinje(kort.dataset.nemkort);
+    if(l && l.kort){
+      const p = nemArk.priser[String(l.kort.produkt_id)];
+      nemKortVis(p || { navn: l.kort.produkt_navn, id: l.kort.produkt_id,
+                        billede: l.kort.billede, hovedgruppe: l.kort.hovedgruppe },
+                 "kortlagt som \u201c" + l.navn + "\u201d");
+    }
+    return;
+  }
   const spring = ev.target.closest("[data-nemspring]");
   if(spring){
     const { l } = nemLinje(spring.dataset.nemspring);
@@ -5588,8 +5705,16 @@ document.getElementById("nemvalg-tekst").addEventListener("keydown", ev => {
 });
 document.getElementById("nemvalg-fund").addEventListener("click", ev => {
   const f = ev.target.closest("[data-nemfund]");
-  if(f) nemValgVaelg(Number(f.dataset.nemfund));
+  if(!f) return;
+  // Tryk på billedet viser kortet; tryk andre steder vælger varen.
+  if(ev.target.closest(".nembil")){
+    nemKortVis(nemValg.fund[Number(f.dataset.nemfund)], "tryk uden for billedet for at vælge");
+    return;
+  }
+  nemValgVaelg(Number(f.dataset.nemfund));
 });
+
+document.getElementById("nemkort-luk").onclick = () => hide("nemkort-back");
 
 document.getElementById("menu-nemlig").onclick = () => {
   hide("menu-back");
