@@ -834,17 +834,19 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemrad .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemrad .under.gaet{color:var(--holiday)}
 .nemrad .tilbud{display:block;font-size:12px;color:var(--mad);margin-top:2px;font-weight:600}
-.nemrad .trin{flex:none}
+.nemrad .trin{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px;
+  width:104px}
+.nemrad .trin .under{text-align:right;margin:0}
 .nemrad input[type=checkbox]{width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--ink)}
 .nemrad.advarsel{background:var(--chip);border-radius:10px;padding:10px;border-top:0;margin-top:8px}
 .nemrad .loes{flex:none;border:1px solid var(--line);border-radius:9px;padding:6px 11px;
   font-size:13px;font-weight:600;color:var(--ink);background:var(--surface)}
 .nemrad .spring{flex:none;border-radius:9px;padding:6px 9px;font-size:13px;color:var(--muted)}
-.nemtrin{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);
-  border-radius:9px;overflow:hidden;background:var(--surface)}
-.nemtrin button{width:30px;height:30px;font-size:17px;color:var(--muted)}
+.nemtrin{display:flex;align-items:center;border:1px solid var(--line);
+  border-radius:9px;overflow:hidden;background:var(--surface);width:104px}
+.nemtrin button{width:34px;height:32px;flex:none;font-size:17px;color:var(--muted)}
 .nemtrin button:hover{color:var(--ink);background:var(--chip)}
-.nemtrin .tal{min-width:26px;text-align:center;font-variant-numeric:tabular-nums;font-size:14px}
+.nemtrin .tal{flex:1;text-align:center;font-variant-numeric:tabular-nums;font-size:14px}
 .nemhusk{margin-top:6px;font-size:13px;color:var(--muted);line-height:1.6}
 .nemtom{padding:18px 2px;color:var(--muted);font-size:14px}
 
@@ -1663,7 +1665,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.30.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.30.2";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5046,6 +5048,30 @@ async function nemHentPriser(){
 const nemAlleLinjer = () =>
   nemArk ? [...nemArk.plan, ...nemArk.tjek, ...nemArk.faste, ...nemArk.ekstra] : [];
 
+/* Varer kortlagt før hovedgruppen og billedet fandtes mangler dem i basen.
+   Når vi alligevel har hentet dem friskt, skrives de stille og roligt ind,
+   så det kun sker én gang pr. vare. */
+async function nemEftermonter(){
+  const mangler = nemligVarer.filter(v =>
+    v.produkt_id && (!v.hovedgruppe || !v.billede) && nemArk.priser[String(v.produkt_id)]);
+  if(!mangler.length) return;
+
+  for(const v of mangler){
+    const p = nemArk.priser[String(v.produkt_id)];
+    const felter = {};
+    if(!v.hovedgruppe && p.hovedgruppe) felter.hovedgruppe = p.hovedgruppe;
+    if(!v.billede && p.billede)         felter.billede     = p.billede;
+    if(!Object.keys(felter).length) continue;
+    const { data, error } = await sb.from("nemlig_varer").update(felter).eq("id", v.id).select();
+    if(!error && data && data[0]){
+      const i = nemligVarer.findIndex(x => x.id === v.id);
+      if(i >= 0) nemligVarer[i] = data[0];
+      const linje = nemAlleLinjer().find(l => l.kort && l.kort.id === v.id);
+      if(linje) linje.kort = data[0];
+    }
+  }
+}
+
 /* En linje er klar, hvis den er kortlagt, findes, og er på lager. */
 function nemTilstand(l){
   if(!l.kort || !l.kort.produkt_id) return "ukendt";
@@ -5099,15 +5125,15 @@ function nemTegn(){
     }
 
     // Behovet står altid, så man kan se om afrundingen giver mening.
-    let under = "";
+    let under = "", underGaet = false;
     if(l.behov != null){
       under = "du skal bruge " + tal(l.behov) + (l.enhed ? " " + boejEnhed(l.enhed, l.behov) : "");
-      if(l.gaet) under += " — kan ikke regnes om";
+      if(l.gaet){ under += " — kan ikke regnes om"; underGaet = true; }
     } else if(l.kilder){
-      under = l.kilder;
+      under = l.kilder;      // hvilke retter varen kommer fra — ikke en advarsel
     }
     const pakke = l.kort.pakke_maengde
-      ? tal(Number(l.kort.pakke_maengde)) + (l.kort.pakke_enhed || "") : "";
+      ? tal(Number(l.kort.pakke_maengde)) + " " + (l.kort.pakke_enhed || "") : "";
     const alt = nemIKurv(l.kort.produkt_id);
 
     const tilbud = p ? nemTilbudTekst(p.kampagne) : "";
@@ -5122,7 +5148,7 @@ function nemTegn(){
                + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(l.navn) + '</span>'
-      + (under ? '<span class="under' + (l.gaet ? " gaet" : "") + '">' + esc(under) + '</span>' : "")
+      + (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : "")
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
       + '</span>'
@@ -5143,7 +5169,10 @@ function nemTegn(){
     if(!liste.length) return '';
     const kasser = new Map();
     liste.forEach((l, i) => {
-      const g = (l.kort && l.kort.hovedgruppe) || "Øvrigt";
+      // Rækker kortlagt før hovedgruppen fandtes har den ikke gemt.
+      // Så tages den fra det friske opslag hos Nemlig i stedet.
+      const p = l.kort && l.kort.produkt_id ? nemArk.priser[String(l.kort.produkt_id)] : null;
+      const g = (l.kort && l.kort.hovedgruppe) || (p && p.hovedgruppe) || "Øvrigt";
       if(!kasser.has(g)) kasser.set(g, []);
       kasser.get(g).push([l, i]);
     });
@@ -5312,6 +5341,7 @@ async function nemAabn(){
   show("nem-back");
   nemTegn();
   await Promise.all([nemHentPriser(), nemHentKurv()]);
+  await nemEftermonter();
   nemTegn();
 }
 
