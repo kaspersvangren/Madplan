@@ -1832,7 +1832,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.39.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.39.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5701,8 +5701,8 @@ function nemByg(){
     return r;
   };
 
-  const alle    = koeb.map(p => lav(p, true)).filter(Boolean);
-  const fraTjek = tjek.map(p => lav(p, false)).filter(Boolean);
+  const fraKoeb = koeb.map(p => lav(p, true)).filter(Boolean);
+  const fraTjekAlle = tjek.map(p => lav(p, false)).filter(Boolean);
 
   /* En vare kan være BÅDE ingrediens og fast køb — æg bruges i opskrifter
      og købes samtidig fast. Før krævede det to rækker med hvert sit navn
@@ -5710,16 +5710,41 @@ function nemByg(){
      og blive købt dobbelt. Nu bærer ingrediens-rækken markeringen
      `koeb_altid`, og linjen flyttes HERFRA og ned under Faste indkøb —
      med den mængde ugens retter kræver, og allerede tilvalgt.
-     Ét sted, én linje, intet dobbeltkøb. */
+
+     FEJL rettet: omdirigeringen kørte først kun på "Skal købes". Men SEKS
+     af de otte markerede varer står som "Tjek om vi har" i opskrifterne —
+     remoulade, æg, ketchup, oliven, olivenolie — så de gled forbi og blev
+     liggende i tjek-afsnittet. Markeringen skal slå BEGGE kategorier. */
   const erAltid = l => Boolean(l.kort && l.kort.koeb_altid);
-  const fraPlan = alle.filter(l => !erAltid(l));
-  const altidMedBehov = alle.filter(erAltid)
-    .map(l => Object.assign({}, l, {
-      medtaget: true, fastOgBrugt: true,
-      /* Sættes den til nul og til igen, skal den tilbage til det UDREGNEDE
-         antal — ikke til 1. Otte æg er stadig en bakke. */
-      standardAntal: l.antal
-    }));
+  const fraPlan = fraKoeb.filter(l => !erAltid(l));
+  const fraTjek = fraTjekAlle.filter(l => !erAltid(l));
+
+  /* Samme vare kan optræde i begge kategorier på én uge — feta og
+     peberfrugt gør det. Så skal de smeltes til ÉN linje, ikke to, ellers
+     er dobbeltkøbet tilbage ad bagvejen. Behovet lægges sammen når
+     enheden er den samme; ellers tages det største antal. */
+  const altidMedBehov = [];
+  for(const l of fraKoeb.concat(fraTjekAlle).filter(erAltid)){
+    const haves = altidMedBehov.find(x => nemNoegle(x.navn) === nemNoegle(l.navn));
+    if(!haves){
+      altidMedBehov.push(Object.assign({}, l, { medtaget: true, fastOgBrugt: true }));
+      continue;
+    }
+    const retter = [haves.kilder, l.kilder].filter(Boolean).join(", ");
+    haves.kilder = [...new Set(retter.split(", ").filter(Boolean))].join(", ");
+    if(haves.behov != null && l.behov != null && haves.enhed === l.enhed){
+      haves.behov += l.behov;
+      const a = nemAntal(haves.behov, haves.enhed,
+                         Number(haves.kort.pakke_maengde), haves.kort.pakke_enhed, haves.kort);
+      haves.antal = a.antal; haves.gaet = a.gaet;
+    } else {
+      haves.antal = Math.max(haves.antal, l.antal);
+      haves.gaet = haves.gaet || l.gaet;
+    }
+  }
+  /* Sættes en til nul og til igen, skal den tilbage til det UDREGNEDE
+     antal — ikke til 1. Otte æg er stadig en bakke. */
+  altidMedBehov.forEach(l => { l.standardAntal = l.antal; });
 
   /* Dem der allerede har fået en linje ovenfra, skal ikke også hentes ind
      som tom fast vare nedenfor. */
