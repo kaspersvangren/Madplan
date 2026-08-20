@@ -747,14 +747,20 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
    afrundet, tonet felt inde i dagskortet — men i fuld bredde og med
    en tynd streg der viser hvor langt bilen er nået. Den vises kun på
    selve leveringsdagen, og kun mens der er en ordre i gang.        */
-/* Stregen sidder FOROVEN. Aftalerne har ingen streg forneden, og
-   påmindelsesblokken har sin egen foroven — en streg her forneden ville
-   give to streger oven på hinanden. */
-.levblok{padding:12px 12px 13px;border-top:1px solid var(--line)}
+/* Stregen sidder FORNEDEN. Feltet ligger nu mellem aftensmaden (som har
+   sin egen streg forneden) og opgaverne, så en streg foroven ville give
+   to streger oven på hinanden. */
+.levblok{padding:11px 12px 12px;border-bottom:1px solid var(--line)}
 .levfelt{background:var(--lev-bg);border-radius:12px;padding:10px 12px 11px}
 .levfelt .mini{font-size:11px;font-weight:700;letter-spacing:.07em;
   text-transform:uppercase;color:var(--lev);
   margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.levfelt .mini .lt{flex:1;min-width:0}
+/* Krydset trækkes ud i hjørnet, så det ikke skubber overskriften ind.
+   Samme størrelse og opførsel som krydset i fryserfeltet. */
+.levfelt .mini .vaek{flex:none;width:26px;height:26px;border-radius:999px;
+  display:grid;place-items:center;color:var(--muted);margin:-5px -5px 0 0}
+.levfelt .mini .vaek:hover{background:var(--surface);color:var(--ink)}
 .levfelt .hoved{font-size:15px;font-weight:600;line-height:1.3;color:var(--ink)}
 .levfelt .til{font-size:13px;color:var(--muted);margin-top:1px}
 /* Stregen er ren udsmykning: den siger det samme som teksten, bare
@@ -1723,7 +1729,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.33.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.34.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4502,19 +4508,65 @@ const timeLabel = e => e.allDay ? "Hele dagen"
    Alle tider fra serveren er UTC med Z til sidst. new Date() regner selv
    om til dansk tid — der må ALDRIG klippes i teksten med substring.
    ======================================================================= */
-let levering       = null;   // {dato, slotFra, slotTil, budFra, budTil, ...}
+let levering       = null;   // {ordre, dato, slotFra, slotTil, budFra, ...}
 let leveringHentet = 0;
 let leveringTravl  = false;
-/* Nemlig tømmer efter alt at dømme svaret, når varerne er sat af. Så
-   ville feltet forsvinde i samme sekund, uden at nogen nåede at se at
-   det gik godt. Derfor huskes den sidste levering på dagen, og "Leveret"
-   får lov at stå tre timer efter det bestilte vindue. Hukommelsen er kun
-   i denne fane: genindlæses siden, er den væk. Det er med vilje — vi
-   gemmer ikke noget vi ikke har set. */
-let leveringSidst  = null;
 
-const LEV_HYPPIGT = 150000;    // to en halv minut, mens en ordre er i gang
-const LEV_SJAELDENT = 1800000; // en halv time ellers — nok til at opdage en ny ordre
+const LEV_HYPPIGT   = 150000;    // to en halv minut, mens en ordre er i gang
+const LEV_SJAELDENT = 1800000;   // en halv time ellers
+const LEV_EFTER     = 7200000;   // to timer: så længe står "Leveret" bagefter
+
+/* Hukommelsen ligger på DENNE enhed, ikke i databasen. Valgt bevidst:
+   trykker man feltet væk på telefonen, skal det stadig stå på tabletten.
+   Den bruges til to ting, som begge kræver at man husker noget efter at
+   Nemlig er holdt op med at svare:
+     1. hvilken ordre der er trykket væk
+     2. hvornår feltet skal holde op med at vise "Leveret"
+   Én ordre ad gangen — der er aldrig to leveringer i gang.               */
+const LEV_NOEGLE = "kalender-levering";
+let levHusk = null;   // {ordre, dato, slut, skjult, sidst}
+
+function levLaes(){
+  try{
+    const r = JSON.parse(localStorage.getItem(LEV_NOEGLE) || "null");
+    levHusk = (r && typeof r === "object") ? r : null;
+  }catch(e){ levHusk = null; }
+  /* Er datoen ikke længere i dag, er hele huskesedlen forældet. Så
+     starter næste levering med blanke tavler af sig selv. */
+  if(levHusk && levHusk.dato !== iso(new Date())) levHusk = null;
+}
+function levGem(){
+  try{
+    if(levHusk) localStorage.setItem(LEV_NOEGLE, JSON.stringify(levHusk));
+    else        localStorage.removeItem(LEV_NOEGLE);
+  }catch(e){}
+}
+
+/* Kaldes hver gang serveren har svaret. Holder huskesedlen ved lige. */
+function levNoter(L){
+  const idag = iso(new Date());
+
+  if(L && L.dato === idag){
+    /* Ny ordre? Så gælder en tidligere fjernelse ikke længere. */
+    if(!levHusk || levHusk.ordre !== L.ordre){
+      levHusk = { ordre: L.ordre, dato: L.dato, slut: null, skjult: false, sidst: null };
+    }
+    levHusk.sidst = L;
+    /* Siger Nemlig selv "leveret", starter uret nu — men kun første gang,
+       så nedtællingen ikke bliver ved med at starte forfra. */
+    if(L.leveret && !levHusk.slut) levHusk.slut = Date.now() + LEV_EFTER;
+    levGem();
+    return;
+  }
+
+  /* Intet svar fra Nemlig. Havde vi en levering i dag, er den kommet —
+     Nemlig rydder feltet når varerne er sat af. Vi viser "Leveret" videre
+     i to timer, i stedet for at lade feltet forsvinde i samme sekund. */
+  if(levHusk && levHusk.dato === idag && levHusk.sidst){
+    if(!levHusk.slut) levHusk.slut = Date.now() + LEV_EFTER;
+    levGem();
+  }
+}
 
 async function hentLevering(){
   if(leveringTravl) return;
@@ -4522,12 +4574,9 @@ async function hentLevering(){
   try{
     const { data, error } = await sb.functions.invoke("nemlig-levering", { body: {} });
     if(error) throw error;
-    if(data && data.aktiv && data.levering){
-      levering = data.levering;
-      if(levering.dato === iso(new Date())) leveringSidst = levering;
-    } else {
-      levering = null;
-    }
+    levering = (data && data.aktiv && data.levering) ? data.levering : null;
+    levLaes();
+    levNoter(levering);
     leveringHentet = Date.now();
   }catch(err){
     /* Leveringen er en ekstra oplysning, ikke noget kalenderen står og
@@ -4540,17 +4589,34 @@ async function hentLevering(){
   if(fane === "kalender" && view === "day") render();
 }
 
-/* Hvilken levering hører til denne dag? Enten den aktive, eller den vi
-   lige har set forsvinde, hvis der stadig er kort tid siden. */
+/* Hvilken levering hører til denne dag — hvis nogen? */
 function leveringPaa(ds){
+  levLaes();
+
+  // Trykket væk på denne enhed: så vises den ikke igen for den ordre.
+  if(levHusk && levHusk.skjult && levHusk.dato === ds) return null;
+
+  // Uret er løbet ud efter levering.
+  if(levHusk && levHusk.slut && Date.now() > levHusk.slut && levHusk.dato === ds) return null;
+
   if(levering && levering.dato === ds) return levering;
-  if(leveringSidst && leveringSidst.dato === ds){
-    const slut = leveringSidst.budTil || leveringSidst.slotTil;
-    if(slut && Date.now() < new Date(slut).getTime() + 10800000){
-      return Object.assign({}, leveringSidst, { leveret: true, fremdrift: 100 });
-    }
+
+  /* Nemlig svarer ikke længere, men vi så en levering i dag og uret er
+     ikke løbet ud endnu. Så står der "Leveret". */
+  if(levHusk && levHusk.dato === ds && levHusk.sidst && levHusk.slut){
+    return Object.assign({}, levHusk.sidst, { leveret: true, fremdrift: 100 });
   }
   return null;
+}
+
+/* Trykket væk. Ingen bekræftelse: feltet er en oplysning, ikke en
+   påmindelse man kan miste, og det kommer igen ved næste ordre. */
+function levSkjul(){
+  levLaes();
+  if(!levHusk) return;
+  levHusk.skjult = true;
+  levGem();
+  render();
 }
 
 /* Klokkeslættet skrives med kolon, ikke med det punktum dansk locale
@@ -4613,7 +4679,11 @@ function renderLevering(ds){
        +     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
        +       '<path d="M3 8h11v9H3z"/><path d="M14 11h4l3 3v3h-7z"/>'
        +       '<circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>'
-       +     '</svg>Levering fra Nemlig</div>'
+       +     '</svg><span class="lt">Levering fra Nemlig</span>'
+       +     '<button class="vaek" data-levvaek="1" aria-label="Skjul leveringen">'
+       +       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+       +     '</button>'
+       +   '</div>'
        +   '<div class="hoved">' + esc(hoved) + '</div>'
        +   (under ? '<div class="til">' + esc(under) + '</div>' : "")
        +   bar
@@ -4701,6 +4771,10 @@ function renderDay(){
     h += '<div class="strip"><span class="label">Helligdag</span><span class="holiday-tag">'+esc(hol)+'</span></div>';
   }
 
+  /* Leveringen står mellem maden og opgaverne: den hører til dagens
+     praktiske ting, ikke til aftalerne. */
+  h += renderLevering(ds);
+
   h += renderDagOpgaver(ds);
 
   if(!list.length){
@@ -4731,8 +4805,6 @@ function renderDay(){
     });
     h += '</div>';
   }
-
-  h += renderLevering(ds);
 
   const paamind = paamindelserPaa(ds);
   if(paamind.length){
@@ -6126,6 +6198,7 @@ document.getElementById("stage").addEventListener("click", async ev => {
   if(husk){ spoergHusk(husk.dataset.husk); return; }
   const opt = ev.target.closest("[data-optoen]");
   if(opt){ spoergOptoen(opt.dataset.optoen); return; }
+  if(ev.target.closest("[data-levvaek]")){ levSkjul(); return; }
   const goto = ev.target.closest("[data-goto]");
   const week = ev.target.closest("[data-week]");
   const evb  = ev.target.closest("[data-ev]");
