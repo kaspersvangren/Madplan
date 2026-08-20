@@ -866,12 +866,26 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemknap svg{flex:none}
 
 .nemgruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-  font-weight:700;margin:18px 0 6px;display:flex;align-items:baseline;gap:8px}
+  font-weight:700;margin:18px 0 6px;display:flex;align-items:center;gap:8px;
+  width:100%;text-align:left;padding:4px 2px}
+.nemgruppe:hover{color:var(--ink)}
+/* Pilen drejer i stedet for at skifte tegn — så kan øjet følge med i
+   hvad der sker, og overskriften hopper ikke. */
+.nemgruppe .pil{flex:none;display:grid;place-items:center;
+  transition:transform .18s ease}
+.nemgruppe .pil.lukket{transform:rotate(-90deg)}
+.nemgruppe .n{flex:none;font-weight:600;font-variant-numeric:tabular-nums;
+  text-transform:none;letter-spacing:0}
 .nemgruppe:first-of-type{margin-top:6px}
 .nemgruppe .t{flex:1}
 .nemrad{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;
   border-top:1px solid var(--line);font-size:15px}
 .nemrad .v{flex:1;min-width:0}
+/* Sat til nul: linjen bliver stående, så man kan skrue op igen, men den
+   træder tydeligt tilbage. Antalsknapperne beholder fuld styrke — det er
+   dem man skal ramme for at fortryde. */
+.nemrad.fravalgt > .v, .nemrad.fravalgt .nembilknap{opacity:.45}
+.nemrad.fravalgt .navn{text-decoration:line-through}
 .nemrad .navn{display:block}
 .nemrad .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemrad .under.gaet{color:var(--holiday)}
@@ -1805,7 +1819,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.37.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.38.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5324,6 +5338,21 @@ function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
   return { antal:1, gaet:true };
 }
 
+/* Hvilke afsnit i indkøbsarket der er foldet sammen. Ligger på enheden,
+   ikke i basen: det er en visningsting, og den skal ikke følge med over
+   på tabletten midt i en indkøbstur. */
+const NEMFOLD_NOEGLE = "kalender-nemlig-foldet";
+let nemFoldet = new Set();
+try{
+  const r = JSON.parse(localStorage.getItem(NEMFOLD_NOEGLE) || "[]");
+  if(Array.isArray(r)) nemFoldet = new Set(r.map(String));
+}catch(e){}
+function nemFoldSkift(gruppe){
+  if(nemFoldet.has(gruppe)) nemFoldet.delete(gruppe); else nemFoldet.add(gruppe);
+  try{ localStorage.setItem(NEMFOLD_NOEGLE, JSON.stringify([...nemFoldet])); }catch(e){}
+  nemTegn();
+}
+
 /* ---------- Flere produkter til samme ingrediens ----------
    Salat er hjertesalat den ene uge og iceberg den næste. Standardvalget
    bliver i selve rækken; alternativerne ligger ved siden af som HELE
@@ -5647,7 +5676,7 @@ function nemByg(){
       kort,
       ekstra,                          // andre varer på samme linje
       medtaget,
-      antal: 1,
+      antal: medtaget ? 1 : 0,
       gaet: false,
       spring: false
     };
@@ -5668,7 +5697,8 @@ function nemByg(){
     .map(v => ({
       navn: v.navn, behov: null, enhed: "", kilder: "", kort: nemMedUgevalg(v, v.navn),
       ekstra: nemLinjeEkstra(v, v.navn),
-      medtaget: false, antal: v.standard_antal || 1, gaet: false, spring: false
+      medtaget: false, antal: 0, gaet: false, spring: false,
+      standardAntal: v.standard_antal || 1
     }));
 
   nemArk = {
@@ -5807,7 +5837,7 @@ function nemTegn(){
     /* Knappen vises kun naar der faktisk er noget at vaelge imellem —
        ellers ville hver eneste linje faa en knap der ikke goer noget. */
     const flere = nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
-    return '<div class="nemrad">'
+    return '<div class="nemrad' + (l.antal < 1 ? " fravalgt" : "") + '">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
                    + (l.medtaget ? " checked" : "") + '>' : "")
       + (bil ? '<button class="nembilknap" data-nemkort="' + gruppe + ':' + i + '">'
@@ -5815,7 +5845,9 @@ function nemTegn(){
                + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(l.navn) + '</span>'
-      + (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : "")
+      + (l.antal < 1
+          ? '<span class="under">tages ikke med</span>'
+          : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
       + ((l.ekstra && l.ekstra.length)
           ? '<span class="nemogsaa">og ' + esc(l.ekstra.map(e =>
               e.antal + " × " + (e.produkt_navn || "vare")).join(", ")) + '</span>' : "")
@@ -5830,10 +5862,27 @@ function nemTegn(){
       + '</span></div>';
   };
 
+  /* Overskriften er nu en knap der folder afsnittet sammen. Tallet til
+     højre siger hvor mange varer der rent faktisk kommer med, så et
+     sammenfoldet afsnit stadig kan overskues. */
+  const hoved = (titel, liste, gruppe) => {
+    const med = liste.filter(l => l.medtaget && !l.spring).length;
+    const lukket = nemFoldet.has(gruppe);
+    return '<button type="button" class="nemgruppe" data-nemfold="' + gruppe + '"'
+      + ' aria-expanded="' + (!lukket) + '">'
+      + '<span class="pil' + (lukket ? " lukket" : "") + '" aria-hidden="true">'
+      +   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+      + '</span>'
+      + '<span class="t">' + titel + '</span>'
+      + '<span class="n">' + med + " af " + liste.length + '</span>'
+      + '</button>';
+  };
+
   const afsnit = (titel, liste, gruppe) => {
     if(!liste.length) return '';
-    return '<div class="nemgruppe"><span class="t">' + titel + '</span></div>'
-      + liste.map((l, i) => linje(l, gruppe, i)).join("");
+    return hoved(titel, liste, gruppe)
+      + (nemFoldet.has(gruppe) ? ""
+         : liste.map((l, i) => linje(l, gruppe, i)).join(""));
   };
 
   /* De faste indkøb inddeles efter Nemligs egen hovedgruppe — Brød, Drikke,
@@ -5853,7 +5902,8 @@ function nemTegn(){
     const orden = [...kasser.keys()].sort((a, b) =>
       (a === "Øvrigt") - (b === "Øvrigt") || a.localeCompare(b, "da"));
 
-    let ud = '<div class="nemgruppe"><span class="t">' + titel + '</span></div>';
+    let ud = hoved(titel, liste, gruppe);
+    if(nemFoldet.has(gruppe)) return ud;
     for(const g of orden){
       if(kasser.size > 1) ud += '<div class="nemundergruppe">' + esc(g) + '</div>';
       ud += kasser.get(g).map(([l, i]) => linje(l, gruppe, i)).join("");
@@ -6567,14 +6617,19 @@ document.getElementById("nem-send").onclick  = async () => {
 };
 
 document.getElementById("nem-krop").addEventListener("click", async ev => {
+  const fold = ev.target.closest("[data-nemfold]");
+  if(fold){ nemFoldSkift(fold.dataset.nemfold); return; }
   const trin = ev.target.closest("[data-nemtrin]");
   if(trin){
     const [gruppe, i, retning] = trin.dataset.nemtrin.split(":");
     const l = (nemArk[gruppe] || [])[Number(i)];
     if(l){
+      /* Nul betyder "tages ikke med". Før sprang tallet tilbage til 1,
+         så en linje fra madplanen kunne fravælges — men intet på skærmen
+         viste det, og man kunne ikke se forskel på med og uden.
+         Nu bliver nullet stående, og linjen tones ned.                */
       l.antal = Math.max(0, l.antal + Number(retning));
-      if(l.antal === 0){ l.antal = 1; l.medtaget = false; }
-      else if(gruppe === "faste" || gruppe === "tjek"){ l.medtaget = true; }
+      l.medtaget = l.antal > 0;
       nemTegn();
     }
     return;
@@ -6623,7 +6678,15 @@ document.getElementById("nem-krop").addEventListener("change", ev => {
   const v = ev.target.closest("[data-nemvalgt]");
   if(!v) return;
   const { l } = nemLinje(v.dataset.nemvalgt);
-  if(l){ l.medtaget = v.checked; nemTegn(); }
+  if(l){
+    l.medtaget = v.checked;
+    /* Sætter man fluebenet i en linje der står på nul, skal den også have
+       et antal — ellers ville den være valgt til og alligevel ikke komme
+       med. Og omvendt: fjernes fluebenet, står nullet der. */
+    if(v.checked && l.antal < 1) l.antal = l.standardAntal || 1;
+    if(!v.checked) l.antal = 0;
+    nemTegn();
+  }
 });
 
 document.getElementById("nemvalg-erfast").addEventListener("change", nemNavneVarsel);
