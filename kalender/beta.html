@@ -1729,7 +1729,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.34.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.34.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4652,7 +4652,9 @@ function renderLevering(ds){
     : Boolean(L.slotFra && Date.now() >= new Date(L.slotFra).getTime());
 
   let hoved;
-  if(L.leveret)                        hoved = "Leveret";
+  /* Er den leveret, står klokkeslættet — Nemlig skriver selv "Ordre leveret
+     10:40", og det er DeliveryTime der er blevet til det faktiske tidspunkt. */
+  if(L.leveret)                        hoved = "Leveret" + (L.budPunkt ? " " + levKlok(L.budPunkt) : "");
   /* Mens bilen kører, viser Nemlig ét præcist tidspunkt i stedet for
      vinduet — "Vi er hos dig ca. 10:43". Vi gør det samme, så de to
      skærme ikke står og siger hver sit. */
