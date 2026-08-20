@@ -1016,6 +1016,15 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemsum .linje span{display:block;height:100%;border-radius:999px;
   background:var(--muted);transition:width .35s ease}
 .nemsum .linje span.naaet{background:#3E8E5A}
+/* Mærket på et afsnit der gemmer noget der kræver handling. Samme farve
+   som advarslen på selve linjen, så de to hører tydeligt sammen.
+   Hedder nemHASTER, ikke nemmangler — det navn er allerede brugt i
+   kortlægningslisten til "ikke kortlagt endnu". */
+.nemhaster{flex:none;font-size:11.5px;font-weight:700;color:var(--holiday);
+  background:color-mix(in srgb, var(--holiday) 14%, transparent);
+  border-radius:999px;padding:1px 8px;letter-spacing:0;text-transform:none;
+  font-variant-numeric:tabular-nums}
+.nemgruppe.haster .t, .nemundergruppe.haster .t{color:var(--holiday)}
 html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 .nembytknap{display:block;margin-top:4px;font-size:12.5px;color:var(--muted);
   padding:2px 0;border-bottom:1px dashed var(--line-strong);border-radius:0}
@@ -1852,7 +1861,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.42.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.43.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3786,14 +3795,20 @@ function beregnIndkoeb(fredag){
     });
   }
 
-  // Står varen allerede på tjeklisten, skal den ikke også stå på købelisten
-  const paaTjek = new Set([...tjek.values()].map(p => p.navn.toLowerCase()));
+  /* Bruges den samme vare af én ret der siger "skal købes" og en anden der
+     siger "tjek om vi har", vinder SKAL KØBES. Den strengeste går forud:
+     glemmer man at tjekke, står man uden varen, mens et overflødigt køb
+     kun koster en dåse hakkede tomater.
+
+     VENDT OM 20. august efter hans ord. Før vandt tjeklisten, så en vare
+     en ret skulle bruge kunne ende som noget man bare skulle se efter. */
+  const skalKoebes = new Set([...koeb.values()].map(p => p.navn.toLowerCase()));
   const sorter = a => a.sort((x, y) => x.navn.localeCompare(y.navn, "da"));
 
   return {
     dage,
-    koeb: sorter([...koeb.values()].filter(p => !paaTjek.has(p.navn.toLowerCase()))),
-    tjek: sorter([...tjek.values()])
+    koeb: sorter([...koeb.values()]),
+    tjek: sorter([...tjek.values()].filter(p => !skalKoebes.has(p.navn.toLowerCase())))
   };
 }
 
@@ -5898,9 +5913,17 @@ function nemTegn(){
       const tekst = tilstand === "ukendt" ? "ikke kortlagt endnu"
                   : tilstand === "udgaaet" ? "findes ikke længere hos Nemlig"
                   : "udsolgt";
+      /* Er varen udsolgt eller udgået, og der ER gemte alternativer, skal
+         man kunne bytte med to tryk — ikke tvinges over i "Vælg vare" og
+         redigere hele kortlægningen for at komme videre. */
+      const kanByttes = tilstand !== "ukendt"
+        && nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
       return '<div class="nemrad advarsel"><span class="v"><span class="navn">'
         + esc(l.navn) + '</span><span class="under gaet">⚠ ' + tekst + '</span></span>'
         + '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">spring over</button>'
+        + (kanByttes
+            ? '<button class="loes" data-nembytaabn="' + gruppe + ':' + i + '">byt</button>'
+            : "")
         + '<button class="loes" data-nemloes="' + gruppe + ':' + i + '">'
         + (tilstand === "ukendt" ? "find vare" : "vælg ny") + '</button></div>';
     }
@@ -5970,15 +5993,29 @@ function nemTegn(){
   /* Overskriften er nu en knap der folder afsnittet sammen. Tallet til
      højre siger hvor mange varer der rent faktisk kommer med, så et
      sammenfoldet afsnit stadig kan overskues. */
+  /* Hvor mange linjer i en bunke kræver handling? Ukortlagte og udsolgte
+     BLOKERER knappen, og siden afsnittene kunne foldes sammen, kunne de
+     gemme sig helt — så måtte man folde alt ud og lede i blinde for at
+     komme videre. Tallet vises på afsnittet, også når det er foldet, så
+     man kan se HVOR der er noget. Sprunget over tæller ikke med; den er
+     jo håndteret. */
+  const kraeverHandling = liste =>
+    liste.filter(l => !l.spring && nemTilstand(l) !== "klar").length;
+
+  const maerke = n => n
+    ? '<span class="nemhaster">⚠ ' + n + '</span>' : "";
+
   const hoved = (titel, liste, gruppe) => {
     const med = liste.filter(l => l.medtaget && !l.spring).length;
     const lukket = nemFoldet.has(gruppe);
-    return '<button type="button" class="nemgruppe" data-nemfold="' + gruppe + '"'
-      + ' aria-expanded="' + (!lukket) + '">'
+    const haster = kraeverHandling(liste);
+    return '<button type="button" class="nemgruppe' + (haster ? " haster" : "")
+      + '" data-nemfold="' + gruppe + '" aria-expanded="' + (!lukket) + '">'
       + '<span class="pil' + (lukket ? " lukket" : "") + '" aria-hidden="true">'
       +   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
       + '</span>'
       + '<span class="t">' + titel + '</span>'
+      + maerke(haster)
       + '<span class="n">' + med + " af " + liste.length + '</span>'
       + '</button>';
   };
@@ -6018,12 +6055,15 @@ function nemTegn(){
       const raekker = kasser.get(g);
       if(kasser.size > 1){
         const med = raekker.filter(([l]) => l.medtaget && !l.spring).length;
-        ud += '<button type="button" class="nemundergruppe" data-nemfold="' + esc(noegle) + '"'
+        const hasterHer = kraeverHandling(raekker.map(([l]) => l));
+        ud += '<button type="button" class="nemundergruppe' + (hasterHer ? " haster" : "")
+           +  '" data-nemfold="' + esc(noegle) + '"'
            +  ' aria-expanded="' + (!lukket) + '">'
            +  '<span class="pil' + (lukket ? " lukket" : "") + '" aria-hidden="true">'
            +    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
            +  '</span>'
            +  '<span class="t">' + esc(g) + '</span>'
+           +  maerke(hasterHer)
            +  '<span class="n">' + med + " af " + raekker.length + '</span>'
            +  '</button>';
         if(lukket) continue;
@@ -6195,9 +6235,14 @@ function nemLinjePris(produktId, antal){
   if(!p || p.pris == null || !antal) return { sum: null, tilbud: false };
   const k = p.kampagne;
   if(k && k.slags === "mange" && k.antal > 1 && k.samletPris != null){
-    const saet = Math.floor(antal / k.antal);
-    const loese = antal % k.antal;
-    return { sum: saet * k.samletPris + loese * p.pris, tilbud: saet > 0 };
+    /* RETTET 20. august efter hans oplysning: rabatten gaelder ALLE stykker
+       fra og med minimumsantallet — ikke kun hele saet. Med "2 for 44" og
+       stykpris 22,91 koster 3 stk 66,00 og 4 stk 88,00, altsaa 22,00 pr.
+       stk hele vejen. Jeg havde bygget "hele saet til saetpris, resten til
+       stykpris", hvilket gav 66,91. Under minimumsantallet: normal pris. */
+    if(antal >= k.antal){
+      return { sum: (k.samletPris / k.antal) * antal, tilbud: true };
+    }
   }
   return { sum: p.pris * antal, tilbud: false };
 }
