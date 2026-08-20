@@ -997,6 +997,26 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* "og 1 × Iceberg" — de øvrige varer på samme linje. Egen tone, så den
    ikke forveksles med behovet ovenover eller med kurv-mærket. */
 .nemogsaa{display:block;font-size:12.5px;color:var(--lev);margin-top:2px}
+/* Linjesummen står tættere på og lidt kraftigere end stykprisen — det er
+   den man leder efter, når der er skruet op. */
+.nemrad .under.sum{color:var(--ink);font-variant-numeric:tabular-nums;margin-top:1px}
+/* Er et mængdetilbud slået igennem på summen, får den tilbudsfarven —
+   så kan man se at tallet IKKE bare er antal gange stykpris. */
+.nemrad .under.sum.tilbud{color:var(--mad);font-weight:600}
+/* Beløbet nederst. Egen ramme, så det ikke forveksles med en varelinje. */
+.nemsum{margin-top:18px;padding:12px 13px 11px;border:1px solid var(--line);
+  border-radius:12px;background:var(--surface)}
+.nemsum .r{display:flex;justify-content:space-between;align-items:baseline;
+  gap:10px;font-size:15px}
+.nemsum .r b{font-variant-numeric:tabular-nums;font-size:17px}
+.nemsum .r.lille{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+.nemsum .r.varsel{color:var(--holiday)}
+.nemsum .linje{margin:9px 0 7px;height:4px;border-radius:999px;
+  background:color-mix(in srgb, var(--ink) 12%, transparent);overflow:hidden}
+.nemsum .linje span{display:block;height:100%;border-radius:999px;
+  background:var(--muted);transition:width .35s ease}
+.nemsum .linje span.naaet{background:#3E8E5A}
+html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 .nembytknap{display:block;margin-top:4px;font-size:12.5px;color:var(--muted);
   padding:2px 0;border-bottom:1px dashed var(--line-strong);border-radius:0}
 .nembytknap:hover{color:var(--ink);border-bottom-style:solid}
@@ -1832,7 +1852,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.39.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.42.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5926,7 +5946,21 @@ function nemTegn(){
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
       + '</span>'
       + '<span class="trin">' + trin(gruppe, i, l.antal)
-      + (pakke ? '<span class="under" style="text-align:right">à ' + esc(pakke) + '</span>' : "")
+      /* Stykprisen står altid. Køber man flere, står summen for linjen
+         under — ellers skal man selv gange, og det er netop dét man
+         gerne vil slippe for, når man står og skruer op og ned. */
+      + ((pakke || p) ? '<span class="under" style="text-align:right">'
+          + [pakke ? "à " + esc(pakke) : "", p ? nemKr(p.pris) + " kr" : ""]
+              .filter(Boolean).join(" · ")
+          + '</span>' : "")
+      + (() => {
+          if(!p || l.antal <= 1) return "";
+          const r = nemLinjePris(l.kort.produkt_id, l.antal);
+          if(r.sum == null) return "";
+          return '<span class="under sum' + (r.tilbud ? " tilbud" : "")
+            + '" style="text-align:right">' + esc(l.antal) + " × = "
+            + nemKr(r.sum) + ' kr</span>';
+        })()
       + (flere ? '<button class="nembytknap" data-nembytaabn="' + gruppe + ':' + i + '">'
                  + ((l.ekstra && l.ekstra.length) ? "flere valgt"
                      : l.kort._byttet ? "byttet" : "byt") + '</button>' : "")
@@ -6008,6 +6042,8 @@ function nemTegn(){
   if(!nemAlleLinjer().length){
     h += '<div class="nemtom">Der er ikke noget at købe i denne uge.</div>';
   }
+
+  h += nemSumAfsnit();
 
   h += '<div class="nemgruppe" style="margin-top:20px"><span class="t">Tilføj</span></div>'
     +  '<div class="nemsoegfelt"><input type="text" id="nem-tilfoej" placeholder="Søg en vare hos Nemlig" autocomplete="off">'
@@ -6104,6 +6140,96 @@ function nemKurvAfsnit(){
   }
   h += '</div>';
   return h;
+}
+
+/* Beløbet nederst i arket: hvad de valgte varer koster, og hvor langt
+   der er til at kunne bestille. Det er et OVERSLAG — se nemVaerdi. */
+function nemSumAfsnit(){
+  const { sum, varer, mangler, tilbud } = nemVaerdi();
+  if(!varer) return "";
+  const grænse = nemMindstekoeb();
+  const naaet = sum >= grænse;
+  const pct = Math.max(0, Math.min(100, Math.round(sum / grænse * 100)));
+
+  return '<div class="nemsum">'
+    + '<div class="r"><span>' + varer + (varer === 1 ? " vare valgt" : " varer valgt")
+    +   '</span><b>' + nemKr(sum) + ' kr</b></div>'
+    /* Stregen viser hvor langt man er mod mindstekøbet — samme sprog som
+       leveringens fremdrift, så den er til at kende igen. */
+    + '<div class="linje"><span style="width:' + pct + '%"'
+    +   (naaet ? ' class="naaet"' : "") + '></span></div>'
+    + '<div class="r lille"><span>'
+    + (naaet
+        ? "mindstekøbet på " + nemKr(grænse) + " kr er nået"
+        : "mangler " + nemKr(grænse - sum) + " kr for at kunne bestille")
+    + '</span><span></span></div>'
+    + (mangler
+        ? '<div class="r lille varsel"><span>' + mangler
+          + (mangler === 1 ? " vare mangler en pris og er ikke talt med"
+                           : " varer mangler en pris og er ikke talt med")
+          + '</span><span></span></div>'
+        : "")
+    /* Kun mix-tilbud paa tvaers af varer mangler nu — de andre er med.
+       Siges kun naar der faktisk ER et maengdetilbud i spil. */
+    + (tilbud
+        ? '<div class="r lille"><span>mængdetilbud er regnet med · '
+          + 'mixtilbud på tværs af varer er ikke</span><span></span></div>'
+        : "")
+    + '</div>';
+}
+
+/* Hvad koster N stk af en vare — med mængdetilbud regnet med?
+
+   Nedsatte priser er der ALLEREDE: serveren sender den nedsatte pris som
+   varens pris, når kampagnen er af slagsen "nedsat". Det er kun "2 for 44"
+   der kræver regnestykke, for dér staar varen til normalpris.
+
+   Nemligs regel: hvert hele saet koster saetprisen, resten koster stykpris.
+   Fem styk med "2 for 44" og stykpris 22,91 = 2 saet à 44 + 1 løs = 110,91.
+
+   GRÆNSE: mixtilbud paa TVÆRS af forskellige varer kan vi ikke regne —
+   dertil skal man vide hvad de øvrige varer i tilbuddet koster, og de kan
+   ligge paa andre linjer. Der bliver vores tal for højt, aldrig for lavt. */
+function nemLinjePris(produktId, antal){
+  const p = nemArk.priser[String(produktId)];
+  if(!p || p.pris == null || !antal) return { sum: null, tilbud: false };
+  const k = p.kampagne;
+  if(k && k.slags === "mange" && k.antal > 1 && k.samletPris != null){
+    const saet = Math.floor(antal / k.antal);
+    const loese = antal % k.antal;
+    return { sum: saet * k.samletPris + loese * p.pris, tilbud: saet > 0 };
+  }
+  return { sum: p.pris * antal, tilbud: false };
+}
+
+/* Hvad koster det, der er valgt? Regnes af NØJAGTIG samme liste som den
+   der sendes af sted — nemSendeliste — så tallet ikke kan komme til at
+   sige noget andet end det der lander i kurven.
+
+   Mangler prisen på en enkelt vare (den er ikke hentet endnu, eller den
+   er udgået), tælles den ikke med, og det SIGES. Et beløb der stiltiende
+   er for lavt, er værre end intet beløb, når man står og måler sig mod
+   mindstekøbet.
+
+   Tilbud som "2 for 44" er IKKE regnet med. Nemlig trækker dem fra i
+   kurven, så det rigtige tal er altid lidt lavere end vores.          */
+function nemVaerdi(){
+  let sum = 0, varer = 0, mangler = 0, tilbud = 0;
+  for(const { produktId, antal } of nemSendeliste()){
+    varer += antal;
+    const r = nemLinjePris(produktId, antal);
+    if(r.sum == null) mangler++;
+    else { sum += r.sum; if(r.tilbud) tilbud++; }
+  }
+  return { sum, varer, mangler, tilbud };
+}
+
+/* Nemligs mindstekøb. Kendes med sikkerhed fra kurven, når den er hentet;
+   ellers bruges det beløb der har været gældende. Tallet står ét sted. */
+const NEM_MINDSTEKOEB = 500;
+function nemMindstekoeb(){
+  const k = nemArk && nemArk.kurv;
+  return (k && k.mindstekoeb) || NEM_MINDSTEKOEB;
 }
 
 /* Det der faktisk sendes: alt fra madplanen plus det der er sat flueben ved. */
