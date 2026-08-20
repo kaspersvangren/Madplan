@@ -31,6 +31,9 @@
   --mad:#4F7A55;   --mad-bg:#DDEADC;
   --frost:#3F7595; --frost-bg:#D6E6F0;
   --opgf:#4F6A66;  --opg-bg:#EDF2F1;
+  /* Leveringen fra Nemlig. Dæmpet blomme — den eneste farve der ikke
+     allerede betyder noget andet i dagskortet.                     */
+  --lev:#6B5478;   --lev-bg:#EAE3EE;
   --chip:#F2F1ED;
   --holiday:#B0503A;
   --rail:#CFCCC4;--nat:#2B3450;--sky:#8C9096;
@@ -53,6 +56,7 @@ html[data-theme="dark"]{
   --mad:#8FBE95;   --mad-bg:#27331F;
   --frost:#8FB8D4; --frost-bg:#1E2D3B;
   --opgf:#8FB3AD;  --opg-bg:#1B2624;
+  --lev:#C0A6CD;   --lev-bg:#2A2233;
   --chip:#252821;
   --holiday:#E08A70;
   --rail:#3A3E36;--nat:#3D4870;
@@ -738,6 +742,29 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
   display:grid;place-items:center;color:var(--muted);margin:-2px -4px 0 0}
 .duo .fting .vaek:hover{background:var(--chip);color:var(--ink)}
 .sne{line-height:1;font-size:13px}
+
+/* Leveringen fra Nemlig. Samme sprog som mad- og fryserfeltet — et
+   afrundet, tonet felt inde i dagskortet — men i fuld bredde og med
+   en tynd streg der viser hvor langt bilen er nået. Den vises kun på
+   selve leveringsdagen, og kun mens der er en ordre i gang.        */
+/* Stregen sidder FOROVEN. Aftalerne har ingen streg forneden, og
+   påmindelsesblokken har sin egen foroven — en streg her forneden ville
+   give to streger oven på hinanden. */
+.levblok{padding:12px 12px 13px;border-top:1px solid var(--line)}
+.levfelt{background:var(--lev-bg);border-radius:12px;padding:10px 12px 11px}
+.levfelt .mini{font-size:11px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--lev);
+  margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.levfelt .hoved{font-size:15px;font-weight:600;line-height:1.3;color:var(--ink)}
+.levfelt .til{font-size:13px;color:var(--muted);margin-top:1px}
+/* Stregen er ren udsmykning: den siger det samme som teksten, bare
+   hurtigere. Mangler Nemlig et tal for fremdriften, udelades den helt
+   frem for at stå og lyve med en tom bjælke.                       */
+.levbar{margin-top:9px;height:4px;border-radius:999px;
+  background:color-mix(in srgb, var(--lev) 22%, transparent);overflow:hidden}
+.levbar span{display:block;height:100%;border-radius:999px;background:var(--lev);
+  transition:width .6s ease}
+.levfelt.klaret .mini{opacity:.75}
 
 /* Opgaverne får deres egen tone, så de tre slags kan kendes fra
    hinanden på afstand — det er en vægtablet på to meters hold.     */
@@ -1696,7 +1723,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.32.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.33.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4425,6 +4452,9 @@ document.addEventListener("visibilitychange", () => {
   if(document.getElementById("gate").classList.contains("open")) return;
   hentAlt();
   if(Date.now() - vejrHentet > 1800000) hentVejr();
+  /* Har skærmen været slukket mens bilen kørte, er buddet forældet.
+     Er der en ordre i gang, hentes den forfra med det samme. */
+  if(Date.now() - leveringHentet > (levering ? LEV_HYPPIGT : LEV_SJAELDENT)) hentLevering();
 });
 
 /* =======================================================================
@@ -4461,6 +4491,134 @@ const esc = s => String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",
 const timeLabel = e => e.allDay ? "Hele dagen"
   : flerdags(e) ? ((e.start ? "fra " + e.start : "") + (e.end ? (e.start ? ", " : "") + "hjem " + e.end : "") || "Hele dagene")
   : (e.end ? e.start + "–" + e.end : e.start);
+
+/* =======================================================================
+   Levering fra Nemlig
+   Serveren spørger Nemlig om den aktive ordre; her vises den i dagskortet
+   på selve leveringsdagen. Først står der bare det bestilte vindue, og
+   når bilen er kørt, skifter den til Nemligs levende bud, der flytter
+   sig et par minutter ad gangen.
+
+   Alle tider fra serveren er UTC med Z til sidst. new Date() regner selv
+   om til dansk tid — der må ALDRIG klippes i teksten med substring.
+   ======================================================================= */
+let levering       = null;   // {dato, slotFra, slotTil, budFra, budTil, ...}
+let leveringHentet = 0;
+let leveringTravl  = false;
+/* Nemlig tømmer efter alt at dømme svaret, når varerne er sat af. Så
+   ville feltet forsvinde i samme sekund, uden at nogen nåede at se at
+   det gik godt. Derfor huskes den sidste levering på dagen, og "Leveret"
+   får lov at stå tre timer efter det bestilte vindue. Hukommelsen er kun
+   i denne fane: genindlæses siden, er den væk. Det er med vilje — vi
+   gemmer ikke noget vi ikke har set. */
+let leveringSidst  = null;
+
+const LEV_HYPPIGT = 150000;    // to en halv minut, mens en ordre er i gang
+const LEV_SJAELDENT = 1800000; // en halv time ellers — nok til at opdage en ny ordre
+
+async function hentLevering(){
+  if(leveringTravl) return;
+  leveringTravl = true;
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-levering", { body: {} });
+    if(error) throw error;
+    if(data && data.aktiv && data.levering){
+      levering = data.levering;
+      if(levering.dato === iso(new Date())) leveringSidst = levering;
+    } else {
+      levering = null;
+    }
+    leveringHentet = Date.now();
+  }catch(err){
+    /* Leveringen er en ekstra oplysning, ikke noget kalenderen står og
+       falder med. Går kaldet galt, siger vi ingenting i skærmbilledet —
+       et rødt felt om Nemlig midt i familiens kalender gavner ingen. */
+    console.warn("Levering kunne ikke hentes:", err);
+    leveringHentet = Date.now();
+  }
+  leveringTravl = false;
+  if(fane === "kalender" && view === "day") render();
+}
+
+/* Hvilken levering hører til denne dag? Enten den aktive, eller den vi
+   lige har set forsvinde, hvis der stadig er kort tid siden. */
+function leveringPaa(ds){
+  if(levering && levering.dato === ds) return levering;
+  if(leveringSidst && leveringSidst.dato === ds){
+    const slut = leveringSidst.budTil || leveringSidst.slotTil;
+    if(slut && Date.now() < new Date(slut).getTime() + 10800000){
+      return Object.assign({}, leveringSidst, { leveret: true, fremdrift: 100 });
+    }
+  }
+  return null;
+}
+
+/* Klokkeslættet skrives med kolon, ikke med det punktum dansk locale
+   giver. Aftalerne lige ovenover kommer fra et tidsfelt og står som
+   "10:00" — to skrivemåder i samme kort ville se sjusket ud. */
+function levKlok(t){
+  if(!t) return "";
+  const d = new Date(t);
+  if(isNaN(d.getTime())) return "";
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+
+/* "10.00–11.00" som dansk klokkeslæt. Mangler den ene ende, skrives kun
+   den anden — hellere en halv oplysning end en streg ud i ingenting. */
+function levSpand(fra, til){
+  const a = levKlok(fra), b = levKlok(til);
+  if(a && b) return a + "–" + b;
+  return a || b || "";
+}
+
+function renderLevering(ds){
+  const L = leveringPaa(ds);
+  if(!L) return "";
+
+  const bestilt = levSpand(L.slotFra, L.slotTil) || (L.slotTekst || "");
+  const bud     = levSpand(L.budFra, L.budTil);
+
+  /* Er bilen kørt? Serveren afgør det ud fra Nemligs State. Kender den ikke
+     standen, falder vi tilbage på klokken: er den bestilte tid begyndt,
+     regner vi leveringen som i gang. */
+  const paaVej = (typeof L.paaVej === "boolean")
+    ? L.paaVej
+    : Boolean(L.slotFra && Date.now() >= new Date(L.slotFra).getTime());
+
+  let hoved;
+  if(L.leveret)                        hoved = "Leveret";
+  /* Mens bilen kører, viser Nemlig ét præcist tidspunkt i stedet for
+     vinduet — "Vi er hos dig ca. 10:43". Vi gør det samme, så de to
+     skærme ikke står og siger hver sit. */
+  else if(paaVej && L.budPunkt)        hoved = "Hos jer ca. " + levKlok(L.budPunkt);
+  else if(bud && bud !== bestilt)      hoved = "Forventes " + bud;
+  else if(bestilt)                     hoved = "Kommer " + bestilt;
+  else                                 hoved = "Ordren er undervejs";
+
+  /* Underteksten samler standen fra Nemlig ("Klar til levering", "På vej")
+     og den bestilte tid. Er standen ukendt, står der bare tiden. Er der
+     ingen af delene, står linjen slet ikke. */
+  const under = [
+    L.leveret ? "" : (L.standDansk || ""),
+    bestilt && hoved.indexOf(bestilt) === -1 ? "Bestilt tid " + bestilt : ""
+  ].filter(Boolean).join(" · ");
+
+  const p = L.leveret ? 100 : L.fremdrift;
+  const bar = (typeof p === "number")
+    ? '<div class="levbar"><span style="width:' + Math.max(2, Math.min(100, p)) + '%"></span></div>'
+    : "";
+
+  return '<div class="levblok"><div class="levfelt' + (L.leveret ? " klaret" : "") + '">'
+       +   '<div class="mini">'
+       +     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+       +       '<path d="M3 8h11v9H3z"/><path d="M14 11h4l3 3v3h-7z"/>'
+       +       '<circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>'
+       +     '</svg>Levering fra Nemlig</div>'
+       +   '<div class="hoved">' + esc(hoved) + '</div>'
+       +   (under ? '<div class="til">' + esc(under) + '</div>' : "")
+       +   bar
+       + '</div></div>';
+}
 
 /* =======================================================================
    Dagsvisning
@@ -4573,6 +4731,8 @@ function renderDay(){
     });
     h += '</div>';
   }
+
+  h += renderLevering(ds);
 
   const paamind = paamindelserPaa(ds);
   if(paamind.length){
@@ -7550,6 +7710,13 @@ async function start(){
   lytPaaAendringer();
   hentVejr();
   setInterval(() => { if(Date.now() - vejrHentet > 3300000) hentVejr(); }, 600000);
+  hentLevering();
+  /* Ét ur der spørger tit. Hvor tit der rent faktisk hentes, afhænger af
+     om der er en ordre i gang — buddet flytter sig kun, mens bilen kører. */
+  setInterval(() => {
+    const frist = levering ? LEV_HYPPIGT : LEV_SJAELDENT;
+    if(Date.now() - leveringHentet > frist) hentLevering();
+  }, 60000);
   resetIdle();
 }
 
