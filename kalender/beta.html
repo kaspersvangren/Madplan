@@ -766,10 +766,17 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 /* Stregen er ren udsmykning: den siger det samme som teksten, bare
    hurtigere. Mangler Nemlig et tal for fremdriften, udelades den helt
    frem for at stå og lyve med en tom bjælke.                       */
-.levbar{margin-top:9px;height:4px;border-radius:999px;
+.levbar{height:4px;border-radius:999px;
   background:color-mix(in srgb, var(--lev) 22%, transparent);overflow:hidden}
 .levbar span{display:block;height:100%;border-radius:999px;background:var(--lev);
   transition:width .6s ease}
+.levbarrad{display:flex;align-items:center;gap:9px;margin-top:9px}
+.levbarrad .levbar{flex:1;margin-top:0}
+.levflue{flex:none;display:grid;place-items:center;color:var(--line-strong);opacity:.3}
+/* Grøn når der er leveret. Egen farve frem for --mad, som betyder
+   aftensmad i samme kort og ikke skal forveksles med "gik godt". */
+.levflue.klar{color:#3E8E5A;opacity:1}
+html[data-theme="dark"] .levflue.klar{color:#6DBE86}
 .levfelt.klaret .mini{opacity:.75}
 
 /* Opgaverne får deres egen tone, så de tre slags kan kendes fra
@@ -904,6 +911,24 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   background:var(--bg);color:var(--ink);font:inherit}
 .nempakke select{padding:9px 11px;border:1px solid var(--line);border-radius:10px;
   background:var(--bg);color:var(--ink);font:inherit}
+/* Omregning fra én vare til opskrifternes enheder. Der kan være flere
+   linjer, fordi samme ingrediens bruges med flere enheder — hvidløg
+   står både som "stk" og som "fed" i kogebogen. Feltet er valgfrit;
+   står det tomt, regner appen som den altid har gjort. */
+.nemstyk{margin:10px 0 4px}
+.nemstyk .etiket{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.nemstykrad{display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.nemstykrad input{width:90px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);font:inherit}
+.nemstykrad select{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--line);
+  border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.nemstykrad .vaek{flex:none;width:32px;height:32px;border-radius:999px;
+  display:grid;place-items:center;color:var(--muted)}
+.nemstykrad .vaek:hover{background:var(--chip);color:var(--ink)}
+.nemstyktilfoej{font-size:14px;color:var(--muted);padding:6px 2px;text-align:left}
+.nemstyktilfoej:hover{color:var(--ink)}
+.nemstykhint{display:block;font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
 .nemvalgrad{display:flex;gap:9px;align-items:flex-start;padding:9px 2px;font-size:14px}
 .nemvalgrad input{width:19px;height:19px;flex:none;margin-top:2px;accent-color:var(--ink)}
 .nemvalgrad small{display:block;color:var(--muted);font-size:12px}
@@ -1496,6 +1521,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
         <input type="number" id="nemvalg-maengde" step="any" min="0" inputmode="decimal">
         <select id="nemvalg-enhed"></select>
       </div>
+      <div class="nemstyk" id="nemvalg-stykfelt">
+        <span class="etiket">Én vare svarer til</span>
+        <div id="nemvalg-stykliste"></div>
+        <button type="button" class="nemstyktilfoej" id="nemvalg-styk-ny">+ Tilføj enhed</button>
+        <span class="nemstykhint" id="nemvalg-stykhint"></span>
+      </div>
       <label class="nemvalgrad"><input type="radio" name="nemfast" value="1" checked>
         <span><b>Fast valg</b><small>altid denne vare — ingen forslag</small></span></label>
       <label class="nemvalgrad"><input type="radio" name="nemfast" value="0">
@@ -1729,7 +1760,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.34.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.35.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4672,8 +4703,18 @@ function renderLevering(ds){
   ].filter(Boolean).join(" · ");
 
   const p = L.leveret ? 100 : L.fremdrift;
+  /* Fluebenet står til højre for stregen, som hos Nemlig, og bliver
+     grønt når varerne er kommet. Før det er det en tom, grå cirkel —
+     så flytter blikket sig ikke, når det endelig fyldes ud. */
   const bar = (typeof p === "number")
-    ? '<div class="levbar"><span style="width:' + Math.max(2, Math.min(100, p)) + '%"></span></div>'
+    ? '<div class="levbarrad">'
+    +   '<div class="levbar"><span style="width:' + Math.max(2, Math.min(100, p)) + '%"></span></div>'
+    +   '<span class="levflue' + (L.leveret ? " klar" : "") + '" aria-hidden="true">'
+    +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    +       '<circle cx="12" cy="12" r="9"/>' + (L.leveret ? '<path d="M8 12.5l2.5 2.5L16 9.5"/>' : "")
+    +     '</svg>'
+    +   '</span>'
+    + '</div>'
     : "";
 
   return '<div class="levblok"><div class="levfelt' + (L.leveret ? " klaret" : "") + '">'
@@ -5183,20 +5224,48 @@ function nemTilGrund(maengde, enhed){
   return null;
 }
 
-/* Antal pakker = behovet delt med pakkestørrelsen, rundet op.
-   Kan de to ikke sammenlignes, bliver det 1 og linjen markeres. */
-function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed){
-  if(behov == null || !pakkeMaengde)            return { antal:1, gaet:true };
+/* Læser varens omregninger. Formen i basen er
+   [{enhed:"pakke", antal:3}] og betyder "én vare svarer til 3 pakker".
+   Alt der ikke giver mening, lades ude i stilhed — en halvfærdig linje
+   må ikke få hele indkøbslisten til at falde fra hinanden. */
+function nemStykliste(kort){
+  const raa = kort && kort.styk;
+  const arr = Array.isArray(raa) ? raa
+    : (typeof raa === "string" ? (() => { try{ return JSON.parse(raa); }catch(e){ return []; } })() : []);
+  if(!Array.isArray(arr)) return [];
+  return arr
+    .map(x => ({ enhed: String(x && x.enhed || "").trim().toLowerCase(), antal: Number(x && x.antal) }))
+    .filter(x => x.enhed && Number.isFinite(x.antal) && x.antal > 0);
+}
+
+/* Antal varer = behovet delt med hvad ÉN vare rummer, rundet op.
+   Tre veje, i den rækkefølge:
+     1. Varen har en omregning for præcis den enhed opskriften bruger
+        ("1 vare = 3 pakker" → 4 pakker giver 2 varer)
+     2. Vægt mod vægt, eller rumfang mod rumfang, som hidtil
+     3. NØJAGTIG samme stykenhed på begge sider ("stk" mod "stk")
+   Ellers 1, markeret som gæt.
+
+   RETTET 20. august: punkt 3 sammenlignede før ALLE stykvise enheder med
+   hinanden, så "1 pakke" mod "4 stk" blev regnet til 1 UDEN gættemærke.
+   To pakker wraps mod en pose på 8 stk ville have købt én pose og set
+   selvsikker ud imens. Nu skal ordet være det samme.                  */
+function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
+  if(behov == null) return { antal:1, gaet:true };
+  const e1 = (enhed || "").toLowerCase().trim();
+
+  const traef = nemStykliste(kort).find(x => x.enhed === e1);
+  if(traef) return { antal: Math.max(1, Math.ceil(behov / traef.antal)), gaet:false };
+
+  if(!pakkeMaengde) return { antal:1, gaet:true };
   const f1 = nemFamilie(enhed), f2 = nemFamilie(pakkeEnhed);
-  const e1 = (enhed || "").toLowerCase(), e2 = (pakkeEnhed || "").toLowerCase();
+  const e2 = (pakkeEnhed || "").toLowerCase().trim();
 
   if(f1 && f2 && f1 === f2){
     const a = nemTilGrund(behov, e1), b = nemTilGrund(pakkeMaengde, e2);
     if(a && b) return { antal: Math.max(1, Math.ceil(a / b)), gaet:false };
   }
-  // Stykvise enheder mod stykvise: tæl direkte.
-  const styk = ["stk","fed","pakke","dåse","pose","bundt",""];
-  if(!f1 && !f2 && styk.includes(e1) && styk.includes(e2)){
+  if(!f1 && !f2 && e1 && e1 === e2){
     return { antal: Math.max(1, Math.ceil(behov / pakkeMaengde)), gaet:false };
   }
   return { antal:1, gaet:true };
@@ -5259,7 +5328,7 @@ function nemByg(){
       spring: false
     };
     if(kort && kort.produkt_id){
-      const a = nemAntal(p.maengde, p.enhed, Number(kort.pakke_maengde), kort.pakke_enhed);
+      const a = nemAntal(p.maengde, p.enhed, Number(kort.pakke_maengde), kort.pakke_enhed, kort);
       r.antal = a.antal;
       r.gaet  = a.gaet;
     }
@@ -5740,6 +5809,7 @@ function nemValgAaben(opsaet){
     };
     document.getElementById("nemvalg-maengde").value = r.pakke_maengde ?? "";
     enh.value = r.pakke_enhed || "g";
+    nemValg.styk = nemStykliste(r);
     document.querySelector('input[name="nemfast"][value="' + (r.fast_valg ? "1" : "0") + '"]').checked = true;
     document.getElementById("nemvalg-erfast").checked = r.slags === "fast";
     document.getElementById("nemvalg-detalje").hidden = false;
@@ -5748,17 +5818,71 @@ function nemValgAaben(opsaet){
     document.getElementById("nemvalg-maengde").value = "";
     document.getElementById("nemvalg-detalje").hidden = true;
     document.getElementById("nemvalg-erfast").checked = nemValg.fastVare;
+    nemValg.styk = [];
   }
 
   document.getElementById("nemvalg-fund").innerHTML = "";
+  nemStykTegn();
   nemNavneVarsel();
   show("nemvalg-back");
   if(nemValg.navn) nemValgSoeg();
 }
 
-/* Navnet er nøglen mod opskrifterne. En ingrediens hedder allerede noget —
-   det navn står i kogebogen, og appen må ikke lave om på det. Kun faste
-   indkøb har et frit kaldenavn, for de kommer ikke fra nogen opskrift. */
+/* ---------- Omregning: én vare svarer til N af opskriftens enhed ----------
+   Flere linjer er tilladt, fordi kogebogen bruger flere enheder om den
+   samme vare: hvidløg står som "stk" fire steder og som "fed" to steder,
+   men peger på det samme net. Hintet viser hvilke enheder opskrifterne
+   rent faktisk bruger til DENNE ingrediens, så man ikke skal gætte.   */
+function nemStykBrugteEnheder(navn){
+  const n = nemNoegle(navn);
+  const set = new Set();
+  (retter || []).forEach(r => {
+    ingredienserFor(r.id).forEach(ing => {
+      if(nemNoegle(ing.navn) === n && ing.enhed) set.add(String(ing.enhed).toLowerCase());
+    });
+  });
+  return [...set];
+}
+
+function nemStykTegn(){
+  const felt = document.getElementById("nemvalg-stykfelt");
+  const liste = document.getElementById("nemvalg-stykliste");
+  const hint = document.getElementById("nemvalg-stykhint");
+  if(!felt || !liste) return;
+  felt.hidden = document.getElementById("nemvalg-detalje").hidden;
+
+  const raekker = nemValg && Array.isArray(nemValg.styk) ? nemValg.styk : [];
+  liste.innerHTML = raekker.map((r, i) =>
+      '<div class="nemstykrad">'
+    +   '<input type="number" step="any" min="0" inputmode="decimal" data-stykantal="' + i + '" value="'
+    +     (r.antal != null ? esc(r.antal) : "") + '">'
+    +   '<select data-stykenhed="' + i + '">'
+    +     ENHEDER.filter(e => e).map(e =>
+          '<option value="' + e + '"' + (e === r.enhed ? " selected" : "") + '>' + e + '</option>').join("")
+    +   '</select>'
+    +   '<button type="button" class="vaek" data-stykvaek="' + i + '" aria-label="Fjern linjen">'
+    +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+    +   '</button>'
+    + '</div>').join("");
+
+  /* Hintet er hele pointen med feltet: uden det ved man ikke HVILKE
+     enheder der overhovedet er brug for. Mangler en, siges det ligeud. */
+  const brugte = nemStykBrugteEnheder(nemValg && (nemValg.navn || ""));
+  if(!brugte.length){
+    hint.textContent = "Valgfrit. Udfyld kun hvis opskrifterne måler i noget "
+      + "andet end pakkestørrelsen — fx “2 dåser” eller “3 pakker”.";
+  } else {
+    const daekket = new Set(raekker.map(r => r.enhed));
+    const mangler = brugte.filter(e => !daekket.has(e) && e !== (document.getElementById("nemvalg-enhed").value || "").toLowerCase());
+    hint.textContent = "Opskrifterne måler denne i " + brugte.join(" og ") + "."
+      + (mangler.length ? " Mangler stadig: " + mangler.join(", ") + "." : " Alle er dækket.");
+  }
+}
+
+/* ---------- Navnet er nøglen mod opskrifterne ----------
+   En ingrediens hedder allerede noget — det navn står i kogebogen, og
+   appen må ikke lave om på det. Kun faste indkøb har et frit kaldenavn,
+   for de kommer ikke fra nogen opskrift.                              */
 function nemNavneVarsel(){
   const fast = document.getElementById("nemvalg-erfast").checked;
   const felt = document.getElementById("nemvalg-navn");
@@ -5851,6 +5975,15 @@ async function nemValgGem(){
     produkt_navn: nemValg.valgt.navn || "",
     pakke_maengde: maengde === "" ? null : Number(String(maengde).replace(",", ".")),
     pakke_enhed: document.getElementById("nemvalg-enhed").value,
+    /* Tomme og halvfaerdige linjer smides vaek foer der gemmes, og er der
+       intet tilbage, skrives NULL — saa ser en aeldre udgave af filen
+       praecis det den plejer. */
+    styk: (() => {
+      const r = (nemValg.styk || [])
+        .map(x => ({ enhed: String(x.enhed || "").toLowerCase(), antal: Number(x.antal) }))
+        .filter(x => x.enhed && Number.isFinite(x.antal) && x.antal > 0);
+      return r.length ? r : null;
+    })(),
     undergruppe: nemValg.valgt.undergruppe || null,
     hovedgruppe: nemValg.valgt.hovedgruppe || null,
     billede: nemValg.valgt.billede || null,
@@ -5884,7 +6017,7 @@ async function nemValgGem(){
     if(l){
       l.kort = gemt;
       l.navn = gemt.navn;
-      const a = nemAntal(l.behov, l.enhed, Number(gemt.pakke_maengde), gemt.pakke_enhed);
+      const a = nemAntal(l.behov, l.enhed, Number(gemt.pakke_maengde), gemt.pakke_enhed, gemt);
       l.antal = a.antal; l.gaet = a.gaet; l.spring = false;
     }
     await nemHentPriser();
@@ -6121,6 +6254,42 @@ document.getElementById("nem-krop").addEventListener("change", ev => {
 });
 
 document.getElementById("nemvalg-erfast").addEventListener("change", nemNavneVarsel);
+
+/* Omregningslinjerne. Tilstanden bor i nemValg.styk, ikke i felterne —
+   så overlever den at listen bliver tegnet forfra, og Fortryd smider
+   den væk sammen med resten. */
+document.getElementById("nemvalg-styk-ny").onclick = () => {
+  if(!nemValg) return;
+  if(!Array.isArray(nemValg.styk)) nemValg.styk = [];
+  /* Foreslå den enhed opskrifterne bruger og som ikke er dækket endnu —
+     det er næsten altid den man er på vej til at taste. */
+  const brugte = nemStykBrugteEnheder(nemValg.navn || "");
+  const daekket = new Set(nemValg.styk.map(r => r.enhed));
+  const foreslag = brugte.find(e => !daekket.has(e));
+  nemValg.styk.push({ enhed: foreslag || "stk", antal: "" });
+  nemStykTegn();
+};
+document.getElementById("nemvalg-stykliste").addEventListener("input", ev => {
+  const a = ev.target.closest("[data-stykantal]");
+  if(a && nemValg && nemValg.styk[a.dataset.stykantal]){
+    /* Kun tallet ændres — listen tegnes IKKE forfra, for så mister
+       feltet markøren midt i indtastningen. */
+    nemValg.styk[a.dataset.stykantal].antal = a.value;
+  }
+});
+document.getElementById("nemvalg-stykliste").addEventListener("change", ev => {
+  const e = ev.target.closest("[data-stykenhed]");
+  if(e && nemValg && nemValg.styk[e.dataset.stykenhed]){
+    nemValg.styk[e.dataset.stykenhed].enhed = e.value;
+    nemStykTegn();                    // enheden ændrer hvad der mangler
+  }
+});
+document.getElementById("nemvalg-stykliste").addEventListener("click", ev => {
+  const v = ev.target.closest("[data-stykvaek]");
+  if(!v || !nemValg) return;
+  nemValg.styk.splice(Number(v.dataset.stykvaek), 1);
+  nemStykTegn();
+});
 document.getElementById("nemvalg-fortryd").onclick = () => { hide("nemvalg-back"); nemValg = null; };
 document.getElementById("nemvalg-soeg").onclick    = () => nemValgSoeg();
 document.getElementById("nemvalg-gem").onclick     = () => nemValgGem();
