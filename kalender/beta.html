@@ -1011,7 +1011,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemfjern:hover{color:var(--holiday);background:var(--surface)}
 .nemikurv{font-size:12px;color:var(--mad);font-weight:600;white-space:nowrap}
 .nemundergruppe{font-size:12px;color:var(--muted);font-weight:600;margin:14px 0 2px;
-  padding-left:2px;letter-spacing:.02em}
+  letter-spacing:.02em;display:flex;align-items:center;gap:7px;width:100%;
+  text-align:left;padding:3px 2px 3px 14px}
+.nemundergruppe:hover{color:var(--ink)}
+.nemundergruppe .t{flex:1}
+.nemundergruppe .n{flex:none;font-variant-numeric:tabular-nums}
+/* Undergruppens rækker rykkes ind, så det kan ses hvad der hører under
+   hvad, når flere grupper er foldet ud på én gang. */
+.nemundergruppe .pil{flex:none;display:grid;place-items:center;
+  transition:transform .18s ease}
+.nemundergruppe .pil.lukket{transform:rotate(-90deg)}
 .nembil{width:38px;height:38px;flex:none;border-radius:8px;object-fit:contain;
   background:var(--surface);border:1px solid var(--line)}
 .nemfund .nembil{width:44px;height:44px}
@@ -1568,6 +1577,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
         <button type="button" class="nemstyktilfoej" id="nemvalg-styk-ny">+ Tilføj enhed</button>
         <span class="nemstykhint" id="nemvalg-stykhint"></span>
       </div>
+      <label class="nemvalgrad" id="nemvalg-altidrad">
+        <input type="checkbox" id="nemvalg-altid">
+        <span><b>Køb altid</b><small>står under Faste indkøb — sat til med
+          det retterne kræver, når ugen bruger den</small></span></label>
       <div class="nemstyk" id="nemvalg-altfelt">
         <span class="etiket">Andre varer der kan bruges</span>
         <div id="nemvalg-altliste"></div>
@@ -1819,7 +1832,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.38.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.39.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5688,18 +5701,47 @@ function nemByg(){
     return r;
   };
 
-  const fraPlan = koeb.map(p => lav(p, true)).filter(Boolean);
+  const alle    = koeb.map(p => lav(p, true)).filter(Boolean);
   const fraTjek = tjek.map(p => lav(p, false)).filter(Boolean);
 
-  const faste = nemligVarer
-    .filter(v => v.slags === "fast" && !v.koeb_aldrig)
-    .sort((a, b) => (a.sortering - b.sortering) || a.navn.localeCompare(b.navn, "da"))
+  /* En vare kan være BÅDE ingrediens og fast køb — æg bruges i opskrifter
+     og købes samtidig fast. Før krævede det to rækker med hvert sit navn
+     (unikt indeks på navnet), og varen kunne så optræde to steder i arket
+     og blive købt dobbelt. Nu bærer ingrediens-rækken markeringen
+     `koeb_altid`, og linjen flyttes HERFRA og ned under Faste indkøb —
+     med den mængde ugens retter kræver, og allerede tilvalgt.
+     Ét sted, én linje, intet dobbeltkøb. */
+  const erAltid = l => Boolean(l.kort && l.kort.koeb_altid);
+  const fraPlan = alle.filter(l => !erAltid(l));
+  const altidMedBehov = alle.filter(erAltid)
+    .map(l => Object.assign({}, l, {
+      medtaget: true, fastOgBrugt: true,
+      /* Sættes den til nul og til igen, skal den tilbage til det UDREGNEDE
+         antal — ikke til 1. Otte æg er stadig en bakke. */
+      standardAntal: l.antal
+    }));
+
+  /* Dem der allerede har fået en linje ovenfra, skal ikke også hentes ind
+     som tom fast vare nedenfor. */
+  const altidNavne = new Set(altidMedBehov.map(l => nemNoegle(l.navn)));
+
+  const fasteTomme = nemligVarer
+    /* Både de gamle rene faste varer OG ingredienser markeret koeb_altid,
+       som ugens retter tilfældigvis ikke bruger. De sidste opfører sig
+       som enhver anden fast vare: står der, men er ikke valgt til. */
+    .filter(v => (v.slags === "fast" || v.koeb_altid)
+              && !v.koeb_aldrig && !altidNavne.has(nemNoegle(v.navn)))
     .map(v => ({
       navn: v.navn, behov: null, enhed: "", kilder: "", kort: nemMedUgevalg(v, v.navn),
       ekstra: nemLinjeEkstra(v, v.navn),
       medtaget: false, antal: 0, gaet: false, spring: false,
-      standardAntal: v.standard_antal || 1
+      standardAntal: v.standard_antal || 1,
+      sortering: v.sortering
     }));
+
+  const faste = altidMedBehov.concat(fasteTomme)
+    .sort((a, b) => ((a.sortering || 0) - (b.sortering || 0))
+                 || a.navn.localeCompare(b.navn, "da"));
 
   nemArk = {
     plan: fraPlan,
@@ -5823,6 +5865,10 @@ function nemTegn(){
     if(l.behov != null){
       under = "du skal bruge " + tal(l.behov) + (l.enhed ? " " + boejEnhed(l.enhed, l.behov) : "");
       if(l.gaet){ under += " — kan ikke regnes om"; underGaet = true; }
+      /* En fast vare som ugens retter OGSÅ bruger, står nede blandt de
+         faste. Uden retternes navne ville man ikke kunne se hvorfor den
+         pludselig er sat til — så dem tager vi med her. */
+      if(l.fastOgBrugt && l.kilder) under += " til " + l.kilder;
     } else if(l.kilder){
       under = l.kilder;      // hvilke retter varen kommer fra — ikke en advarsel
     }
@@ -5905,8 +5951,25 @@ function nemTegn(){
     let ud = hoved(titel, liste, gruppe);
     if(nemFoldet.has(gruppe)) return ud;
     for(const g of orden){
-      if(kasser.size > 1) ud += '<div class="nemundergruppe">' + esc(g) + '</div>';
-      ud += kasser.get(g).map(([l, i]) => linje(l, gruppe, i)).join("");
+      /* Hver undergruppe — Køl, Brød, Tørvarer — kan foldes for sig.
+         Nøglen bærer gruppen med, så "faste/Køl" ikke kolliderer med en
+         undergruppe af samme navn et andet sted. */
+      const noegle = gruppe + "/" + g;
+      const lukket = nemFoldet.has(noegle);
+      const raekker = kasser.get(g);
+      if(kasser.size > 1){
+        const med = raekker.filter(([l]) => l.medtaget && !l.spring).length;
+        ud += '<button type="button" class="nemundergruppe" data-nemfold="' + esc(noegle) + '"'
+           +  ' aria-expanded="' + (!lukket) + '">'
+           +  '<span class="pil' + (lukket ? " lukket" : "") + '" aria-hidden="true">'
+           +    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+           +  '</span>'
+           +  '<span class="t">' + esc(g) + '</span>'
+           +  '<span class="n">' + med + " af " + raekker.length + '</span>'
+           +  '</button>';
+        if(lukket) continue;
+      }
+      ud += raekker.map(([l, i]) => linje(l, gruppe, i)).join("");
     }
     return ud;
   };
@@ -6212,6 +6275,7 @@ function nemValgAaben(opsaet){
     enh.value = r.pakke_enhed || "g";
     nemValg.styk = nemStykliste(r);
     nemValg.alt  = nemAlternativer(r);
+    document.getElementById("nemvalg-altid").checked = !!r.koeb_altid;
     document.querySelector('input[name="nemfast"][value="' + (r.fast_valg ? "1" : "0") + '"]').checked = true;
     document.getElementById("nemvalg-erfast").checked = r.slags === "fast";
     document.getElementById("nemvalg-detalje").hidden = false;
@@ -6222,7 +6286,11 @@ function nemValgAaben(opsaet){
     document.getElementById("nemvalg-erfast").checked = nemValg.fastVare;
     nemValg.styk = [];
     nemValg.alt  = [];
+    document.getElementById("nemvalg-altid").checked = false;
   }
+  /* Markeringen giver kun mening på en INGREDIENS. En fast vare er jo
+     allerede et fast køb — der ville fluebenet ikke betyde noget. */
+  document.getElementById("nemvalg-altidrad").hidden = nemValg.fastVare;
 
   document.getElementById("nemvalg-fund").innerHTML = "";
   nemStykTegn();
@@ -6398,6 +6466,7 @@ async function nemValgGem(){
     /* Tomme og halvfaerdige linjer smides vaek foer der gemmes, og er der
        intet tilbage, skrives NULL — saa ser en aeldre udgave af filen
        praecis det den plejer. */
+    koeb_altid: !nemValg.fastVare && document.getElementById("nemvalg-altid").checked,
     alternativer: (nemValg.alt && nemValg.alt.length) ? nemValg.alt : null,
     styk: (() => {
       const r = (nemValg.styk || [])
