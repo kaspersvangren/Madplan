@@ -1938,7 +1938,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.47.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.47.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6293,13 +6293,6 @@ function nemTegn(){
           : l.antal < 1
           ? '<span class="under">tages ikke med</span>'
           : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
-      /* Knappen staar UNDER navnet, ikke i soejlen til hoejre. Soejlen er
-         laast til plus/minus-knappernes bredde (104px), og dér kan ordet
-         "Varianter" ikke vaere — uanset hvordan man pillede ved knappen. */
-      + (flere ? '<button class="nembytknap" data-nemvarianter="' + gruppe + ':' + i + '">'
-                 + ((l.ekstra && l.ekstra.length)
-                     ? l.ekstra.length + 1 + " slags"
-                     : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
       + (() => {
           const klar = nemEkstraKlar(l), vaek = nemEkstraVaek(l);
           return (klar.length
@@ -6313,6 +6306,14 @@ function nemTegn(){
         })()
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
+      /* Knappen staar NEDERST i linjen — under baade behovet og
+         tilbudsteksten, saa den ikke bryder ind i dem. Soejlen til hoejre
+         er laast til plus/minus-knappernes bredde, og dér kan ordet
+         "Varianter" ikke vaere. */
+      + (flere ? '<button class="nembytknap" data-nemvarianter="' + gruppe + ':' + i + '">'
+                 + ((l.ekstra && l.ekstra.length)
+                     ? l.ekstra.length + 1 + " slags"
+                     : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
       + '</span>'
       + '<span class="trin">' + trin(gruppe, i, l.antal, l.uafklaret)
       /* Stykprisen står altid. Køber man flere, står summen for linjen
