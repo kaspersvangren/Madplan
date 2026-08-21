@@ -127,7 +127,10 @@ a.nemliglink{color:var(--accent);font-weight:600;text-decoration:none}
 .katalogstatus{font-size:13px;color:var(--daemp);padding:10px 2px}
 .maerke.ud{background:var(--rod-bg);color:var(--rod)}
 .udprik{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--rod)}
-.daekning{font-size:11px;color:var(--daemp);padding:4px 2px 0}
+.daekning{font-size:11px;color:var(--daemp);min-width:0}
+.katbar{display:flex;align-items:center;gap:10px;padding:6px 2px 0}
+.minik{border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;flex:0 0 auto}
+.minik.stopper{border-color:var(--rod);background:var(--rod-bg);color:var(--rod)}
 
 /* ---------- værktøjslinje ---------- */
 .vaerktoej{position:sticky;top:var(--hovedhoejde,92px);z-index:15;background:var(--papir);padding:10px 0 8px;margin:-4px 0 4px}
@@ -244,7 +247,10 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
       <div class="chips" id="v-grupper"></div>
       <div class="chips" id="v-under" hidden></div>
       <div class="chips" id="v-sorter"></div>
-      <div class="daekning" id="v-daekning" hidden></div>
+      <div class="katbar" id="v-katbar" hidden>
+        <button class="minik" id="v-katknap"></button>
+        <span class="daekning" id="v-daekning"></span>
+      </div>
     </div>
     <div class="kort" id="v-liste"></div>
   </section>
@@ -288,7 +294,7 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
   </section>
 </main>
 
-<div class="version" id="version">v1.1.0</div>
+<div class="version" id="version">v1.2.0</div>
 
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-side="overblik">
@@ -404,6 +410,7 @@ async function hentAlle(tabel, felter, sortering, fremskridt){
 let ORDRER_ALT = [], LINJER_ALT = [];   // alt hentet, uberoert af periode
 let KATALOG = new Map();                // produkt_id -> vareinfo fra Nemlig
 let FOERSTE_KOEB = new Map();           // produkt_id -> allerfoerste koebsdato
+let ALLE_IDER = [];                     // alle varenumre, mest koebte foerst
 let PERIODE = {navn:"Alt", fra:null, til:null};
 let ORDRER = [];   // {id, leveret(Date), beloeb} - inden for perioden
 let LINJER = [];   // {ordre_id, produkt_id, navn, beskrivelse, antal, beloeb, rabat, gruppe, dato}
@@ -459,6 +466,10 @@ async function hentData(){
     const f = FOERSTE_KOEB.get(l.produkt_id);
     if(!f || l.dato < f) FOERSTE_KOEB.set(l.produkt_id, l.dato);
   });
+
+  const antalKoeb = new Map();
+  LINJER_ALT.forEach(l => antalKoeb.set(l.produkt_id, (antalKoeb.get(l.produkt_id)||0) + 1));
+  ALLE_IDER = [...antalKoeb.entries()].sort((a,b)=> b[1]-a[1]).map(x => x[0]);
 
   tekst.textContent = "Henter vareinfo \u2026";
   await hentKatalog();
@@ -606,16 +617,18 @@ function tegnAlt(){
   tegnVarer();
   tegnOrdrer();
   tegnFund();
+  opdaterKatbar();
 }
 
 /* =====================================================================
    2c. VAREKATALOG - billeder, mærke, undergruppe og udgåede varer
    ===================================================================== */
-const KAT_HOLD = 25;        // varenumre pr. kald
-const KAT_PAUSE = 5000;     // pause mellem kald - hans ønske, ikke et sekund
-const KAT_RUNDER = 4;       // højst fire kald pr. besøg = 100 varer
+const KAT_HOLD = 30;        // varenumre pr. kald - funktionens egen grænse
+const KAT_PAUSE = 2000;     // pause når den fylder op af sig selv
+const KAT_RUNDER = 8;       // pr. besøg = 240 varer uden at han gør noget
+const KAT_FART = 1200;      // pause når HAN selv trykker "hent resten"
 const KAT_DAGE = 30;        // hvornår en post regnes for gammel
-let katalogKoerer = false, katalogFejl = null;
+let katalogKoerer = false, katalogStop = false, katalogFejl = null;
 
 const blund = ms => new Promise(r => setTimeout(r, ms));
 
@@ -650,21 +663,84 @@ async function topOp(){
   try{
     for(let runde = 0; runde < KAT_RUNDER; runde++){
       if(document.hidden) break;
-      const mangler = [];
-      for(const v of VARER){
-        if(mangler.length >= KAT_HOLD) break;
-        if(!KATALOG.has(v.id)) mangler.push(v.id);
-      }
+      const mangler = manglerNu();
       if(!mangler.length) break;
       await kaldKatalog(mangler);
-      tegnVarefiltre(); tegnVarer();
-      if(runde < KAT_RUNDER-1) await blund(KAT_PAUSE);
+      efterHold();
+      if(runde < KAT_RUNDER-1 && manglerNu().length) await blund(KAT_PAUSE);
     }
   }catch(e){
     katalogFejl = String(e.message||e);
-    tegnVarefiltre();
   }
   katalogKoerer = false;
+  efterHold();
+}
+
+/* Trækker fra ALLE varenumre, mest købte først - ikke kun dem der ligger
+   i den valgte periode. Ellers ville katalogget aldrig blive helt fyldt. */
+function manglerNu(){
+  const ud = [];
+  for(const id of ALLE_IDER){
+    if(ud.length >= KAT_HOLD) break;
+    if(!KATALOG.has(id)) ud.push(id);
+  }
+  return ud;
+}
+
+function efterHold(){
+  tegnVarefiltre();
+  tegnVarer();
+  opdaterKatbar();
+}
+
+/* Han kan selv sætte farten op, når han sidder med den. Ét tryk kører
+   videre til katalogget er fyldt, og samme knap stopper igen. */
+async function hentResten(){
+  if(katalogKoerer){ katalogStop = true; opdaterKatbar(); return; }
+  katalogStop = false;
+  katalogKoerer = true;
+  katalogFejl = null;
+  opdaterKatbar();
+  try{
+    while(!katalogStop){
+      const mangler = manglerNu();
+      if(!mangler.length) break;
+      await kaldKatalog(mangler);
+      efterHold();
+      if(!katalogStop && manglerNu().length) await blund(KAT_FART);
+    }
+  }catch(e){
+    katalogFejl = String(e.message||e);
+  }
+  katalogKoerer = false;
+  efterHold();
+}
+
+function opdaterKatbar(){
+  const bar = el("v-katbar"), knap = el("v-katknap"), note = el("v-daekning");
+  if(!bar) return;
+  const mangler = ALLE_IDER.filter(id => !KATALOG.has(id)).length;
+  const hentet = ALLE_IDER.length - mangler;
+
+  bar.hidden = false;
+  knap.classList.toggle("stopper", katalogKoerer && !katalogFejl);
+
+  if(katalogFejl){
+    knap.hidden = false;
+    knap.textContent = "Prøv igen";
+    note.textContent = "Vareinfo kunne ikke hentes: " + katalogFejl;
+  }else if(katalogKoerer){
+    knap.hidden = false;
+    knap.textContent = katalogStop ? "Stopper …" : "Stop";
+    note.textContent = "Henter … " + hentet + " af " + ALLE_IDER.length + " varer";
+  }else if(!mangler){
+    knap.hidden = true;
+    note.textContent = "Vareinfo er hentet for alle " + ALLE_IDER.length + " varer.";
+  }else{
+    knap.hidden = false;
+    knap.textContent = "Hent resten (" + mangler + ")";
+    note.textContent = hentet + " af " + ALLE_IDER.length + " varer har vareinfo.";
+  }
 }
 
 /* =====================================================================
@@ -810,7 +886,7 @@ function tegnVarefiltre(){
    som fylder sig selv op lidt ad gangen. Derfor vises båndet først når
    der er noget at vælge imellem, og det siger hvor meget det dækker. */
 function tegnUnderfiltre(){
-  const baand = el("v-under"), note = el("v-daekning");
+  const baand = el("v-under");
   const grundlag = vGruppe === "alle" ? VARER : VARER.filter(v => v.gruppe === vGruppe);
   const kendte = grundlag.filter(v => {
     const k = KATALOG.get(v.id);
@@ -819,24 +895,12 @@ function tegnUnderfiltre(){
   const navne = [...new Set(kendte.map(v => KATALOG.get(v.id).undergruppe_navn))]
                   .sort((a,b)=> a.localeCompare(b,"da"));
 
-  if(katalogFejl){
-    baand.hidden = true; note.hidden = false;
-    note.textContent = "Vareinfo kunne ikke hentes: " + katalogFejl;
-    return;
-  }
-  if(navne.length < 2){
-    baand.hidden = true; note.hidden = false;
-    note.textContent = "Undergrupper dukker op, efterhånden som vareinfo hentes ("+
-      kendte.length+" af "+grundlag.length+" varer indtil videre).";
-    return;
-  }
+  if(navne.length < 2){ baand.hidden = true; return; }
   if(!navne.includes(vUnder)) vUnder = "alle";
   baand.hidden = false;
   baand.innerHTML = '<button class="chip" data-u="alle" aria-pressed="'+(vUnder==="alle")+
     '">Alle undergrupper</button>' + navne.map(n =>
     '<button class="chip" data-u="'+esc(n)+'" aria-pressed="'+(vUnder===n)+'">'+esc(n)+'</button>').join("");
-  note.hidden = false;
-  note.textContent = "Dækker "+kendte.length+" af "+grundlag.length+" varer.";
 }
 
 function tegnVarer(){
@@ -1145,6 +1209,7 @@ el("h-perioder").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if(!b) return;
   vaelgPeriode(b.dataset.p);
 });
+el("v-katknap").addEventListener("click", hentResten);
 el("p-fra").addEventListener("change", egenPeriode);
 el("p-til").addEventListener("change", egenPeriode);
 
