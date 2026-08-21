@@ -7819,9 +7819,13 @@ function skrivSpor(hvad){
   if(!e){
     e = document.createElement("div");
     e.id = "sporbar";
-    e.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;"
+    /* OEVERST — nederst daekkede den fanebjaelken, saa der ikke kunne
+       skiftes fane. Klik paa striben skjuler den. */
+    e.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:9999;"
       + "background:#111;color:#0f0;font:11px/1.35 monospace;padding:5px 7px;"
-      + "white-space:pre-wrap;max-height:38vh;overflow:auto";
+      + "white-space:pre-wrap;max-height:34vh;overflow:auto;opacity:.94";
+    e.title = "tryk for at skjule";
+    e.addEventListener("click", () => { e.style.display = "none"; });
     document.body.appendChild(e);
   }
   e.textContent = spor.join("\n");
