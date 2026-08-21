@@ -1946,7 +1946,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.51.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.52.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5165,9 +5165,7 @@ function render(){
      noget at bruge — ellers lukker den appen. Det ligger HER og ikke i
      saetFane, fordi man også forlader forsiden ved at skifte dag eller
      visning, ikke kun ved at skifte fane. */
-  if(typeof arkSkridt !== "undefined" && !arkSkridt && !erForsiden()){
-    try{ history.pushState({ ark: true }, ""); arkSkridt = true; }catch(e){}
-  }
+  if(typeof vagtOpdater === "function") vagtOpdater();
   opdaterTodoTal();          // tal og mærke skal passe uanset hvilken fane man står på
   if(fane === "madplan" || fane === "indkoeb"){
     const start = fane === "madplan" ? madplanUge : indkoebUge;
@@ -7755,34 +7753,53 @@ let openEventDato = "";
 
    Der lægges ét skridt ind, ikke ét pr. ark, fordi Escape også lukker
    dem alle på én gang. To knapper, samme opførsel.                    */
-let arkSkridt = false;    // har vi lagt et skridt i historikken?
+/* Vagtskridtet i historikken.
+
+   FØR holdt jeg styr på det i en variabel — og den kunne komme ud af trit
+   med browserens virkelige historik. Så virkede tilbage kun én gang, og
+   næste tryk røg ud af appen. Nu er BROWSEREN facit: skridtet kendes på
+   `history.state.vagt`, og der kan aldrig ligge mere end ét.
+
+   Reglen er enkel: så længe appen ikke står i sin grundstilling — altså
+   forsiden uden åbne ark — skal der ligge et vagtskridt. Efter HVER gang
+   tilbage er brugt, lægges der et nyt, hvis der stadig er noget at gå
+   tilbage fra.                                                          */
 let arkSpring = false;    // spring næste popstate over (vores egen back)
 
 const arkAabne = () => document.querySelectorAll(".backdrop.open").length;
+const harVagt  = () => !!(history.state && history.state.vagt);
 
 function arkLukAlle(){
   document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
   if(typeof closeDropdown === "function") closeDropdown();
 }
 
-/* Ryd skridtet op, når sidste ark er lukket på almindelig vis — ellers
-   ville et tryk på tilbage bagefter ikke gøre noget synligt.
+/* Står vi på forsiden — kalenderfanen, dagsvisning, dags dato — uden
+   åbne ark? Så er der ikke mere at gå tilbage fra inde i appen. */
+function erForsiden(){
+  return fane === "kalender" && view === "day" && iso(cursor) === iso(new Date());
+}
+const appErHjemme = () => !arkAabne() && erForsiden();
+
+/* Læg et vagtskridt hvis der mangler et — og kun hvis der er noget at
+   vogte. Kaldes fra render() og show(), så den fanger både fane-, dag-
+   og visningsskift og åbne ark. */
+function vagtOpdater(){
+  if(appErHjemme() || harVagt()) return;
+  try{ history.pushState({ vagt: true }, ""); }catch(e){}
+}
+
+/* Er alt lukket og vi er hjemme, skal vagtskridtet væk igen — ellers
+   ville et tryk på tilbage bare gøre ingenting.
    Ventetiden er med vilje: nogle steder lukkes ét ark og åbnes et andet
    i samme åndedrag, og så skal skridtet blive liggende. */
 function arkRyd(){
   setTimeout(() => {
-    if(arkSkridt && !arkAabne()){
-      arkSkridt = false;
+    if(harVagt() && appErHjemme()){
       arkSpring = true;
       history.back();
     }
   }, 0);
-}
-
-/* Står vi på forsiden — kalenderfanen, dagsvisning, dags dato? Det er
-   appens grundstilling, og først DER skal tilbage forlade appen. */
-function erForsiden(){
-  return fane === "kalender" && view === "day" && iso(cursor) === iso(new Date());
 }
 
 window.addEventListener("popstate", () => {
@@ -7791,43 +7808,26 @@ window.addEventListener("popstate", () => {
   /* 1. Et åbent ark lukkes først. */
   if(arkAabne()){
     arkLukAlle();
-    arkSkridt = false;
-    arkSkridtIgen();
-    return;
   }
-
-  /* 2. Er vi et andet sted i appen — en anden fane, en anden dag, en
-     anden visning — går vi hjem til i dag i stedet for at lukke appen.
-     Det er den samme knap som husikonet bruger. */
-  if(!erForsiden()){
-    /* Skridtet er BRUGT — det skal nulstilles FØR vi går hjem, ellers
-       tror appen bagefter at der stadig ligger et i historikken, og så
-       lægger render() aldrig et nyt. Så virkede tilbage kun én gang:
-       anden gang røg man ud af appen. */
-    arkSkridt = false;
+  /* 2. Ellers: er vi et andet sted i appen, går vi hjem til i dag —
+        samme sted som husikonet fører til. */
+  else if(!erForsiden()){
     goHome();
     render();
-    return;
   }
+  /* 3. Står vi allerede hjemme, gør vi ingenting, og browseren forlader
+        appen som den plejer. */
 
-  /* 3. Står vi på forsiden, gør vi ingenting, og browseren forlader
-     appen som den plejer. */
+  /* Er der stadig noget at gå tilbage fra, lægges et nyt vagtskridt.
+     Det er DET her, der manglede før, og som gjorde at tilbage kun
+     virkede én gang. */
+  vagtOpdater();
 });
-
-/* Efter et lukket ark: står vi stadig et andet sted end forsiden, skal
-   der ligge et nyt skridt, så næste tryk kan bruges på at gå hjem. */
-function arkSkridtIgen(){
-  if(erForsiden()) return;
-  try{ history.pushState({ ark: true }, ""); arkSkridt = true; }catch(e){}
-}
 
 const show = id => {
   const back = document.getElementById(id);
-  const foerste = !arkAabne();
   back.classList.add("open");
-  if(foerste && !arkSkridt){
-    try{ history.pushState({ ark: true }, ""); arkSkridt = true; }catch(e){}
-  }
+  vagtOpdater();
   const ark = back.querySelector(".sheet");
   if(ark){
     ark.scrollTop = 0;
