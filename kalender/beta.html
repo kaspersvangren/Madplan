@@ -998,6 +998,9 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* "og 1 × Iceberg" — de øvrige varer på samme linje. Egen tone, så den
    ikke forveksles med behovet ovenover eller med kurv-mærket. */
 .nemogsaa{display:block;font-size:12.5px;color:var(--lev);margin-top:2px}
+/* En variant der er udsolgt falder fra. Den nævnes, men i dæmpet farve —
+   den spærrer ikke, den forsvinder bare. */
+.nemogsaa.udgaar{color:var(--muted)}
 /* Linjesummen står tættere på og lidt kraftigere end stykprisen — det er
    den man leder efter, når der er skruet op. */
 .nemrad .under.sum{color:var(--ink);font-variant-numeric:tabular-nums;margin-top:1px}
@@ -1051,6 +1054,9 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* Venter på svar: rammen og tallet træder frem. */
 .nemtrin.spoerg{border-color:var(--holiday)}
 .nemtrin.spoerg .tal{color:var(--holiday);font-weight:700}
+.nemundertitel{font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);font-weight:700;margin:14px 0 4px;padding:0 2px}
+.nemundertitel:first-child{margin-top:2px}
 .nemgruppefilter{display:block;width:100%;text-align:left;font-size:12.5px;
   color:var(--muted);padding:7px 2px 8px;border-bottom:1px solid var(--line)}
 .nemgruppefilter:hover{color:var(--ink)}
@@ -1646,7 +1652,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
         <span><b>Køb altid</b><small>står under Faste indkøb — sat til med
           det retterne kræver, når ugen bruger den</small></span></label>
       <div class="nemstyk" id="nemvalg-altfelt">
-        <span class="etiket">Andre varer der kan bruges</span>
+        <span class="etiket">Varianter</span>
         <div id="nemvalg-altliste"></div>
         <span class="nemstykhint" id="nemvalg-althint"></span>
       </div>
@@ -1681,7 +1687,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 <!-- Nemlig: erstat en vare, KUN for denne uge -->
 <div class="backdrop" id="nemerstat-back">
   <div class="sheet" role="dialog" aria-modal="true">
-    <h2>Erstat for denne uge</h2>
+    <h2>Udskift for denne uge</h2>
     <div class="meta" id="nemerstat-meta"></div>
     <div class="nempakke">
       <input type="text" id="nemerstat-tekst" placeholder="Søg efter en erstatning" style="flex:1">
@@ -1697,11 +1703,11 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 <!-- Nemlig: byt til et andet produkt for DENNE uge -->
 <div class="backdrop" id="nembyt-back">
   <div class="sheet" role="dialog" aria-modal="true">
-    <h2 id="nembyt-titel">Vælg vare til denne uge</h2>
+    <h2 id="nembyt-titel">Varianter</h2>
     <div class="meta" id="nembyt-meta"></div>
     <div id="nembyt-krop"></div>
     <div class="actions">
-      <button class="btn" id="nembyt-soeg">Søg efter en anden</button>
+      <button class="btn" id="nembyt-soeg">Tilføj en variant</button>
       <button class="btn primary" id="nembyt-luk">Luk</button>
     </div>
   </div>
@@ -1912,7 +1918,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.45.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.46.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5565,7 +5571,7 @@ function nemMedUgevalg(kort, navn){
    søgning efter erstatning for pålæg gav chips og fodcreme.          */
 let nemErstat = null;   // {sti, navn, grund, fund, kunGruppe}
 
-function nemErstatAaben(sti){
+function nemUdskiftAaben(sti){
   const { l } = nemLinje(sti);
   if(!l) return;
   const grund = nemFind(l.navn) || l.kort;
@@ -5593,10 +5599,44 @@ async function nemErstatSoeg(){
   }
 }
 
+/* De gemte varianter staar OEVERST i Udskift-arket — det er som regel dem
+   man vil have, og saa slipper man for at soege. Den vare linjen allerede
+   viser er ikke med (den er jo netop den der ikke duer), og udsolgte
+   muligheder vises nedtonet og kan IKKE vaelges. */
+function nemUdskiftGemte(){
+  if(!nemErstat) return "";
+  const l = nemLinje(nemErstat.sti).l || {};
+  const nu = String((l.kort || {}).produkt_id || "");
+  const andre = nemMuligheder(nemErstat.grund).filter(m => m.produkt_id !== nu);
+  if(!andre.length) return "";
+
+  return '<div class="nemundertitel">Gemte varianter</div>'
+    + andre.map(m => {
+        const p = nemArk && nemArk.priser[m.produkt_id];
+        const vaek = (p && !p.paaLager) || nemArk.findesIkke.includes(m.produkt_id);
+        const pakke = m.pakke_maengde
+          ? tal(Number(m.pakke_maengde)) + " " + (m.pakke_enhed || "") : "";
+        const bil = (p && p.billede) || m.billede;
+        return '<button class="nemfund"' + (vaek ? " disabled" : "")
+          + ' data-nemudskiftvalg="' + esc(m.produkt_id) + '"'
+          + (vaek ? ' style="opacity:.45"' : "") + '>'
+          + (bil ? '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">' : "")
+          + '<span class="v"><span>' + esc(m.produkt_navn || nemErstat.navn) + '</span>'
+          + '<span class="under">' + esc([pakke, m.standard ? "standard" : ""].filter(Boolean).join(" · "))
+          + (vaek ? ' <span class="udsolgt">udsolgt — kan ikke vælges</span>' : "") + '</span></span>'
+          + '<span class="pris">' + (p ? nemKr(p.pris) : "") + '</span></button>';
+      }).join("")
+    + '<div class="nemundertitel">Eller søg efter en anden</div>';
+}
+
 function nemErstatTegn(){
   const ud = document.getElementById("nemerstat-fund");
   if(!nemErstat) return;
-  if(!nemErstat.fund.length){ ud.innerHTML = '<div class="nemtom">Ingen varer fundet.</div>'; return; }
+  const gemte = nemUdskiftGemte();
+  if(!nemErstat.fund.length){
+    ud.innerHTML = gemte + '<div class="nemtom">Ingen varer fundet.</div>';
+    return;
+  }
 
   const maal = nemGruppeAf(nemErstat.grund);
   const harMaal = maal && (maal.hoved || maal.mellem || maal.under);
@@ -5605,7 +5645,7 @@ function nemErstatTegn(){
   const vist = filtrer ? passer : nemErstat.fund;
   const skjulte = nemErstat.fund.length - passer.length;
 
-  ud.innerHTML =
+  ud.innerHTML = gemte +
     ((harMaal && skjulte > 0)
       ? '<button type="button" class="nemgruppefilter" id="nemerstat-filter">'
         + (filtrer ? "Viser kun varer i samme gruppe · vis alle " + nemErstat.fund.length
@@ -5663,6 +5703,31 @@ function nemErstatVaelg(i){
   nemHentPriser().then(nemTegn);
   nemTegn();
   nemStandOpdater();
+}
+
+/* En gemt variant valgt i Udskift: sæt den som ugens vare og luk. Den er
+   allerede kendt af varen, så der er intet at gemme. */
+function nemUdskiftGemtValgt(produktId){
+  if(!nemErstat) return;
+  const { l } = nemLinje(nemErstat.sti);
+  if(!l) return;
+  const standardId = String(nemErstat.grund.produkt_id || "");
+  nemUgeSaet(nemErstat.navn, produktId === standardId ? null : produktId);
+  /* Har varen ogsaa staaet som en EKSTRA variant, skal den ud derfra —
+     ellers ville den baade vaere linjens vare og ligge ved siden af. */
+  nemUgeEkstraSaet(nemErstat.navn, produktId, 0);
+  l.kort = nemMedUgevalg(nemErstat.grund, nemErstat.navn);
+  l.ekstra = nemLinjeEkstra(nemErstat.grund, nemErstat.navn);
+  l.spring = false;
+  if(l.behov != null){
+    const a = nemAntal(l.behov, l.enhed, Number(l.kort.pakke_maengde), l.kort.pakke_enhed, l.kort);
+    l.antal = a.antal; l.gaet = a.gaet;
+  }
+  if(l.antal < 1){ l.antal = 1; l.medtaget = true; }
+  hide("nemerstat-back");
+  nemErstat = null;
+  nemHentPriser().then(nemTegn);
+  nemTegn();
 }
 
 /* Skriver alternativerne tilbage i basen, saa erstatningen ogsaa er der
@@ -6075,6 +6140,20 @@ function nemTilstand(l){
   return "klar";
 }
 
+/* En udsolgt VARIANT spærrer ikke linjen — man har jo allerede sagt ja til
+   de øvrige. Den falder fra med en note, og resten går igennem. Kun
+   linjens EGEN vare kan blokere; det er nemTilstand ovenfor. */
+function nemEkstraVaek(l){
+  return (l.ekstra || []).filter(e => {
+    const p = nemArk.priser[e.produkt_id];
+    return (p && !p.paaLager) || nemArk.findesIkke.includes(e.produkt_id);
+  });
+}
+function nemEkstraKlar(l){
+  const vaek = new Set(nemEkstraVaek(l).map(e => e.produkt_id));
+  return (l.ekstra || []).filter(e => !vaek.has(e.produkt_id));
+}
+
 /* ---------- Tegn arket ---------- */
 function nemTegn(){
   const krop = document.getElementById("nem-krop");
@@ -6138,11 +6217,14 @@ function nemTegn(){
         +     (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
         +   '</span>'
         + '</span>'
+        /* KUN Udskift her. Man tilføjer ikke smagsvarianter til noget der
+           ikke kan købes — Varianter hører til på en linje der er i orden.
+           Er varen slet ikke kortlagt, skal man derimod redigere den
+           rigtigt, og så hedder knappen "find vare". */
         + '<span class="knapper">'
-        +   (kanByttes
-              ? '<button class="loes" data-nembytaabn="' + gruppe + ':' + i + '">byt</button>' : "")
-        +   '<button class="loes" data-nemerstat="' + gruppe + ':' + i + '">'
-        +     (tilstand === "ukendt" ? "find vare" : "erstat") + '</button>'
+        +   (tilstand === "ukendt"
+              ? '<button class="loes" data-nemloes="' + gruppe + ':' + i + '">find vare</button>'
+              : '<button class="loes" data-nemudskift="' + gruppe + ':' + i + '">Udskift</button>')
         +   '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">spring over</button>'
         + '</span></div>';
     }
@@ -6191,9 +6273,17 @@ function nemTegn(){
           : l.antal < 1
           ? '<span class="under">tages ikke med</span>'
           : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
-      + ((l.ekstra && l.ekstra.length)
-          ? '<span class="nemogsaa">og ' + esc(l.ekstra.map(e =>
-              e.antal + " × " + (e.produkt_navn || "vare")).join(", ")) + '</span>' : "")
+      + (() => {
+          const klar = nemEkstraKlar(l), vaek = nemEkstraVaek(l);
+          return (klar.length
+            ? '<span class="nemogsaa">og ' + esc(klar.map(e =>
+                e.antal + " × " + (e.produkt_navn || "vare")).join(", ")) + '</span>' : "")
+            + (vaek.length
+            ? '<span class="nemogsaa udgaar">' + esc(vaek.map(e =>
+                e.produkt_navn || "vare").join(", "))
+              + (vaek.length === 1 ? " er udsolgt og udgår" : " er udsolgte og udgår")
+              + '</span>' : "");
+        })()
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
       + '</span>'
@@ -6213,9 +6303,13 @@ function nemTegn(){
             + '" style="text-align:right">' + esc(l.antal) + " × = "
             + nemKr(r.sum) + ' kr</span>';
         })()
-      + (flere ? '<button class="nembytknap" data-nembytaabn="' + gruppe + ':' + i + '">'
-                 + ((l.ekstra && l.ekstra.length) ? "flere valgt"
-                     : l.kort._byttet ? "byttet" : "byt") + '</button>' : "")
+      /* Varianter: flere slags af den samme vare på én linje. Majskiks i
+         tre smage, salat som hjerte og iceberg. Vises kun når varen har
+         gemte alternativer. */
+      + (flere ? '<button class="nembytknap" data-nemvarianter="' + gruppe + ':' + i + '">'
+                 + ((l.ekstra && l.ekstra.length)
+                     ? l.ekstra.length + 1 + " slags"
+                     : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
       + '</span></div>';
   };
 
@@ -6518,7 +6612,7 @@ function nemSendeliste(){
     ud.set(id, (ud.get(id) || 0) + l.antal);      // samme vare lægges sammen
     /* Har man valgt en af hver — fx både hjertesalat og iceberg — er de
        ekstra varer selvstændige varenumre og lægges sammen på lige fod. */
-    (l.ekstra || []).forEach(e => {
+    nemEkstraKlar(l).forEach(e => {
       ud.set(e.produkt_id, (ud.get(e.produkt_id) || 0) + e.antal);
     });
   });
@@ -7217,12 +7311,14 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
     if(l){ l.spring = !l.spring; nemTegn(); }
     return;
   }
-  const byt = ev.target.closest("[data-nembytaabn]");
-  if(byt){ nemBytAaben(byt.dataset.nembytaabn); return; }
-  /* "erstat" = kun for denne uge. At en vare er udsolgt én uge maa ikke
-     aendre standardvaren for altid; dertil er "vaelg ny". */
-  const erstat = ev.target.closest("[data-nemerstat]");
-  if(erstat){ nemErstatAaben(erstat.dataset.nemerstat); return; }
+  const varianter = ev.target.closest("[data-nemvarianter]");
+  if(varianter){ nemBytAaben(varianter.dataset.nemvarianter); return; }
+  const udskift = ev.target.closest("[data-nemudskift]");
+  if(udskift){ nemUdskiftAaben(udskift.dataset.nemudskift); return; }
+  /* Udskift = kun for denne uge. At en vare er udsolgt én uge maa ikke
+     aendre standardvaren for altid. Er varen slet ikke kortlagt, er det
+     derimod "find vare", som redigerer kortlaegningen rigtigt. */
+
 
   const loes = ev.target.closest("[data-nemloes]");
   if(loes){
@@ -7358,6 +7454,10 @@ document.getElementById("nemerstat-fund").addEventListener("click", ev => {
     nemErstatTegn();
     return;
   }
+  /* En gemt variant valgt: den ERSTATTER linjens vare for denne uge.
+     Ikke "en af hver" — det er dét Varianter er til. */
+  const g = ev.target.closest("[data-nemudskiftvalg]");
+  if(g){ nemUdskiftGemtValgt(g.dataset.nemudskiftvalg); return; }
   const v = ev.target.closest("[data-nemerstatvalg]");
   if(v) nemErstatVaelg(Number(v.dataset.nemerstatvalg));
 });
