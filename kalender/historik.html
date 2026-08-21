@@ -35,6 +35,7 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 
 /* ---------- login ---------- */
 #login{position:fixed;inset:0;z-index:80;background:var(--papir);display:flex;align-items:center;justify-content:center;padding:24px}
+#login[hidden],#hent[hidden]{display:none!important}
 #login .boks{width:100%;max-width:340px}
 #login h1{font-size:26px;margin-bottom:4px}
 #login p{color:var(--daemp);font-size:14px;margin:0 0 22px}
@@ -255,7 +256,7 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
   </section>
 </main>
 
-<div class="version" id="version">v1.0.0</div>
+<div class="version" id="version">v1.0.1</div>
 
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-side="overblik">
@@ -882,6 +883,8 @@ el("l-knap").addEventListener("click", async () => {
     await logInd(mail, kode);
     try{ localStorage.setItem("historik-mail", mail); }catch(e){}
     el("login").hidden = true;
+    el("l-knap").disabled = false; el("l-knap").textContent = "Log ind";
+    el("l-kode").value = "";
     await start();
   }catch(err){
     el("l-fejl").textContent = String(err.message||err);
