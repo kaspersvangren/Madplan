@@ -1000,6 +1000,14 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nembytnote{font-size:12.5px;color:var(--muted);padding:10px 4px 0;line-height:1.45}
 /* "og 1 × Iceberg" — de øvrige varer på samme linje. Egen tone, så den
    ikke forveksles med behovet ovenover eller med kurv-mærket. */
+/* Billigere vej til samme behov. Egen tone — det er hverken et tilbud
+   fra Nemlig eller en advarsel, men et forslag man selv kan tage stilling
+   til. Samme grøn som tilbud, så pengene hænger sammen visuelt. */
+.nembillig{display:block;font-size:12.5px;color:var(--mad);margin-top:2px;
+  font-weight:600}
+.nembytrad.billig{background:color-mix(in srgb, var(--mad) 9%, transparent);
+  border-radius:9px;padding-left:8px;padding-right:8px}
+.nembytrad.billig .u{color:var(--mad);font-weight:600}
 .nemogsaa{display:block;font-size:12.5px;color:var(--lev);margin-top:2px;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 /* En variant der udgår skal kunne SES — den forsvinder jo fra ordren.
@@ -1938,7 +1946,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.50.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.51.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5794,6 +5802,7 @@ function nemBytTegn(){
   const ekstra = {};
   (l.ekstra || []).forEach(e => { ekstra[e.produkt_id] = e.antal; });
   const muligheder = nemMuligheder(nemByt.grund);
+  const billig = nemBilligere(l);
 
   /* Hver mulighed har sit eget antal. Den der står på 1 eller mere er
      den linjen viser; sætter man to op, købes der en af hver. Mindst én
@@ -5808,7 +5817,12 @@ function nemBytTegn(){
     const bil = (p && p.billede) || m.billede;
     const dele = [pakke, m.standard ? "standard" : ""].filter(Boolean);
     if(p && !p.paaLager) dele.push("udsolgt");
-    return '<div class="nembytrad' + (antal > 0 ? " med" : "") + '">'
+    /* Er DENNE variant den billigere vej til behovet, mærkes den — så man
+       kan se hvad noten på linjen handlede om. */
+    const erBillig = billig && billig.bedst.m.produkt_id === m.produkt_id;
+    if(erBillig) dele.push(billig.bedst.antal + " stk dækker behovet");
+    return '<div class="nembytrad' + (antal > 0 ? " med" : "")
+      + (erBillig ? " billig" : "") + '">'
       + (bil ? '<img src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
              : '<span style="width:44px;flex:none"></span>')
       + '<span class="v"><span class="n">' + esc(m.produkt_navn || nemByt.navn) + '</span>'
@@ -6327,6 +6341,13 @@ function nemTegn(){
         })()
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
+      /* Findes der en billigere vej til samme behov, siges det HER — som
+         en oplysning, ikke som noget der skal handles på. Man går selv
+         ind i Varianter, hvis man vil skifte. */
+      + (() => {
+          const b = nemBilligere(l);
+          return b ? '<span class="nembillig">' + esc(nemBilligereTekst(b)) + '</span>' : "";
+        })()
       /* Knappen staar NEDERST i linjen — under baade behovet og
          tilbudsteksten, saa den ikke bryder ind i dem. Soejlen til hoejre
          er laast til plus/minus-knappernes bredde, og dér kan ordet
@@ -6616,6 +6637,64 @@ function nemLinjePris(produktId, antal){
     }
   }
   return { sum: p.pris * antal, tilbud: false };
+}
+
+/* ---------- Findes der en billigere måde at dække behovet? ----------
+   Appen VÆLGER ikke — den siger til. En mindre pakning kan sagtens være
+   dyrere, og pris og pakkestørrelse er to forskellige ting.
+
+   Kun varer sat til ÅBEN. Er varen sat til FAST VALG, tier vi stille:
+   det er dér man sætter de varer man køber med vilje, som de øko hakkede
+   tomater, hvor den billige udgave kun er en nødløsning ved udsolgt.
+
+   Grænsen er 10 %. Uden den ville den brokke sig over halvtreds øre. */
+const NEM_BILLIGERE = 0.10;
+
+function nemBilligere(l){
+  if(!l || l.behov == null || !l.kort) return null;
+  const grund = nemFind(l.navn) || l.kort;
+  if(!grund || grund.fast_valg) return null;          // fast valg: ti stille
+
+  const muligheder = nemMuligheder(grund);
+  if(muligheder.length < 2) return null;
+
+  /* Hvad koster hver mulighed for at dække DETTE behov? Antallet regnes
+     med varens egen pakkestørrelse, prisen med mængderabat. */
+  const bud = [];
+  for(const m of muligheder){
+    const p = nemArk.priser[m.produkt_id];
+    if(!p || p.pris == null || !p.paaLager) continue;
+    if(nemArk.findesIkke.includes(m.produkt_id)) continue;
+    const a = nemAntal(l.behov, l.enhed, Number(m.pakke_maengde), m.pakke_enhed, m);
+    if(a.gaet) continue;              // kan ikke regnes om: ikke sammenlignelig
+    const r = nemLinjePris(m.produkt_id, a.antal);
+    if(r.sum == null) continue;
+    bud.push({ m, antal: a.antal, sum: r.sum });
+  }
+  if(bud.length < 2) return null;
+
+  const nuId = String((l.kort || {}).produkt_id || "");
+  const nu = bud.find(x => x.m.produkt_id === nuId);
+  if(!nu) return null;
+
+  /* Er den vi bruger allerede billigst, siges der INTET — hans regel. */
+  const bedst = bud.reduce((a, b) => b.sum < a.sum ? b : a);
+  if(bedst.m.produkt_id === nuId) return null;
+  if(nu.sum <= 0) return null;
+  const spar = nu.sum - bedst.sum;
+  if(spar / nu.sum < NEM_BILLIGERE) return null;
+
+  return { bedst, nu, spar, alle: bud };
+}
+
+/* Kort tekst til linjen: hvad man skulle købe i stedet, og hvad det koster. */
+function nemBilligereTekst(b){
+  const m = b.bedst.m;
+  const pakke = m.pakke_maengde
+    ? tal(Number(m.pakke_maengde)) + " " + (m.pakke_enhed || "") : "";
+  return "billigere: " + b.bedst.antal + " × " + (pakke || m.produkt_navn || "vare")
+    + " = " + nemKr(b.bedst.sum) + " mod " + nemKr(b.nu.sum)
+    + " · spar " + nemKr(b.spar);
 }
 
 /* Hvad koster det, der er valgt? Regnes af NØJAGTIG samme liste som den
