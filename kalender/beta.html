@@ -1946,7 +1946,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.51.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.51.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7800,9 +7800,13 @@ window.addEventListener("popstate", () => {
      anden visning — går vi hjem til i dag i stedet for at lukke appen.
      Det er den samme knap som husikonet bruger. */
   if(!erForsiden()){
+    /* Skridtet er BRUGT — det skal nulstilles FØR vi går hjem, ellers
+       tror appen bagefter at der stadig ligger et i historikken, og så
+       lægger render() aldrig et nyt. Så virkede tilbage kun én gang:
+       anden gang røg man ud af appen. */
+    arkSkridt = false;
     goHome();
     render();
-    arkSkridtIgen();
     return;
   }
 
@@ -7810,9 +7814,8 @@ window.addEventListener("popstate", () => {
      appen som den plejer. */
 });
 
-/* Efter vi har brugt et skridt, lægger vi et nyt ind — ellers ville
-   næste tryk på tilbage ryge direkte ud, selv om man nu står et sted
-   hvor der stadig er noget at gå tilbage fra. */
+/* Efter et lukket ark: står vi stadig et andet sted end forsiden, skal
+   der ligge et nyt skridt, så næste tryk kan bruges på at gå hjem. */
 function arkSkridtIgen(){
   if(erForsiden()) return;
   try{ history.pushState({ ark: true }, ""); arkSkridt = true; }catch(e){}
