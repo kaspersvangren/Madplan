@@ -1023,25 +1023,41 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    kortlægningslisten til "ikke kortlagt endnu". */
 /* Knappen der slår gruppefiltret til og fra. Diskret — den skal kunne
    findes, men ikke stjæle opmærksomhed fra selve resultatet. */
-/* Udsolgt og ukortlagt ligner nu de andre linjer, bare nedtonet. Billedets
-   plads holdes fri selv når der ikke er noget, så navnene står på linje
-   ned gennem listen. Knapperne beholder fuld styrke — det er dem man skal
-   ramme for at komme videre. */
-.nemrad.mangler > .v, .nemrad.mangler > .nembil, .nemrad.mangler > input{opacity:.55}
-.nemrad.mangler .navn{text-decoration:none}
-.nemrad .nembil.tom{background:var(--surface);border:1px dashed var(--line)}
-.nemrad .trin.loesninger{width:auto;flex-direction:column;gap:5px;align-items:stretch}
-.nemrad .trin.loesninger button{white-space:nowrap}
-/* Venter på svar: rammen og tallet træder frem, så man kan se HVOR man
-   mangler at tage stilling. */
+/* ---------- Linjer der KRÆVER handling ----------
+   Udsolgt, udgået, ikke kortlagt og "ikke taget stilling" ser ens ud, for
+   de gør det samme: de spærrer knappen. Nedtonet udgave — hvid bund, rød
+   ramme hele vejen rundt og en kraftig venstrekant der fanger øjet når man
+   ruller. Med op til 51 faste varer ville fyldt rød bund larme for meget.
+
+   De må ALDRIG tones ned eller få streg over navnet. De skal frem. */
+.nemrad.kraever{border:1px solid color-mix(in srgb, var(--holiday) 45%, transparent);
+  border-left:4px solid var(--holiday);border-radius:11px;
+  background:var(--bg);padding:11px 12px;margin:9px 0;
+  box-shadow:0 1px 4px color-mix(in srgb, var(--holiday) 14%, transparent)}
+.nemrad.kraever .navn{text-decoration:none;font-weight:600}
+.kraevertekst{color:var(--holiday);font-weight:600}
+
+/* Med knapper: varen øverst, knapperne på deres egen række under. */
+.nemrad.medknapper{display:block}
+.nemrad.medknapper .hoved{display:flex;align-items:center;gap:11px}
+.nemrad.medknapper .hoved .v{flex:1;min-width:0}
+.nemrad.medknapper .knapper{display:flex;gap:7px;margin-top:10px}
+.nemrad.medknapper .knapper button{flex:1;white-space:nowrap;padding:8px 6px;
+  border:1px solid var(--line);border-radius:9px;font-size:13.5px;background:var(--surface)}
+.nemrad.medknapper .knapper button:hover{border-color:var(--line-strong);color:var(--ink)}
+.nemrad .nembil.tom{background:var(--surface);border:1px dashed var(--line);
+  width:38px;height:38px;flex:none;border-radius:8px}
+
+/* Venter på svar: rammen og tallet træder frem. */
 .nemtrin.spoerg{border-color:var(--holiday)}
 .nemtrin.spoerg .tal{color:var(--holiday);font-weight:700}
 .nemgruppefilter{display:block;width:100%;text-align:left;font-size:12.5px;
   color:var(--muted);padding:7px 2px 8px;border-bottom:1px solid var(--line)}
 .nemgruppefilter:hover{color:var(--ink)}
-.nemhaster{flex:none;font-size:11.5px;font-weight:700;color:var(--holiday);
-  background:color-mix(in srgb, var(--holiday) 14%, transparent);
-  border-radius:999px;padding:1px 8px;letter-spacing:0;text-transform:none;
+.nemhaster{flex:none;font-size:11.5px;font-weight:700;
+  color:#fff;background:var(--holiday);
+  border-radius:999px;min-width:19px;height:19px;padding:0 6px;
+  display:inline-grid;place-items:center;letter-spacing:0;text-transform:none;
   font-variant-numeric:tabular-nums}
 .nemgruppe.haster .t, .nemundergruppe.haster .t{color:var(--holiday)}
 html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
@@ -1896,7 +1912,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.44.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.45.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6109,15 +6125,20 @@ function nemTegn(){
       const kanByttes = tilstand !== "ukendt"
         && nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
       const bil = (p && p.billede) || (l.kort && l.kort.billede) || null;
-      return '<div class="nemrad fravalgt mangler">'
-        + '<input type="checkbox" disabled aria-label="Kan ikke vælges">'
-        + (bil ? '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
-               : '<span class="nembil tom"></span>')
-        + '<span class="v"><span class="navn">' + esc(l.navn) + '</span>'
-        +   '<span class="under gaet">⚠ ' + tekst + '</span>'
-        +   (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
+      /* Knapperne staar paa deres EGEN raekke i fuld bredde. Foer stod de
+         i en smal lodret soejle, og "spring over" blev klippet af paa en
+         telefon. Nu er der plads til alle tre, og de er til at ramme. */
+      return '<div class="nemrad kraever medknapper">'
+        + '<span class="hoved">'
+        +   '<input type="checkbox" disabled aria-label="Kan ikke vælges">'
+        +   (bil ? '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
+                 : '<span class="nembil tom"></span>')
+        +   '<span class="v"><span class="navn">' + esc(l.navn) + '</span>'
+        +     '<span class="under kraevertekst">' + tekst + '</span>'
+        +     (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
+        +   '</span>'
         + '</span>'
-        + '<span class="trin loesninger">'
+        + '<span class="knapper">'
         +   (kanByttes
               ? '<button class="loes" data-nembytaabn="' + gruppe + ':' + i + '">byt</button>' : "")
         +   '<button class="loes" data-nemerstat="' + gruppe + ':' + i + '">'
@@ -6149,7 +6170,13 @@ function nemTegn(){
     /* Knappen vises kun naar der faktisk er noget at vaelge imellem —
        ellers ville hver eneste linje faa en knap der ikke goer noget. */
     const flere = nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
-    return '<div class="nemrad' + (l.antal < 1 ? " fravalgt" : "") + '">'
+    /* FEJL rettet: en uafklaret linje står på 0 og fik derfor "fravalgt"
+       — streg over navnet og "tages ikke med". Den sagde altså at varen
+       var valgt fra, samtidig med at spørgsmålstegnet sagde at der IKKE
+       var taget stilling. To modsatte beskeder på samme linje. Uafklaret
+       skal fremhæves, ikke tones ned. */
+    return '<div class="nemrad' + (l.uafklaret ? " kraever"
+                                 : l.antal < 1 ? " fravalgt" : "") + '">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
                    + (l.medtaget ? " checked" : "") + '>' : "")
       + (bil ? '<button class="nembilknap" data-nemkort="' + gruppe + ':' + i + '">'
@@ -6157,7 +6184,11 @@ function nemTegn(){
                + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(l.navn) + '</span>'
-      + (l.antal < 1
+      + (l.uafklaret
+          ? '<span class="under kraevertekst">'
+            + esc(l.kilder ? "skal bruges til " + l.kilder : "fast vare")
+            + ' — køb eller lad være?</span>'
+          : l.antal < 1
           ? '<span class="under">tages ikke med</span>'
           : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
       + ((l.ekstra && l.ekstra.length)
@@ -6201,7 +6232,9 @@ function nemTegn(){
     liste.filter(l => !l.spring && nemTilstand(l) !== "klar").length;
 
   const maerke = n => n
-    ? '<span class="nemhaster">⚠ ' + n + '</span>' : "";
+    /* Trekanten er droppet — den var for meget alarm, og den røde
+       cirkel med tallet siger det samme roligere. */
+    ? '<span class="nemhaster">' + n + '</span>' : "";
 
   const hoved = (titel, liste, gruppe) => {
     const med = liste.filter(l => l.medtaget && !l.spring).length;
