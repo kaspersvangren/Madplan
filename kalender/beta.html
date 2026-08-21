@@ -1938,7 +1938,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.47.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.48.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7643,16 +7643,69 @@ let openEventDato = "";
    betyder ingenting.
    Foerst efter klassen er sat: et skjult element kan ikke rulles. rAF'en
    er en sikkerhedsline, hvis noget indhold foerst faar hoejde bagefter. */
+/* ---------- Telefonens tilbage-knap lukker arket ----------
+   Uden det her forlader tilbage-knappen hele appen, midt i et ark. Det er
+   en indgroet vane på Android, og det er ærgerligt at ryge helt ud, fordi
+   man ville lukke et vindue.
+
+   Fremgangsmåden: når det FØRSTE ark åbnes, lægges et ekstra skridt i
+   browserens historik. Trykker man tilbage, bruges det skridt på at lukke
+   arkene — præcis som Escape gør — og appen bliver stående. Er der
+   ingen ark åbne, opfører tilbage sig som den plejer.
+
+   Der lægges ét skridt ind, ikke ét pr. ark, fordi Escape også lukker
+   dem alle på én gang. To knapper, samme opførsel.                    */
+let arkSkridt = false;    // har vi lagt et skridt i historikken?
+let arkSpring = false;    // spring næste popstate over (vores egen back)
+
+const arkAabne = () => document.querySelectorAll(".backdrop.open").length;
+
+function arkLukAlle(){
+  document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
+  if(typeof closeDropdown === "function") closeDropdown();
+}
+
+/* Ryd skridtet op, når sidste ark er lukket på almindelig vis — ellers
+   ville et tryk på tilbage bagefter ikke gøre noget synligt.
+   Ventetiden er med vilje: nogle steder lukkes ét ark og åbnes et andet
+   i samme åndedrag, og så skal skridtet blive liggende. */
+function arkRyd(){
+  setTimeout(() => {
+    if(arkSkridt && !arkAabne()){
+      arkSkridt = false;
+      arkSpring = true;
+      history.back();
+    }
+  }, 0);
+}
+
+window.addEventListener("popstate", () => {
+  if(arkSpring){ arkSpring = false; return; }
+  if(arkAabne()){
+    arkLukAlle();
+    arkSkridt = false;
+  }
+  /* Er der ingen ark åbne, gør vi ingenting — så virker tilbage som den
+     skal, og man kan forlade appen hvis det er dét man vil. */
+});
+
 const show = id => {
   const back = document.getElementById(id);
+  const foerste = !arkAabne();
   back.classList.add("open");
+  if(foerste && !arkSkridt){
+    try{ history.pushState({ ark: true }, ""); arkSkridt = true; }catch(e){}
+  }
   const ark = back.querySelector(".sheet");
   if(ark){
     ark.scrollTop = 0;
     requestAnimationFrame(() => { ark.scrollTop = 0; });
   }
 };
-const hide = id => document.getElementById(id).classList.remove("open");
+const hide = id => {
+  document.getElementById(id).classList.remove("open");
+  arkRyd();
+};
 
 function openDetail(id, ds){
   const e = events.find(x => x.id === id); if(!e) return;
@@ -8100,12 +8153,14 @@ document.getElementById("ferieslet-ja").onclick = async () => {
 };
 
 document.querySelectorAll(".backdrop").forEach(b => {
-  b.addEventListener("click", ev => { if(ev.target === b) b.classList.remove("open"); });
+  b.addEventListener("click", ev => {
+    if(ev.target === b){ b.classList.remove("open"); arkRyd(); }
+  });
 });
 document.addEventListener("keydown", ev => {
   if(ev.key === "Escape"){
-    document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
-    closeDropdown();
+    arkLukAlle();
+    arkRyd();
   }
 });
 
