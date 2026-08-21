@@ -1086,9 +1086,9 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
    til "Varia / nter". Bliver teksten for lang, afkortes den i stedet. */
 /* Knappen er praecis saa bred som sit ord — hverken strukket ud over
    soejlen eller klemt sammen. Hoejrekanten flugter med plus-knappen. */
-.nembytknap{display:inline-block;width:auto;margin-top:4px;font-size:12px;
-  color:var(--muted);padding:4px 10px;border:1px solid var(--line);
-  border-radius:9px;line-height:1.3;white-space:nowrap}
+.nembytknap{display:inline-block;margin-top:5px;font-size:12.5px;
+  color:var(--muted);padding:4px 11px;border:1px solid var(--line);
+  border-radius:999px;line-height:1.35;white-space:nowrap}
 .nembytknap:hover{color:var(--ink);border-color:var(--line-strong)}
 .nemkurv{background:var(--chip);border-radius:12px;padding:4px 12px 10px;margin-bottom:6px}
 .nemkurv .nemrad{border-top-color:var(--line)}
@@ -1938,7 +1938,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.46.4";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.47.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6293,6 +6293,13 @@ function nemTegn(){
           : l.antal < 1
           ? '<span class="under">tages ikke med</span>'
           : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
+      /* Knappen staar UNDER navnet, ikke i soejlen til hoejre. Soejlen er
+         laast til plus/minus-knappernes bredde (104px), og dér kan ordet
+         "Varianter" ikke vaere — uanset hvordan man pillede ved knappen. */
+      + (flere ? '<button class="nembytknap" data-nemvarianter="' + gruppe + ':' + i + '">'
+                 + ((l.ekstra && l.ekstra.length)
+                     ? l.ekstra.length + 1 + " slags"
+                     : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
       + (() => {
           const klar = nemEkstraKlar(l), vaek = nemEkstraVaek(l);
           return (klar.length
@@ -6326,10 +6333,7 @@ function nemTegn(){
       /* Varianter: flere slags af den samme vare på én linje. Majskiks i
          tre smage, salat som hjerte og iceberg. Vises kun når varen har
          gemte alternativer. */
-      + (flere ? '<button class="nembytknap" data-nemvarianter="' + gruppe + ':' + i + '">'
-                 + ((l.ekstra && l.ekstra.length)
-                     ? l.ekstra.length + 1 + " slags"
-                     : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
+
       + '</span></div>';
   };
 
@@ -7308,6 +7312,16 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
         l.antal = Math.max(0, l.antal + Number(retning));
       }
       l.medtaget = l.antal > 0;
+      /* Sat helt til nul: saa er ugens bytte ogsaa ligegyldigt. Uden det
+         stod der "byttet" paa en linje der slet ikke blev koebt. */
+      if(l.antal === 0 && l.kort && l.kort._byttet){
+        nemUgeSaet(l.navn, null);
+        const grund = nemFind(l.navn);
+        if(grund){
+          l.kort = nemMedUgevalg(grund, l.navn);
+          l.ekstra = nemLinjeEkstra(grund, l.navn);
+        }
+      }
       nemTegn();
     }
     return;
