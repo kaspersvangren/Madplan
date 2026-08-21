@@ -1938,7 +1938,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.48.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.49.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3895,7 +3895,7 @@ function renderIndkoeb(){
   const egne = indkoebEkstra.filter(e => e.uge_start === ugeStart)
                             .sort((a, b) => a.sortering - b.sortering);
 
-  const vare = p => '<div class="ivare"><span class="n">' + esc(p.navn)
+  const vare = p => '<div class="ivare"><span class="n">' + esc(storNavn(p.navn))
     + '<span class="kilder">' + esc([...p.retter].join(", ")) + '</span></span>'
     + '<span class="m">' + (p.maengde != null ? tal(p.maengde) + (p.enhed ? " " + esc(boejEnhed(p.enhed, p.maengde)) : "") : "") + '</span></div>';
 
@@ -5929,6 +5929,20 @@ function nemAltTegn(){
 }
 
 const nemNoegle = navn => String(navn || "").trim().toLowerCase();
+
+/* Varenavne står med stort begyndelsesbogstav, når de er OVERSKRIFT på en
+   linje. Ingredienser fra kogebogen er alle skrevet med småt (156 ud af
+   156), mens faste indkøb han selv har navngivet ofte har stort — så uden
+   det her stod "Toiletpapir" og "kyllingebryst" side om side.
+
+   Dataene er URØRTE: nøglen er navnet med små bogstaver hele vejen, så
+   det her er kun pynt. Skifter vi mening, er det ét sted at ændre.
+   Inde i en sætning bruges navnet som det står — dér ville et stort
+   bogstav midt i teksten være forkert. */
+const storNavn = navn => {
+  const s = String(navn || "");
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+};
 function nemFind(navn){
   const n = nemNoegle(navn);
   return nemligVarer.find(v => nemNoegle(v.navn) === n) || null;
@@ -6204,7 +6218,7 @@ function nemTegn(){
 
     if(l.spring){
       return '<div class="nemrad"><span class="v"><span class="navn" style="opacity:.55">'
-        + esc(l.navn) + '</span><span class="under">springes over</span></span>'
+        + esc(storNavn(l.navn)) + '</span><span class="under">springes over</span></span>'
         + '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">fortryd</button></div>';
     }
 
@@ -6232,7 +6246,7 @@ function nemTegn(){
         +   '<input type="checkbox" disabled aria-label="Kan ikke vælges">'
         +   (bil ? '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
                  : '<span class="nembil tom"></span>')
-        +   '<span class="v"><span class="navn">' + esc(l.navn) + '</span>'
+        +   '<span class="v"><span class="navn">' + esc(storNavn(l.navn)) + '</span>'
         +     '<span class="under kraevertekst">' + tekst + '</span>'
         +     (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
         +   '</span>'
@@ -6285,7 +6299,7 @@ function nemTegn(){
                + '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
                + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
-      + esc(l.navn) + '</span>'
+      + esc(storNavn(l.navn)) + '</span>'
       + (l.uafklaret
           ? '<span class="under kraevertekst">'
             + esc(l.kilder ? "skal bruges til " + l.kilder : "fast vare")
@@ -6711,7 +6725,7 @@ function nemTegnKvittering(){
   if(sprunget.length){
     h += '<div class="nemgruppe"><span class="t">Sprunget over</span></div>';
     h += sprunget.map(l => '<div class="nemrad"><span class="v"><span class="navn">'
-      + esc(l.navn) + '</span></span></div>').join("");
+      + esc(storNavn(l.navn)) + '</span></span></div>').join("");
   }
 
   if(nemArk.husk.length){
@@ -7201,7 +7215,7 @@ function nemVarerTegn(){
       + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
                      + '" alt="" loading="lazy">' : "")
       + '<span class="v">'
-      + '<span class="navn">' + esc(navn) + '</span>'
+      + '<span class="navn">' + esc(storNavn(navn)) + '</span>'
       + '<span class="under">' + esc(v.produkt_navn || "ingen vare valgt") + '</span>'
       + '<span class="under">' + esc(pakke + " pr. pakke · " + maerker) + '</span>'
       + (ekstra || "")
