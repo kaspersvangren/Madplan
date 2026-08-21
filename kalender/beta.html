@@ -1054,6 +1054,27 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    ruller. Med op til 51 faste varer ville fyldt rød bund larme for meget.
 
    De må ALDRIG tones ned eller få streg over navnet. De skal frem. */
+/* Grøn venstrekant på det man har valgt til under Faste indkøb og Tjek
+   om vi har. Begge afsnit starter fravalgt, så kanten er den hurtige
+   måde at se hvad man allerede har taget stilling til — uden at læse
+   fluebenene ét for ét. Kun kanten, ikke resten af linjen.
+   VIGTIGT: .kraever står EFTER denne regel og vinder derfor, når en
+   linje både er valgt og spærrer knappen. Rød skal aldrig kunne
+   overtrumfes af grøn. */
+.nemrad.valgt{border-left:4px solid var(--mad);border-radius:0 10px 10px 0;
+  padding-left:8px}
+
+/* Rytmelinjen: en fast vare de køber jævnligt, som ikke er købt længe.
+   Tavs som standard — den står kun der når mønsteret faktisk er brudt. */
+.nemrad .under.rytme{color:var(--holiday);font-weight:600}
+
+/* Mærket på en vare man har købt før. Samme plads som ★, men med et tal:
+   forskellen på "købt 1 gang" og "købt 30 gange" er hele pointen. */
+.nemegne .nemfund .under{color:var(--mad);font-weight:600}
+.nemfund .koebt{font-size:11px;font-weight:600;color:var(--mad);
+  background:var(--mad-bg);border-radius:999px;padding:1px 7px;
+  margin-left:6px;white-space:nowrap;vertical-align:1px}
+
 .nemrad.kraever{border:1px solid color-mix(in srgb, var(--holiday) 45%, transparent);
   border-left:4px solid var(--holiday);border-radius:11px;
   background:var(--bg);padding:11px 12px;margin:9px 0;
@@ -1946,7 +1967,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.53.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.54.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2452,7 +2473,7 @@ document.getElementById("banner-close").onclick = skjulBesked;
    ======================================================================= */
 async function hentAlt(forsoeg){
   skjulBesked();
-  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes, phRes, miRes, nvRes] = await Promise.all([
+  const [pRes, aRes, uRes, rRes, iRes, mRes, eRes, oRes, sRes, feRes, gRes, phRes, miRes, nvRes, npRes] = await Promise.all([
     sb.from("personer").select("*").order("raekkefoelge"),
     sb.from("aftaler").select("*").order("dato"),
     sb.from("delebarn_undtagelser").select("*"),
@@ -2466,7 +2487,8 @@ async function hentAlt(forsoeg){
     sb.from("gentag_undtag").select("*"),
     sb.from("paamind_skjult").select("*"),
     sb.from("madplan_ingrediens").select("*"),
-    sb.from("nemlig_varer").select("*")
+    sb.from("nemlig_varer").select("*"),
+    sb.from("nemlig_profil_vare").select("*")
   ]);
 
   const fejl = pRes.error || aRes.error || uRes.error || rRes.error || iRes.error || mRes.error || eRes.error || oRes.error;
@@ -2500,6 +2522,15 @@ async function hentAlt(forsoeg){
     vis("Nemlig-varer kunne ikke hentes: " + nvRes.error.message);
   } else {
     nemligVarer = nvRes.data || [];
+  }
+
+  /* Købsprofilen pr. vare — hentes for sig, ligesom alt det andet Nemlig-
+     grej, så appen virker fuldstændig uændret hvis viewet ikke findes.
+     Der siges heller ingenting: en manglende profil betyder bare at
+     rytmelinjen og det foreslåede antal udebliver, ikke at noget er galt. */
+  nemProfilVare = new Map();
+  if(!npRes.error){
+    (npRes.data || []).forEach(r => nemProfilVare.set(r.vare_id, r));
   }
 
   /* Ingrediensmarkeringer — også for sig, af samme grund. */
@@ -5406,6 +5437,21 @@ function spoergHusk(noegle){
    nemlig-kurv sender af sted. Ingen af dem kan afgive en ordre.      */
 
 let nemligVarer = [];        // rækkerne fra nemlig_varer
+
+/* Købsprofil pr. vare, slået op på nemlig_varer.id. Kommer fra viewet
+   nemlig_profil_vare, som tæller varianterne med — køber man den samme
+   ting under to varenumre, er det ÉN rytme, ikke to halve.
+   Tom Map = ingen profil, og alt opfører sig som før. */
+let nemProfilVare = new Map();
+
+/* Profilen for en linje. Linjen kender sit navn, ikke sit vare-id, så
+   opslaget går gennem nemFind(). Svarer null når varen aldrig er købt —
+   det gælder fx nye kortlægninger, hvor varenummeret ikke findes i
+   historikken endnu. */
+function nemProfilFor(navn){
+  const g = nemFind(navn);
+  return (g && nemProfilVare.get(g.id)) || null;
+}
 let nemArk      = null;      // arkets tilstand mens det er åbent
 let nemValg     = null;      // det der redigeres i "vælg vare"
 let nemVarerFilter = "";
@@ -5604,11 +5650,104 @@ function nemMedUgevalg(kort, navn){
    søgning efter erstatning for pålæg gav chips og fodcreme.          */
 let nemErstat = null;   // {sti, navn, grund, fund, kunGruppe}
 
+/* ---------- Kandidater fra jeres egne køb ----------
+   En vare der ikke er kortlagt spærrer knappen, og så skal man søge sig
+   frem fra bunden. Men varen er som regel købt før — bare uden at være
+   knyttet til navnet i opskriften. Derfor: slå navnet op i katalogget
+   over det I FAKTISK har købt, ikke i Nemligs fulde sortiment.
+
+   Det er netop derfor forslagene er i orden her, selv om forslag fra en
+   fri søgning ikke er det: kilden er hans egne ordrer.
+
+   Findes der et navnematch, udvides der med naboerne i samme undergruppe
+   — 301 undergrupper med under tre varer i hver, så det er hylden ved
+   siden af, ikke en hel afdeling. Uden navnematch sker der INGENTING:
+   der er så intet at gå ud fra, og et gæt ville bare være støj. */
+async function nemHentEgneKoeb(navn){
+  const rent = String(navn || "").replace(/[%_,]/g, " ").trim();
+  if(rent.length < 2) return [];
+  const felter = "produkt_id,navn,maerke,billede,undergruppe,undergruppe_navn,pris,findes";
+  try{
+    const { data: traef, error } = await sb.from("nemlig_katalog")
+      .select(felter).ilike("navn", "%" + rent + "%").limit(30);
+    if(error) throw error;
+    let liste = (traef || []).filter(v => v.findes !== false);
+    if(!liste.length) return [];
+
+    /* Naboerne hentes ud fra den undergruppe navnematchene peger på.
+       Er undergruppen tom — det er den for hver tredje vare — springes
+       udvidelsen over, i stedet for at falde tilbage på hovedgruppen,
+       som er alt for bred til at sige noget. */
+    const under = (liste.find(v => v.undergruppe) || {}).undergruppe;
+    if(under){
+      const { data: naboer } = await sb.from("nemlig_katalog")
+        .select(felter).eq("undergruppe", under).limit(30);
+      const kendte = new Set(liste.map(v => String(v.produkt_id)));
+      (naboer || []).forEach(v => {
+        if(v.findes !== false && !kendte.has(String(v.produkt_id))){
+          kendte.add(String(v.produkt_id));
+          v.nabo = true;
+          liste.push(v);
+        }
+      });
+    }
+
+    /* Antal køb afgør rækkefølgen. Varer uden køb falder helt ud —
+       katalogget rummer kun ting I har købt, men en nabo kan sagtens
+       være hentet ind uden selv at være købt. */
+    const ider = liste.map(v => String(v.produkt_id));
+    const { data: prof } = await sb.from("nemlig_profil_nummer")
+      .select("produkt_id,antal_koeb,sidste_koeb").in("produkt_id", ider);
+    const kort = new Map((prof || []).map(r => [String(r.produkt_id), r]));
+    liste.forEach(v => {
+      const pr = kort.get(String(v.produkt_id));
+      v.koebt = pr ? pr.antal_koeb : 0;
+    });
+    return liste.filter(v => v.koebt > 0)
+                .sort((a, b) => (b.koebt - a.koebt))
+                .slice(0, 6);
+  }catch(err){
+    return [];      // tavst: uden forslag virker søgningen som hidtil
+  }
+}
+
+/* Blokken øverst i Udskift-arket. Tom streng når der intet er — så
+   forsvinder den helt frem for at stå og sige "ingen forslag". */
+function nemEgneKoeb(){
+  if(!nemErstat || !Array.isArray(nemErstat.egne) || !nemErstat.egne.length) return "";
+  return '<div class="nemundertitel">Købt før</div><div class="nemegne">'
+    + nemErstat.egne.map(v =>
+        '<button class="nemfund" data-nemegne="' + esc(String(v.produkt_id)) + '">'
+        + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
+                       + '" alt="" loading="lazy">' : "")
+        + '<span class="v"><span>' + esc(v.navn) + '</span>'
+        + '<span class="under">købt ' + v.koebt + '×'
+        + (v.nabo ? " · samme hylde" : "") + '</span></span>'
+        + '<span class="pris">' + (v.pris != null ? nemKr(v.pris) : "") + '</span></button>'
+      ).join("")
+    + '</div><div class="nemundertitel">Eller søg selv</div>';
+}
+
 function nemUdskiftAaben(sti){
   const { l } = nemLinje(sti);
   if(!l) return;
   const grund = nemFind(l.navn) || l.kort;
-  nemErstat = { sti, navn: l.navn, grund, fund: [], kunGruppe: true };
+  nemErstat = { sti, navn: l.navn, grund, fund: [], kunGruppe: true, egne: [] };
+
+  /* Kun for varer der slet ikke er kortlagt. Er varen bare udsolgt eller
+     udgået, har den allerede sine gemte varianter øverst, og så ville en
+     liste mere gøre arket rodet. */
+  if(nemTilstand(l) === "ukendt"){
+    const oensket = l.navn;
+    nemHentEgneKoeb(oensket).then(egne => {
+      /* Arket kan være lukket eller åbnet på en anden vare imens —
+         så skal svaret smides væk, ikke tegnes ind det forkerte sted. */
+      if(nemErstat && nemErstat.navn === oensket){
+        nemErstat.egne = egne;
+        nemErstatTegn();
+      }
+    });
+  }
   document.getElementById("nemerstat-meta").textContent =
     "i stedet for \u201c" + (l.kort && l.kort.produkt_navn || l.navn) + "\u201d, kun denne uge";
   document.getElementById("nemerstat-tekst").value = l.navn;
@@ -5625,7 +5764,7 @@ async function nemErstatSoeg(){
   try{
     const { data, error } = await sb.functions.invoke("nemlig-soeg", { body: { tekst, antal: 20 } });
     if(error) throw error;
-    nemErstat.fund = data.fund || [];
+    nemErstat.fund = await nemBerigFund(data.fund || []);
     nemErstatTegn();
   }catch(err){
     ud.innerHTML = '<div class="nemtom">Søgningen gik galt: ' + esc(err.message || String(err)) + '</div>';
@@ -5665,7 +5804,7 @@ function nemUdskiftGemte(){
 function nemErstatTegn(){
   const ud = document.getElementById("nemerstat-fund");
   if(!nemErstat) return;
-  const gemte = nemUdskiftGemte();
+  const gemte = nemEgneKoeb() + nemUdskiftGemte();
   if(!nemErstat.fund.length){
     ud.innerHTML = gemte + '<div class="nemtom">Ingen varer fundet.</div>';
     return;
@@ -5691,7 +5830,7 @@ function nemErstatTegn(){
       return '<button class="nemfund" data-nemerstatvalg="' + i + '"'
         + (v.paaLager ? "" : " disabled style=\"opacity:.5\"") + '>'
         + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120)) + '" alt="" loading="lazy">' : "")
-        + '<span class="v"><span>' + esc(v.navn) + '</span>'
+        + '<span class="v"><span>' + esc(v.navn) + nemKoebtMaerke(v) + '</span>'
         + '<span class="under">' + esc([v.maerke, v.beskrivelse].filter(Boolean).join(" · "))
         + (kilo ? " · " + esc(kilo) : "")
         + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span></span>'
@@ -5997,6 +6136,17 @@ function nemDato(iso8601){
 }
 
 /* ---------- Byg arkets indhold ---------- */
+/* Hvor mange fluebenet skal sætte. Rækkefølgen er: et tal man selv har
+   skrevet ind vinder (over 1 kan kun være sat i hånden), derefter det
+   antal de plejer at købe, og til sidst 1. Er profilen ukendt eller
+   under 1, bliver det 1 — aldrig 0, for så var fluebenet uden virkning. */
+function nemStandardAntal(v){
+  if(Number(v.standard_antal) > 1) return Number(v.standard_antal);
+  const p = nemProfilVare.get(v.id);
+  const t = p && Number(p.typisk_antal);
+  return (t && t > 1) ? t : (Number(v.standard_antal) || 1);
+}
+
 function nemByg(){
   const ugeStart = iso(indkoebUge);
   const { koeb, tjek } = beregnIndkoeb(indkoebUge);
@@ -6104,7 +6254,11 @@ function nemByg(){
       navn: v.navn, behov: null, enhed: "", kilder: "", kort: nemMedUgevalg(v, v.navn),
       ekstra: nemLinjeEkstra(v, v.navn),
       medtaget: false, antal: 0, gaet: false, spring: false,
-      standardAntal: v.standard_antal || 1,
+      /* Antallet fluebenet sætter. Før stod der altid 1, også for
+         letmælk, som de køber seks af. Historikkens typetal er et bedre
+         gæt — men KUN når det er større end 1 og varen faktisk er købt
+         før; ellers står den gamle værdi. */
+      standardAntal: nemStandardAntal(v),
       sortering: v.sortering
     }));
 
@@ -6310,8 +6464,13 @@ function nemTegn(){
        var valgt fra, samtidig med at spørgsmålstegnet sagde at der IKKE
        var taget stilling. To modsatte beskeder på samme linje. Uafklaret
        skal fremhæves, ikke tones ned. */
+    /* Valgt-kanten gælder kun de to afsnit hvor man selv vælger til;
+       under "Fra madplanen" er ALT valgt, og så ville hver eneste linje
+       få en grøn kant og signalet forsvinde. */
+    const erValgt = vaelges && l.antal >= 1 && !l.uafklaret;
     return '<div class="nemrad' + (l.uafklaret ? " kraever"
-                                 : l.antal < 1 ? " fravalgt" : "") + '">'
+                                 : l.antal < 1 ? " fravalgt" : "")
+                                 + (erValgt ? " valgt" : "") + '">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
                    + (l.medtaget ? " checked" : "") + '>' : "")
       + (bil ? '<button class="nembilknap" data-nemkort="' + gruppe + ':' + i + '">'
@@ -6326,6 +6485,16 @@ function nemTegn(){
           : l.antal < 1
           ? '<span class="under">tages ikke med</span>'
           : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
+      /* "Ikke købt i N dage" — kun på faste varer, kun når rytmen er
+         brudt, og kun med antallet af dage. Rytmen selv afgør OM linjen
+         vises, men skrives ikke ud: den fylder uden at hjælpe, når man
+         alligevel kender sine egne faste varer. */
+      + (() => {
+          if(gruppe !== "faste") return "";
+          const pr = nemProfilFor(l.navn);
+          if(!pr || !pr.rytme_brudt) return "";
+          return '<span class="under rytme">Ikke købt i ' + pr.dage_siden + ' dage</span>';
+        })()
       + (() => {
           const klar = nemEkstraKlar(l), vaek = nemEkstraVaek(l);
           return (klar.length
@@ -7007,6 +7176,44 @@ function nemNavneVarsel(){
   document.getElementById("nemvalg-noegle").hidden = fast;
 }
 
+/* Slår de fundne varenumre op i købsprofilen og lægger dem han har købt
+   før ØVERST, med flest køb først. Kilden er hans egne ordrer — ikke et
+   forslag fra Nemligs katalog, som han udtrykkeligt ikke vil have.
+
+   Opslaget sker først EFTER søgningen og kun på de numre der faktisk kom
+   retur (typisk 15-20), så der hentes aldrig 1.318 rækker ned i appen.
+   Går opslaget galt, sker der ingenting: listen står i Nemligs egen
+   rækkefølge, præcis som før. */
+async function nemBerigFund(fund){
+  if(!Array.isArray(fund) || !fund.length) return fund;
+  const ider = fund.map(v => String(v.id)).filter(Boolean);
+  if(!ider.length) return fund;
+  try{
+    const { data, error } = await sb.from("nemlig_profil_nummer")
+      .select("produkt_id,antal_koeb,sidste_koeb").in("produkt_id", ider);
+    if(error) throw error;
+    const kort = new Map((data || []).map(r => [String(r.produkt_id), r]));
+    fund.forEach(v => {
+      const pr = kort.get(String(v.id));
+      v.koebt = pr ? pr.antal_koeb : 0;
+      v.sidstKoebt = pr ? pr.sidste_koeb : null;
+    });
+    /* Stabil sortering: kun de købte flyttes op. Alt andet bevarer
+       Nemligs egen rækkefølge, som er deres relevans-vurdering. */
+    fund.sort((a, b) => (b.koebt || 0) - (a.koebt || 0));
+  }catch(err){
+    /* Tavst med vilje — en manglende profil er ikke en fejl brugeren
+       kan gøre noget ved, og søgningen virker uændret uden den. */
+  }
+  return fund;
+}
+
+/* Mærket der vises på en træffer man har købt før. */
+function nemKoebtMaerke(v){
+  if(!v || !v.koebt) return "";
+  return '<span class="koebt">købt ' + v.koebt + '×</span>';
+}
+
 async function nemValgSoeg(){
   const tekst = document.getElementById("nemvalg-tekst").value.trim();
   if(!tekst) return;
@@ -7015,7 +7222,7 @@ async function nemValgSoeg(){
   try{
     const { data, error } = await sb.functions.invoke("nemlig-soeg", { body: { tekst, antal: 15 } });
     if(error) throw error;
-    nemValg.fund = data.fund || [];
+    nemValg.fund = await nemBerigFund(data.fund || []);
     nemValgTegnFund();
   }catch(err){
     ud.innerHTML = '<div class="nemtom">Søgningen gik galt: ' + esc(err.message || String(err)) + '</div>';
@@ -7105,7 +7312,8 @@ function nemValgTegnFund(){
       + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
                      + '" alt="" loading="lazy">' : "")
       + '<span class="v"><span>' + esc(v.navn)
-      + (v.favorit ? ' <span class="favorit">★</span>' : "") + '</span>'
+      + (v.favorit ? ' <span class="favorit">★</span>' : "")
+      + nemKoebtMaerke(v) + '</span>'
       + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
       + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
@@ -7585,6 +7793,18 @@ document.getElementById("nemerstat-fund").addEventListener("click", ev => {
   if(ev.target.closest("#nemerstat-filter")){
     nemErstat.kunGruppe = !nemErstat.kunGruppe;
     nemErstatTegn();
+    return;
+  }
+  /* Et forslag fra jeres egne køb. Den kan IKKE vælges direkte: den
+     eksisterende valgsti slår kun op blandt varens egne gemte varianter,
+     og en vare fra historikken står ikke dér. I stedet søges varenummeret
+     frem — det rammer præcis den vare — så den lander som et almindeligt
+     søgefund med frisk pris og lagerstatus og kan vælges som alt andet.
+     Ét tryk mere, men ingen parallel vej ind i de samme data. */
+  const e = ev.target.closest("[data-nemegne]");
+  if(e){
+    document.getElementById("nemerstat-tekst").value = e.dataset.nemegne;
+    nemErstatSoeg();
     return;
   }
   /* En gemt variant valgt: den ERSTATTER linjens vare for denne uge.
