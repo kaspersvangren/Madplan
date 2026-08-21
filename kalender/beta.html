@@ -1946,7 +1946,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.52.0-maaling";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.53.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5165,7 +5165,7 @@ function render(){
      noget at bruge — ellers lukker den appen. Det ligger HER og ikke i
      saetFane, fordi man også forlader forsiden ved at skifte dag eller
      visning, ikke kun ved at skifte fane. */
-  if(typeof vagtOpdater === "function") vagtOpdater();
+  if(typeof vagtSync === "function") vagtSync();
   opdaterTodoTal();          // tal og mærke skal passe uanset hvilken fane man står på
   if(fane === "madplan" || fane === "indkoeb"){
     const start = fane === "madplan" ? madplanUge : indkoebUge;
@@ -7753,112 +7753,76 @@ let openEventDato = "";
 
    Der lægges ét skridt ind, ikke ét pr. ark, fordi Escape også lukker
    dem alle på én gang. To knapper, samme opførsel.                    */
-/* Vagtskridtet i historikken.
+/* ---------- Telefonens tilbage-knap ----------
+   Uden det her forlader tilbage hele appen midt i et ark.
 
-   FØR holdt jeg styr på det i en variabel — og den kunne komme ud af trit
-   med browserens virkelige historik. Så virkede tilbage kun én gang, og
-   næste tryk røg ud af appen. Nu er BROWSEREN facit: skridtet kendes på
-   `history.state.vagt`, og der kan aldrig ligge mere end ét.
+   MÅLT 21. august, efter tre forkerte gæt: Chrome på Android SPRINGER
+   historik-skridt over, hvis de er lagt uden at brugeren har rørt
+   skærmen. Netop derfor virkede det ikke at lægge et nyt skridt inde i
+   tilbage-håndteringen — skridtet blev lagt, målingen viste det tydeligt,
+   og browseren gik alligevel forbi det og ud af appen.
 
-   Reglen er enkel: så længe appen ikke står i sin grundstilling — altså
-   forsiden uden åbne ark — skal der ligge et vagtskridt. Efter HVER gang
-   tilbage er brugt, lægges der et nyt, hvis der stadig er noget at gå
-   tilbage fra.                                                          */
-let arkSpring = false;    // spring næste popstate over (vores egen back)
+   Derfor: skridtene lægges NÅR MAN TRYKKER, ét pr. niveau man går ned i.
+   Niveauet er "er vi væk fra forsiden" plus antallet af åbne ark. Så
+   svarer historikken altid til hvor dybt man står, og tilbage-knappen
+   arbejder sig op ét niveau ad gangen helt af sig selv.               */
+let vagter    = 0;   // hvor mange skridt VI har lagt
+let egenBack  = 0;   // hvor mange popstates vi selv har udløst
 
 const arkAabne = () => document.querySelectorAll(".backdrop.open").length;
-const harVagt  = () => !!(history.state && history.state.vagt);
 
 function arkLukAlle(){
   document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
   if(typeof closeDropdown === "function") closeDropdown();
 }
 
-/* Står vi på forsiden — kalenderfanen, dagsvisning, dags dato — uden
-   åbne ark? Så er der ikke mere at gå tilbage fra inde i appen. */
+/* Forsiden: kalenderfanen, dagsvisning, dags dato. */
 function erForsiden(){
   return fane === "kalender" && view === "day" && iso(cursor) === iso(new Date());
 }
-const appErHjemme = () => !arkAabne() && erForsiden();
 
-/* Læg et vagtskridt hvis der mangler et — og kun hvis der er noget at
-   vogte. Kaldes fra render() og show(), så den fanger både fane-, dag-
-   og visningsskift og åbne ark. */
-function vagtOpdater(){
-  if(appErHjemme()){ if(typeof skrivSpor==="function") skrivSpor("   vagt: ingen (hjemme)"); return; }
-  if(harVagt()){ if(typeof skrivSpor==="function") skrivSpor("   vagt: findes allerede"); return; }
-  try{
-    history.pushState({ vagt: true }, "");
-    if(typeof skrivSpor==="function") skrivSpor("   vagt: LAGT · " + sporStand());
-  }catch(err){
-    if(typeof skrivSpor==="function") skrivSpor("   vagt: FEJLEDE " + err);
+/* Hvor dybt står vi? 0 = forsiden uden åbne ark. */
+const niveau = () => (erForsiden() ? 0 : 1) + arkAabne();
+
+/* Bringer historikken i takt med hvor dybt vi står. Kaldes fra render(),
+   show() og hide() — altså altid som følge af noget brugeren gjorde. */
+function vagtSync(){
+  const n = niveau();
+  while(vagter < n){
+    vagter++;
+    try{ history.pushState({ vagt: vagter }, ""); }catch(e){ vagter--; break; }
+  }
+  if(vagter > n){
+    const skridt = vagter - n;
+    vagter = n;
+    egenBack += skridt;
+    try{ history.go(-skridt); }catch(e){ egenBack -= skridt; }
   }
 }
-
-/* Er alt lukket og vi er hjemme, skal vagtskridtet væk igen — ellers
-   ville et tryk på tilbage bare gøre ingenting.
-   Ventetiden er med vilje: nogle steder lukkes ét ark og åbnes et andet
-   i samme åndedrag, og så skal skridtet blive liggende. */
-function arkRyd(){
-  setTimeout(() => {
-    if(harVagt() && appErHjemme()){
-      if(typeof skrivSpor==="function") skrivSpor("   arkRyd: bruger vagten (hjemme)");
-      arkSpring = true;
-      history.back();
-    }
-  }, 0);
-}
-
-/* ===== MIDLERTIDIG MAALING — fjernes igen =====
-   Tre gaet ramte forbi, saa nu skrives det ud hvad der faktisk sker. */
-const spor = [];
-function skrivSpor(hvad){
-  spor.push(hvad);
-  if(spor.length > 6) spor.shift();
-  let e = document.getElementById("sporbar");
-  if(!e){
-    e = document.createElement("div");
-    e.id = "sporbar";
-    /* OEVERST — nederst daekkede den fanebjaelken, saa der ikke kunne
-       skiftes fane. Klik paa striben skjuler den. */
-    e.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:9999;"
-      + "background:#111;color:#0f0;font:11px/1.35 monospace;padding:5px 7px;"
-      + "white-space:pre-wrap;max-height:34vh;overflow:auto;opacity:.94";
-    e.title = "tryk for at skjule";
-    e.addEventListener("click", () => { e.style.display = "none"; });
-    document.body.appendChild(e);
-  }
-  e.textContent = spor.join("\n");
-}
-const sporStand = () => "vagt=" + (harVagt() ? "JA" : "nej")
-  + " ark=" + arkAabne() + " fane=" + fane
-  + " forsiden=" + (erForsiden() ? "JA" : "nej");
 
 window.addEventListener("popstate", () => {
-  skrivSpor("TILBAGE trykket · " + sporStand() + (arkSpring ? " · SPRING" : ""));
-  if(arkSpring){ arkSpring = false; return; }
+  /* Var det os selv der gik tilbage (fx da et ark blev lukket med
+     krydset), skal der ikke ske mere. */
+  if(egenBack > 0){ egenBack--; return; }
+
+  vagter = Math.max(0, vagter - 1);
 
   /* 1. Et åbent ark lukkes først. */
   if(arkAabne()){
     arkLukAlle();
   }
-  /* 2. Ellers: er vi et andet sted i appen, går vi hjem til i dag —
-        samme sted som husikonet fører til. */
+  /* 2. Ellers går vi hjem til i dag — samme sted som husikonet. */
   else if(!erForsiden()){
     goHome();
     render();
   }
-  /* 3. Står vi allerede hjemme, gør vi ingenting, og browseren forlader
-        appen som den plejer. */
-
-  vagtOpdater();
-  skrivSpor("   efter: " + sporStand());
+  /* 3. Står vi hjemme, gør vi ingenting, og browseren forlader appen. */
 });
 
 const show = id => {
   const back = document.getElementById(id);
   back.classList.add("open");
-  vagtOpdater();
+  vagtSync();
   const ark = back.querySelector(".sheet");
   if(ark){
     ark.scrollTop = 0;
@@ -7867,7 +7831,9 @@ const show = id => {
 };
 const hide = id => {
   document.getElementById(id).classList.remove("open");
-  arkRyd();
+  /* Ventetiden er med vilje: nogle steder lukkes ét ark og åbnes et
+     andet i samme åndedrag, og så skal skridtet blive liggende. */
+  setTimeout(vagtSync, 0);
 };
 
 function openDetail(id, ds){
@@ -8317,13 +8283,13 @@ document.getElementById("ferieslet-ja").onclick = async () => {
 
 document.querySelectorAll(".backdrop").forEach(b => {
   b.addEventListener("click", ev => {
-    if(ev.target === b){ b.classList.remove("open"); arkRyd(); }
+    if(ev.target === b){ b.classList.remove("open"); vagtSync(); }
   });
 });
 document.addEventListener("keydown", ev => {
   if(ev.key === "Escape"){
     arkLukAlle();
-    arkRyd();
+    vagtSync();
   }
 });
 
