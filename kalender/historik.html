@@ -35,7 +35,7 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 
 /* ---------- login ---------- */
 #login{position:fixed;inset:0;z-index:80;background:var(--papir);display:flex;align-items:center;justify-content:center;padding:24px}
-#login[hidden],#hent[hidden]{display:none!important}
+[hidden]{display:none!important}
 #login .boks{width:100%;max-width:340px}
 #login h1{font-size:26px;margin-bottom:4px}
 #login p{color:var(--daemp);font-size:14px;margin:0 0 22px}
@@ -109,8 +109,28 @@ main{padding:16px 16px 24px;max-width:820px;margin:0 auto}
 .rk .hoejre span{display:block;font-size:11px;color:var(--daemp)}
 .rk .pil{flex:0 0 auto;color:var(--daemp);opacity:.5}
 
+/* ---------- periodebånd ---------- */
+.egenperiode{display:flex;gap:8px;align-items:center;padding:9px 0 2px;font-size:13px;color:var(--daemp)}
+.egenperiode input{flex:1;min-width:0;padding:8px 9px;border:1px solid var(--streg);border-radius:9px;background:var(--kort);color:var(--blaek);font-size:15px}
+
+/* ---------- katalog: billede, vareinfo, udgået ---------- */
+.varetop{display:flex;gap:13px;align-items:flex-start;margin:14px 0 4px}
+.varebil{width:76px;height:76px;flex:0 0 auto;border-radius:12px;border:1px solid var(--streg);background:#fff;object-fit:contain;padding:4px}
+.varetop .ved{flex:1;min-width:0;font-size:14px}
+.varetop .ved b{display:block;font-size:15px}
+.varetop .ved span{display:block;color:var(--daemp);font-size:13px;margin-top:2px}
+.infor{display:flex;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid var(--streg);font-size:14px}
+.infor:last-child{border-bottom:0}
+.infor .m{color:var(--daemp);flex:0 0 auto}
+.infor .v{text-align:right;min-width:0;overflow-wrap:anywhere}
+a.nemliglink{color:var(--accent);font-weight:600;text-decoration:none}
+.katalogstatus{font-size:13px;color:var(--daemp);padding:10px 2px}
+.maerke.ud{background:var(--rod-bg);color:var(--rod)}
+.udprik{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--rod)}
+.daekning{font-size:11px;color:var(--daemp);padding:4px 2px 0}
+
 /* ---------- værktøjslinje ---------- */
-.vaerktoej{position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:15;background:var(--papir);padding:10px 0 8px;margin:-4px 0 4px}
+.vaerktoej{position:sticky;top:var(--hovedhoejde,92px);z-index:15;background:var(--papir);padding:10px 0 8px;margin:-4px 0 4px}
 .soeg{width:100%;padding:11px 13px;border:1px solid var(--streg);border-radius:10px;background:var(--kort);color:var(--blaek);font-size:16px}
 .soeg:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
 .chips{display:flex;gap:7px;overflow-x:auto;padding:9px 0 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -191,6 +211,11 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
     <h1 id="h-titel">Overblik</h1>
     <span class="periode" id="h-periode"></span>
   </div>
+  <div class="chips" id="h-perioder"></div>
+  <div class="egenperiode" id="h-egen" hidden>
+    <input type="date" id="p-fra" aria-label="Fra og med"><span>til</span>
+    <input type="date" id="p-til" aria-label="Til og med">
+  </div>
 </header>
 
 <main>
@@ -217,7 +242,9 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
     <div class="vaerktoej">
       <input class="soeg" id="v-soeg" type="search" placeholder="Søg efter en vare" autocomplete="off">
       <div class="chips" id="v-grupper"></div>
+      <div class="chips" id="v-under" hidden></div>
       <div class="chips" id="v-sorter"></div>
+      <div class="daekning" id="v-daekning" hidden></div>
     </div>
     <div class="kort" id="v-liste"></div>
   </section>
@@ -249,6 +276,11 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
       <div id="f-dyre"></div>
     </div>
     <div class="kort">
+      <h2>Nyt i perioden</h2>
+      <p class="fundtekst">Varer I aldrig havde købt før.</p>
+      <div id="f-nyt"></div>
+    </div>
+    <div class="kort">
       <h2>Kun prøvet én gang</h2>
       <p class="fundtekst">Købt præcis én gang, aldrig igen.</p>
       <div id="f-engang"></div>
@@ -256,7 +288,7 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;st
   </section>
 </main>
 
-<div class="version" id="version">v1.0.1</div>
+<div class="version" id="version">v1.1.0</div>
 
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-side="overblik">
@@ -369,7 +401,11 @@ async function hentAlle(tabel, felter, sortering, fremskridt){
 /* =====================================================================
    2. DATA
    ===================================================================== */
-let ORDRER = [];   // {id, leveret(Date), beloeb}
+let ORDRER_ALT = [], LINJER_ALT = [];   // alt hentet, uberoert af periode
+let KATALOG = new Map();                // produkt_id -> vareinfo fra Nemlig
+let FOERSTE_KOEB = new Map();           // produkt_id -> allerfoerste koebsdato
+let PERIODE = {navn:"Alt", fra:null, til:null};
+let ORDRER = [];   // {id, leveret(Date), beloeb} - inden for perioden
 let LINJER = [];   // {ordre_id, produkt_id, navn, beskrivelse, antal, beloeb, rabat, gruppe, dato}
 let VARER = [];    // samlet pr. produkt_id
 let GRUPPER = [];  // {navn, kr, farve}
@@ -392,9 +428,9 @@ async function hentData(){
   tekst.textContent = "Henter ordrer …";
   // BEMÆRK: aldrig select=* på nemlig_ordrer — kolonnen "raa" er ca. 30 kB pr. ordre.
   const o = await hentAlle("nemlig_ordrer", "id,leveret,beloeb", "leveret.desc");
-  ORDRER = o.map(r => ({id:r.id, leveret:new Date(r.leveret), beloeb:Number(r.beloeb)||0}))
-            .filter(r => !isNaN(r.leveret));
-  ORDRER.sort((a,b)=> b.leveret - a.leveret);
+  ORDRER_ALT = o.map(r => ({id:r.id, leveret:new Date(r.leveret), beloeb:Number(r.beloeb)||0}))
+                .filter(r => !isNaN(r.leveret));
+  ORDRER_ALT.sort((a,b)=> b.leveret - a.leveret);
 
   const l = await hentAlle(
     "nemlig_ordrelinjer",
@@ -402,9 +438,9 @@ async function hentData(){
     "id.asc", saet);
 
   const datoer = {};
-  ORDRER.forEach(r => datoer[r.id] = r.leveret);
+  ORDRER_ALT.forEach(r => datoer[r.id] = r.leveret);
 
-  LINJER = l.map(r => ({
+  LINJER_ALT = l.map(r => ({
     ordre_id: r.ordre_id,
     produkt_id: r.produkt_id,
     navn: r.produkt_navn || "Uden navn",
@@ -416,10 +452,28 @@ async function hentData(){
     dato: datoer[r.ordre_id] || null
   })).filter(r => r.dato);
 
-  FOERSTE = ORDRER.length ? ORDRER[ORDRER.length-1].leveret : new Date();
-  SIDSTE  = ORDRER.length ? ORDRER[0].leveret : new Date();
+  // Allerfoerste koeb pr. vare, uafhaengigt af hvilken periode der vises.
+  // Uden den ville "Nyt i perioden" vise alt som nyt hver gang man skifter.
+  FOERSTE_KOEB.clear();
+  LINJER_ALT.forEach(l => {
+    const f = FOERSTE_KOEB.get(l.produkt_id);
+    if(!f || l.dato < f) FOERSTE_KOEB.set(l.produkt_id, l.dato);
+  });
 
-  byg();
+  tekst.textContent = "Henter vareinfo \u2026";
+  await hentKatalog();
+
+  anvendPeriode();
+}
+
+/* Katalogtabellen er ny og maa gerne vaere tom - den fylder sig selv op. */
+async function hentKatalog(){
+  try{
+    const raekker = await hentAlle("nemlig_katalog",
+      "produkt_id,navn,maerke,beskrivelse,billede,sti,mellemgruppe,undergruppe_navn," +
+      "pris,normalpris,enhedspris,enhedsmaal,paa_lager,findes,opdateret", "produkt_id.asc");
+    KATALOG = new Map(raekker.map(r => [r.produkt_id, r]));
+  }catch(e){ KATALOG = new Map(); }
 }
 
 /* --- saml varelinjer til varer. GRUPPERES PÅ VARENUMMER, aldrig på navn:
@@ -468,6 +522,149 @@ function medianInterval(koeb){
   d.sort((a,b)=>a-b);
   const m = Math.floor(d.length/2);
   return d.length % 2 ? d[m] : (d[m-1]+d[m])/2;
+}
+
+/* =====================================================================
+   2b. PERIODE - ét bånd i toppen der slår igennem på alle fire faner
+   ===================================================================== */
+function periodeValg(){
+  if(!ORDRER_ALT.length) return [];
+  const nu = new Date();
+  const iAar = nu.getFullYear();
+  const aar = [...new Set(ORDRER_ALT.map(o => o.leveret.getFullYear()))].sort((a,b)=> b-a);
+  const valg = [{navn:"Alt", fra:null, til:null}];
+  valg.push({navn:"I år", fra:new Date(iAar,0,1), til:null});
+  valg.push({navn:"12 mdr.", fra:new Date(nu.getFullYear()-1, nu.getMonth(), nu.getDate()), til:null});
+  aar.filter(a => a !== iAar).forEach(a =>
+    valg.push({navn:String(a), fra:new Date(a,0,1), til:new Date(a,11,31,23,59,59)}));
+  valg.push({navn:"Vælg…", egen:true});
+  return valg;
+}
+
+function tegnPerioder(){
+  el("h-perioder").innerHTML = periodeValg().map(v =>
+    '<button class="chip" data-p="'+esc(v.navn)+'" aria-pressed="'+(v.navn===PERIODE.navn)+'">'+
+    esc(v.navn)+'</button>').join("");
+}
+
+function vaelgPeriode(navn){
+  const v = periodeValg().find(x => x.navn === navn);
+  if(!v) return;
+  if(v.egen){
+    const boks = el("h-egen");
+    boks.hidden = !boks.hidden;
+    if(!boks.hidden){
+      const t = SIDSTE || new Date(), f = FOERSTE || new Date();
+      if(!el("p-fra").value) el("p-fra").value = f.toISOString().slice(0,10);
+      if(!el("p-til").value) el("p-til").value = t.toISOString().slice(0,10);
+    }
+    return;
+  }
+  el("h-egen").hidden = true;
+  PERIODE = {navn:v.navn, fra:v.fra, til:v.til};
+  anvendPeriode();
+}
+
+function egenPeriode(){
+  const f = el("p-fra").value, t = el("p-til").value;
+  if(!f || !t) return;
+  const fra = new Date(f+"T00:00:00"), til = new Date(t+"T23:59:59");
+  if(isNaN(fra) || isNaN(til) || fra > til) return;
+  PERIODE = {navn:"Vælg…", fra, til};
+  anvendPeriode();
+}
+
+/* Ét sted der skærer data til og tegner alt om. Alle fire faner regner
+   udelukkende på ORDRER og LINJER, så de følger perioden af sig selv. */
+function anvendPeriode(){
+  const i = d => (!PERIODE.fra || d >= PERIODE.fra) && (!PERIODE.til || d <= PERIODE.til);
+  ORDRER = ORDRER_ALT.filter(o => i(o.leveret));
+  const gyldige = new Set(ORDRER.map(o => o.id));
+  LINJER = LINJER_ALT.filter(l => gyldige.has(l.ordre_id));
+
+  FOERSTE = ORDRER.length ? ORDRER[ORDRER.length-1].leveret : (PERIODE.fra || new Date());
+  SIDSTE  = ORDRER.length ? ORDRER[0].leveret : (PERIODE.til || new Date());
+
+  byg();
+  tegnAlt();
+}
+
+function tegnAlt(){
+  tegnPerioder();
+  if(!ORDRER.length){
+    el("h-periode").textContent = "ingen leveringer";
+    el("ov-tal").innerHTML = "";
+    el("ov-maaneder").innerHTML = '<div class="tom">Ingen leveringer i det valgte tidsrum.</div>';
+    el("ov-stak").innerHTML = ""; el("ov-grupper").innerHTML = ""; el("ov-top").innerHTML = "";
+    el("v-liste").innerHTML = '<div class="tom">Ingen varer i det valgte tidsrum.</div>';
+    el("o-liste").innerHTML = '<div class="tom">Ingen leveringer i det valgte tidsrum.</div>';
+    ["f-rabat","f-mangler","f-priser","f-dyre","f-nyt","f-engang"].forEach(n => el(n).innerHTML = "");
+    return;
+  }
+  tegnOverblik();
+  tegnVarefiltre();
+  tegnVarer();
+  tegnOrdrer();
+  tegnFund();
+}
+
+/* =====================================================================
+   2c. VAREKATALOG - billeder, mærke, undergruppe og udgåede varer
+   ===================================================================== */
+const KAT_HOLD = 25;        // varenumre pr. kald
+const KAT_PAUSE = 5000;     // pause mellem kald - hans ønske, ikke et sekund
+const KAT_RUNDER = 4;       // højst fire kald pr. besøg = 100 varer
+const KAT_DAGE = 30;        // hvornår en post regnes for gammel
+let katalogKoerer = false, katalogFejl = null;
+
+const blund = ms => new Promise(r => setTimeout(r, ms));
+
+function friskNok(k){
+  return !!(k && k.opdateret && (Date.now() - new Date(k.opdateret)) < KAT_DAGE*86400000);
+}
+
+async function kaldKatalog(ider, andenGang){
+  const svar = await fetch(SB_URL+"/functions/v1/nemlig-katalog", {
+    method:"POST",
+    headers:{"Content-Type":"application/json", apikey:SB_NOEGLE,
+             Authorization:"Bearer "+(session ? session.access_token : "")},
+    body: JSON.stringify({ider})
+  });
+  if(svar.status === 401 && !andenGang && await forny()) return kaldKatalog(ider, true);
+  const data = await svar.json().catch(()=> ({}));
+  if(!svar.ok || data.fejl) throw new Error(data.fejl || ("Opslaget svarede "+svar.status));
+
+  const nu = new Date().toISOString();
+  (data.varer||[]).forEach(v => KATALOG.set(v.produkt_id, v));
+  (data.udgaaet||[]).forEach(id =>
+    KATALOG.set(id, Object.assign({produkt_id:id, navn:""}, KATALOG.get(id)||{},
+                                  {findes:false, opdateret:nu})));
+  return data;
+}
+
+/* Fylder katalogget lidt ad gangen. Aldrig et gennemløb af alle 1.318 i
+   træk - det var netop det han var bekymret for. Mest købte først. */
+async function topOp(){
+  if(katalogKoerer) return;
+  katalogKoerer = true;
+  try{
+    for(let runde = 0; runde < KAT_RUNDER; runde++){
+      if(document.hidden) break;
+      const mangler = [];
+      for(const v of VARER){
+        if(mangler.length >= KAT_HOLD) break;
+        if(!KATALOG.has(v.id)) mangler.push(v.id);
+      }
+      if(!mangler.length) break;
+      await kaldKatalog(mangler);
+      tegnVarefiltre(); tegnVarer();
+      if(runde < KAT_RUNDER-1) await blund(KAT_PAUSE);
+    }
+  }catch(e){
+    katalogFejl = String(e.message||e);
+    tegnVarefiltre();
+  }
+  katalogKoerer = false;
 }
 
 /* =====================================================================
@@ -569,7 +766,7 @@ const kortTal = (b, s) => '<div><b class="tal">'+b+'</b><span>'+s+'</span></div>
 /* =====================================================================
    5. VARER
    ===================================================================== */
-let vGruppe = "alle", vSort = "gange", vSoegning = "";
+let vGruppe = "alle", vUnder = "alle", vSort = "gange", vSoegning = "";
 
 const SORTERINGER = [
   {n:"gange", t:"Oftest købt",  f:(a,b)=> b.gange-a.gange},
@@ -580,16 +777,24 @@ const SORTERINGER = [
 ];
 
 function tegnVarefiltre(){
-  el("v-grupper").innerHTML =
-    '<button class="chip" data-g="alle" aria-pressed="true">Alle grupper</button>' +
-    GRUPPER.map(g => '<button class="chip" data-g="'+esc(g.navn)+'" aria-pressed="false">'+esc(g.navn)+'</button>').join("");
+  el("v-grupper").innerHTML = ['alle'].concat(GRUPPER.map(g=>g.navn)).map(n =>
+    '<button class="chip" data-g="'+esc(n)+'" aria-pressed="'+(n===vGruppe)+'">'+
+    (n==="alle" ? "Alle grupper" : esc(n))+'</button>').join("");
+  tegnUnderfiltre();
+  el("v-under").onclick = e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    vUnder = b.dataset.u;
+    tegnUnderfiltre(); tegnVarer();
+  };
   el("v-sorter").innerHTML = SORTERINGER.map(s =>
     '<button class="chip" data-s="'+s.n+'" aria-pressed="'+(s.n===vSort)+'">'+s.t+'</button>').join("");
 
   el("v-grupper").onclick = e => {
     const b = e.target.closest(".chip"); if(!b) return;
     vGruppe = b.dataset.g;
+    vUnder = "alle";
     [...el("v-grupper").children].forEach(c => c.setAttribute("aria-pressed", c===b));
+    tegnUnderfiltre();
     tegnVarer();
   };
   el("v-sorter").onclick = e => {
@@ -601,9 +806,46 @@ function tegnVarefiltre(){
   el("v-soeg").oninput = e => { vSoegning = e.target.value.trim().toLowerCase(); tegnVarer(); };
 }
 
+/* Undergrupperne findes ikke i historikken - de kommer fra katalogget,
+   som fylder sig selv op lidt ad gangen. Derfor vises båndet først når
+   der er noget at vælge imellem, og det siger hvor meget det dækker. */
+function tegnUnderfiltre(){
+  const baand = el("v-under"), note = el("v-daekning");
+  const grundlag = vGruppe === "alle" ? VARER : VARER.filter(v => v.gruppe === vGruppe);
+  const kendte = grundlag.filter(v => {
+    const k = KATALOG.get(v.id);
+    return k && k.undergruppe_navn;
+  });
+  const navne = [...new Set(kendte.map(v => KATALOG.get(v.id).undergruppe_navn))]
+                  .sort((a,b)=> a.localeCompare(b,"da"));
+
+  if(katalogFejl){
+    baand.hidden = true; note.hidden = false;
+    note.textContent = "Vareinfo kunne ikke hentes: " + katalogFejl;
+    return;
+  }
+  if(navne.length < 2){
+    baand.hidden = true; note.hidden = false;
+    note.textContent = "Undergrupper dukker op, efterhånden som vareinfo hentes ("+
+      kendte.length+" af "+grundlag.length+" varer indtil videre).";
+    return;
+  }
+  if(!navne.includes(vUnder)) vUnder = "alle";
+  baand.hidden = false;
+  baand.innerHTML = '<button class="chip" data-u="alle" aria-pressed="'+(vUnder==="alle")+
+    '">Alle undergrupper</button>' + navne.map(n =>
+    '<button class="chip" data-u="'+esc(n)+'" aria-pressed="'+(vUnder===n)+'">'+esc(n)+'</button>').join("");
+  note.hidden = false;
+  note.textContent = "Dækker "+kendte.length+" af "+grundlag.length+" varer.";
+}
+
 function tegnVarer(){
   let liste = VARER;
   if(vGruppe !== "alle") liste = liste.filter(v => v.gruppe === vGruppe);
+  if(vUnder !== "alle") liste = liste.filter(v => {
+    const k = KATALOG.get(v.id);
+    return k && k.undergruppe_navn === vUnder;
+  });
   if(vSoegning) liste = liste.filter(v =>
     v.navn.toLowerCase().includes(vSoegning) ||
     v.beskrivelse.toLowerCase().includes(vSoegning) ||
@@ -618,7 +860,10 @@ function tegnVarer(){
 }
 
 function varerk(v){
+  const k = KATALOG.get(v.id);
+  const ud = k && k.findes === false;
   return '<button class="rk" data-vare="'+esc(v.id)+'">'+
+    (ud ? '<span class="udprik" title="Findes ikke længere hos Nemlig"></span>' : '')+
     '<div class="krop">'+
       '<div class="navn">'+esc(v.navn)+'</div>'+
       '<div class="under">'+v.gange+' gange · sidst '+siden(v.dageSiden)+'</div>'+
@@ -690,6 +935,16 @@ function tegnFund(){
   el("f-dyre").innerHTML = [...VARER].sort((a,b)=> b.kr-a.kr).slice(0,10)
     .map(v => enkeltRk(v, kr(v.kr), v.gange+" gange")).join("");
 
+  /* Nyt i perioden - målt på det allerførste køb nogensinde, ikke på
+     hvad der tilfældigvis er det første inden for det valgte tidsrum */
+  const nyt = VARER.filter(v => {
+    const f = FOERSTE_KOEB.get(v.id);
+    return f && (!PERIODE.fra || f >= PERIODE.fra) && (!PERIODE.til || f <= PERIODE.til);
+  }).sort((a,b)=> b.kr - a.kr).slice(0,10);
+  el("f-nyt").innerHTML = nyt.length
+    ? nyt.map(v => enkeltRk(v, kr(v.kr), "første gang "+dato(FOERSTE_KOEB.get(v.id)))).join("")
+    : '<div class="tom">Ingen nye varer i det valgte tidsrum.</div>';
+
   /* Prøvet én gang */
   const engang = VARER.filter(v => v.gange === 1 && v.kr >= 25 && v.dageSiden > 120)
     .sort((a,b)=> b.kr-a.kr).slice(0,10);
@@ -730,6 +985,7 @@ function visVare(id){
 
   let html = "<h2>"+esc(v.navn)+"</h2>"+
     '<div class="meta">'+esc(v.beskrivelse || v.gruppe)+" · varenr. "+esc(v.id)+"</div>"+
+    '<div id="kat-'+esc(v.id)+'">'+katalogHtml(v)+'</div>'+
     '<div class="fakta">'+
       '<div><b class="tal">'+v.gange+'</b><span>gange købt</span></div>'+
       '<div><b class="tal">'+v.stk.toLocaleString("da-DK")+'</b><span>stk. i alt</span></div>'+
@@ -760,6 +1016,62 @@ function visVare(id){
       '<span class="pil">›</span></button>').join("");
 
   aabnArk(html);
+  if(!friskNok(KATALOG.get(v.id))) hentEnVare(v.id);
+}
+
+/* Vareinfoen hentes hos Nemlig når man åbner varen - ét kald, mens man
+   alligevel står og kigger. Den gemmes, så det kun sker én gang. */
+function katalogHtml(v){
+  const k = KATALOG.get(v.id);
+  if(!k) return '<div class="katalogstatus">Vareinfo hentes …</div>';
+  if(k.findes === false)
+    return '<div class="varetop"><div class="ved">'+
+      '<b><span class="maerke ud">Udgået</span></b>'+
+      '<span>Varen findes ikke længere hos Nemlig. Det I ser her, er jeres egen historik.</span>'+
+      '</div></div>';
+
+  const nemligUrl = k.sti
+    ? (/^https?:/.test(k.sti) ? k.sti : "https://www.nemlig.com" + (k.sti[0]==="/" ? "" : "/") + k.sti)
+    : null;
+
+  const rk = (m, vaerdi) => '<div class="infor"><span class="m">'+m+'</span><span class="v">'+vaerdi+'</span></div>';
+  const linjer = [];
+  if(k.pris != null){
+    const nu = kr2(Number(k.pris));
+    linjer.push(rk("Pris hos Nemlig i dag",
+      (k.normalpris != null && Number(k.normalpris) > Number(k.pris))
+        ? nu+' <span class="maerke ned">tilbud</span>' : nu));
+  }
+  if(k.enhedspris != null)
+    linjer.push(rk("Enhedspris", kr2(Number(k.enhedspris)) + (k.enhedsmaal ? " / "+esc(k.enhedsmaal) : "")));
+  if(v.snitpris) linjer.push(rk("Hvad I har betalt i snit", kr2(v.snitpris)));
+  if(k.mellemgruppe) linjer.push(rk("Kategori", esc(k.mellemgruppe)));
+  if(k.undergruppe_navn) linjer.push(rk("Undergruppe", esc(k.undergruppe_navn)));
+  if(k.paa_lager === false) linjer.push(rk("Lager", '<span class="maerke op">udsolgt lige nu</span>'));
+  linjer.push(rk("Varenummer", nemligUrl
+    ? '<a class="nemliglink" href="'+esc(nemligUrl)+'" target="_blank" rel="noopener">'+esc(v.id)+' ↗</a>'
+    : esc(v.id)));
+
+  return '<div class="varetop">'+
+      (k.billede ? '<img class="varebil" src="'+esc(k.billede)+'&w=160" alt="" loading="lazy">' : '')+
+      '<div class="ved"><b>'+esc(k.navn || v.navn)+'</b>'+
+      '<span>'+esc([k.maerke, k.beskrivelse].filter(Boolean).join(" · "))+'</span></div>'+
+    '</div>'+
+    '<div class="infoliste">'+linjer.join("")+'</div>';
+}
+
+async function hentEnVare(id){
+  const felt = () => document.getElementById("kat-"+id);
+  try{
+    await kaldKatalog([id]);
+  }catch(e){
+    if(felt()) felt().innerHTML = '<div class="katalogstatus">Kunne ikke hente vareinfo: '+esc(e.message||e)+'</div>';
+    return;
+  }
+  // Kun den ene blok tegnes om - ellers ville arket hoppe til toppen.
+  const v = VARER.find(x => x.id === id);
+  if(v && felt()) felt().innerHTML = katalogHtml(v);
+  tegnUnderfiltre(); tegnVarer();
 }
 
 function prisGraf(koeb){
@@ -829,6 +1141,21 @@ function skiftSide(navn){
   window.scrollTo(0,0);
 }
 
+el("h-perioder").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if(!b) return;
+  vaelgPeriode(b.dataset.p);
+});
+el("p-fra").addEventListener("change", egenPeriode);
+el("p-til").addEventListener("change", egenPeriode);
+
+/* Værktøjslinjen i Varer klæber under headeren, og headeren er blevet
+   højere med periodebåndet. Målt frem for gættet, så den ikke skjuler sig. */
+function maalHoved(){
+  const h = document.querySelector("header");
+  if(h) document.documentElement.style.setProperty("--hovedhoejde", h.offsetHeight+"px");
+}
+window.addEventListener("resize", maalHoved);
+
 document.querySelector("nav").addEventListener("click", e => {
   const b = e.target.closest("button[data-side]"); if(!b) return;
   skiftSide(b.dataset.side);
@@ -897,13 +1224,10 @@ el("l-kode").addEventListener("keydown", e => { if(e.key === "Enter") el("l-knap
 async function start(){
   el("hent").hidden = false;
   try{
-    await hentData();
-    tegnOverblik();
-    tegnVarefiltre();
-    tegnVarer();
-    tegnOrdrer();
-    tegnFund();
+    await hentData();          // anvendPeriode() -> tegnAlt() sker inde i den
     el("hent").hidden = true;
+    maalHoved();
+    topOp();                   // fylder katalogget stille og roligt op
   }catch(err){
     el("hent-tekst").textContent = "Kunne ikke hente data: " + String(err.message||err);
   }
