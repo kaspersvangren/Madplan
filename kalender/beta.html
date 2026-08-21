@@ -998,9 +998,14 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* "og 1 × Iceberg" — de øvrige varer på samme linje. Egen tone, så den
    ikke forveksles med behovet ovenover eller med kurv-mærket. */
 .nemogsaa{display:block;font-size:12.5px;color:var(--lev);margin-top:2px}
-/* En variant der er udsolgt falder fra. Den nævnes, men i dæmpet farve —
-   den spærrer ikke, den forsvinder bare. */
-.nemogsaa.udgaar{color:var(--muted)}
+/* En variant der udgår skal kunne SES — den forsvinder jo fra ordren.
+   Den spærrer ikke knappen, men man skal vide det. Derfor advarselsfarve
+   og en lille prik foran, ikke bare grå tekst. */
+.nemogsaa.udgaar s{text-decoration:line-through}
+.nemogsaa.udgaar{color:var(--holiday);font-weight:600;
+  display:flex;align-items:baseline;gap:5px}
+.nemogsaa.udgaar::before{content:"";flex:none;width:6px;height:6px;
+  border-radius:999px;background:var(--holiday)}
 /* Linjesummen står tættere på og lidt kraftigere end stykprisen — det er
    den man leder efter, når der er skruet op. */
 .nemrad .under.sum{color:var(--ink);font-variant-numeric:tabular-nums;margin-top:1px}
@@ -1067,8 +1072,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   font-variant-numeric:tabular-nums}
 .nemgruppe.haster .t, .nemundergruppe.haster .t{color:var(--holiday)}
 html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
+/* Knappen skal holde sig inden for antalssøjlen (104px). Uden max-width og
+   ombrydning stak "Varianter" ud over kanten på en telefon. */
 .nembytknap{display:block;margin-top:4px;font-size:12.5px;color:var(--muted);
-  padding:2px 0;border-bottom:1px dashed var(--line-strong);border-radius:0}
+  padding:2px 0;border:1px solid var(--line);border-radius:9px;
+  max-width:100%;width:100%;text-align:center;line-height:1.25;
+  overflow-wrap:anywhere}
 .nembytknap:hover{color:var(--ink);border-bottom-style:solid}
 .nemkurv{background:var(--chip);border-radius:12px;padding:4px 12px 10px;margin-bottom:6px}
 .nemkurv .nemrad{border-top-color:var(--line)}
@@ -1918,7 +1927,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.46.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.46.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6279,9 +6288,10 @@ function nemTegn(){
             ? '<span class="nemogsaa">og ' + esc(klar.map(e =>
                 e.antal + " × " + (e.produkt_navn || "vare")).join(", ")) + '</span>' : "")
             + (vaek.length
-            ? '<span class="nemogsaa udgaar">' + esc(vaek.map(e =>
-                e.produkt_navn || "vare").join(", "))
-              + (vaek.length === 1 ? " er udsolgt og udgår" : " er udsolgte og udgår")
+            ? '<span class="nemogsaa udgaar"><s>' + esc(vaek.map(e =>
+                e.produkt_navn || "vare").join(", ")) + '</s>'
+              + (vaek.length === 1 ? " er udsolgt og kommer ikke med"
+                                   : " er udsolgte og kommer ikke med")
               + '</span>' : "");
         })()
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
