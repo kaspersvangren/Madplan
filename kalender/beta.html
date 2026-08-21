@@ -1946,7 +1946,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.52.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.52.0-maaling";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7785,8 +7785,14 @@ const appErHjemme = () => !arkAabne() && erForsiden();
    vogte. Kaldes fra render() og show(), så den fanger både fane-, dag-
    og visningsskift og åbne ark. */
 function vagtOpdater(){
-  if(appErHjemme() || harVagt()) return;
-  try{ history.pushState({ vagt: true }, ""); }catch(e){}
+  if(appErHjemme()){ if(typeof skrivSpor==="function") skrivSpor("   vagt: ingen (hjemme)"); return; }
+  if(harVagt()){ if(typeof skrivSpor==="function") skrivSpor("   vagt: findes allerede"); return; }
+  try{
+    history.pushState({ vagt: true }, "");
+    if(typeof skrivSpor==="function") skrivSpor("   vagt: LAGT · " + sporStand());
+  }catch(err){
+    if(typeof skrivSpor==="function") skrivSpor("   vagt: FEJLEDE " + err);
+  }
 }
 
 /* Er alt lukket og vi er hjemme, skal vagtskridtet væk igen — ellers
@@ -7796,13 +7802,36 @@ function vagtOpdater(){
 function arkRyd(){
   setTimeout(() => {
     if(harVagt() && appErHjemme()){
+      if(typeof skrivSpor==="function") skrivSpor("   arkRyd: bruger vagten (hjemme)");
       arkSpring = true;
       history.back();
     }
   }, 0);
 }
 
+/* ===== MIDLERTIDIG MAALING — fjernes igen =====
+   Tre gaet ramte forbi, saa nu skrives det ud hvad der faktisk sker. */
+const spor = [];
+function skrivSpor(hvad){
+  spor.push(hvad);
+  if(spor.length > 6) spor.shift();
+  let e = document.getElementById("sporbar");
+  if(!e){
+    e = document.createElement("div");
+    e.id = "sporbar";
+    e.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;"
+      + "background:#111;color:#0f0;font:11px/1.35 monospace;padding:5px 7px;"
+      + "white-space:pre-wrap;max-height:38vh;overflow:auto";
+    document.body.appendChild(e);
+  }
+  e.textContent = spor.join("\n");
+}
+const sporStand = () => "vagt=" + (harVagt() ? "JA" : "nej")
+  + " ark=" + arkAabne() + " fane=" + fane
+  + " forsiden=" + (erForsiden() ? "JA" : "nej");
+
 window.addEventListener("popstate", () => {
+  skrivSpor("TILBAGE trykket · " + sporStand() + (arkSpring ? " · SPRING" : ""));
   if(arkSpring){ arkSpring = false; return; }
 
   /* 1. Et åbent ark lukkes først. */
@@ -7818,10 +7847,8 @@ window.addEventListener("popstate", () => {
   /* 3. Står vi allerede hjemme, gør vi ingenting, og browseren forlader
         appen som den plejer. */
 
-  /* Er der stadig noget at gå tilbage fra, lægges et nyt vagtskridt.
-     Det er DET her, der manglede før, og som gjorde at tilbage kun
-     virkede én gang. */
   vagtOpdater();
+  skrivSpor("   efter: " + sporStand());
 });
 
 const show = id => {
