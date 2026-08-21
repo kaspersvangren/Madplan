@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3E6B4A">
+<title>Købshistorik</title>
+<style>
+:root{
+  --papir:#FBFAF7; --kort:#FFFFFF; --blaek:#23201C; --daemp:#7A736A;
+  --streg:#E7E2DA; --accent:#3E6B4A; --accent-bg:#E4EDE4; --accent-svag:#9BB9A2;
+  --rod:#A8503E; --rod-bg:#F3E3DF; --gul:#B08325;
+  --skygge:0 1px 2px rgba(35,32,28,.06), 0 6px 18px rgba(35,32,28,.05);
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --papir:#16181A; --kort:#1E2124; --blaek:#E8E4DE; --daemp:#95908A;
+    --streg:#2C3034; --accent:#8FBE95; --accent-bg:#22331F; --accent-svag:#4C6B52;
+    --rod:#D99483; --rod-bg:#38251F; --gul:#D8AC53;
+    --skygge:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--papir); color:var(--blaek);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));
+}
+button{font:inherit;color:inherit;cursor:pointer}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+.tal{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* ---------- login ---------- */
+#login{position:fixed;inset:0;z-index:80;background:var(--papir);display:flex;align-items:center;justify-content:center;padding:24px}
+#login .boks{width:100%;max-width:340px}
+#login h1{font-size:26px;margin-bottom:4px}
+#login p{color:var(--daemp);font-size:14px;margin:0 0 22px}
+#login label{display:block;font-size:13px;color:var(--daemp);margin:14px 0 5px}
+#login input{width:100%;padding:12px 13px;border:1px solid var(--streg);border-radius:10px;background:var(--kort);color:var(--blaek);font-size:16px}
+#login input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+#login button{width:100%;margin-top:20px;padding:13px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:600}
+@media (prefers-color-scheme: dark){#login button{color:#16181A}}
+#login .fejl{margin-top:14px;font-size:14px;color:var(--rod);background:var(--rod-bg);padding:10px 12px;border-radius:10px}
+
+/* ---------- indlæsning ---------- */
+#hent{position:fixed;inset:0;z-index:70;background:var(--papir);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+#hent .bar{width:200px;height:5px;border-radius:3px;background:var(--streg);overflow:hidden}
+#hent .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+#hent p{margin:0;color:var(--daemp);font-size:14px}
+
+/* ---------- ramme ---------- */
+header{
+  position:sticky;top:0;z-index:20;background:var(--papir);
+  padding:calc(14px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--streg)
+}
+header .titel{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+header h1{font-size:19px}
+header .periode{font-size:12px;color:var(--daemp);white-space:nowrap}
+main{padding:16px 16px 24px;max-width:820px;margin:0 auto}
+.side{display:none}
+.side.vis{display:block}
+
+/* ---------- kort ---------- */
+.kort{background:var(--kort);border:1px solid var(--streg);border-radius:var(--r);padding:14px;box-shadow:var(--skygge);margin-bottom:14px}
+.kort > h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--daemp);font-weight:600;margin-bottom:12px}
+
+.nogletal{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--streg);border-radius:var(--r);overflow:hidden;border:1px solid var(--streg);margin-bottom:14px}
+.nogletal div{background:var(--kort);padding:13px 14px}
+.nogletal b{display:block;font-size:23px;font-weight:650;letter-spacing:-.02em}
+.nogletal span{display:block;font-size:12px;color:var(--daemp);margin-top:2px}
+
+/* ---------- månedssøjler ---------- */
+.maaneder{display:flex;gap:3px;align-items:flex-end;height:120px;overflow-x:auto;padding-bottom:22px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.maaned{flex:0 0 16px;position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;background:none;border:0;padding:0}
+.maaned i{display:block;width:100%;background:var(--accent-svag);border-radius:3px 3px 0 0;min-height:2px;transition:background .15s}
+.maaned.aar i{background:var(--accent)}
+.maaned b{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--daemp);font-weight:500}
+.maaned:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- gruppefordeling ---------- */
+.stak{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-bottom:14px}
+.stak i{display:block;height:100%}
+.grpliste{display:grid;gap:9px}
+.grprk{display:flex;align-items:center;gap:9px;font-size:14px}
+.prik{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.grprk .navn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grprk .kr{color:var(--daemp);font-size:13px}
+
+/* ---------- rytmestribe (signaturen) ---------- */
+.rytme{position:relative;height:16px;border-radius:4px;background:var(--streg);overflow:hidden;margin-top:6px}
+.rytme i{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);border-radius:1px;opacity:.85}
+.rytme.stor{height:34px;border-radius:7px}
+.rytme.stor i{width:3px}
+.rytmeaar{display:flex;justify-content:space-between;font-size:10px;color:var(--daemp);margin-top:3px}
+
+/* ---------- lister ---------- */
+.rk{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--streg);padding:11px 2px}
+.rk:last-child{border-bottom:0}
+.rk:active{background:var(--accent-bg)}
+.rk .krop{flex:1;min-width:0}
+.rk .navn{font-size:15px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .under{font-size:12px;color:var(--daemp);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .hoejre{text-align:right;flex:0 0 auto}
+.rk .hoejre b{display:block;font-size:15px;font-weight:600}
+.rk .hoejre span{display:block;font-size:11px;color:var(--daemp)}
+.rk .pil{flex:0 0 auto;color:var(--daemp);opacity:.5}
+
+/* ---------- værktøjslinje ---------- */
+.vaerktoej{position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:15;background:var(--papir);padding:10px 0 8px;margin:-4px 0 4px}
+.soeg{width:100%;padding:11px 13px;border:1px solid var(--streg);border-radius:10px;background:var(--kort);color:var(--blaek);font-size:16px}
+.soeg:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.chips{display:flex;gap:7px;overflow-x:auto;padding:9px 0 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid var(--streg);background:var(--kort);font-size:13px;color:var(--daemp);white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:550}
+@media (prefers-color-scheme: dark){.chip[aria-pressed="true"]{color:#16181A}}
+
+/* ---------- fund ---------- */
+.fundtekst{font-size:13px;color:var(--daemp);margin:-4px 0 12px}
+.maerke{display:inline-block;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:600;vertical-align:1px}
+.maerke.op{background:var(--rod-bg);color:var(--rod)}
+.maerke.ned{background:var(--accent-bg);color:var(--accent)}
+
+/* ---------- ark ---------- */
+.slor{position:fixed;inset:0;z-index:40;background:rgba(20,18,16,0);pointer-events:none;transition:background .3s}
+.slor.aaben{background:rgba(20,18,16,.42);pointer-events:auto}
+.ark{
+  position:fixed;left:0;right:0;bottom:0;z-index:41;max-height:92dvh;
+  background:var(--kort);border-radius:20px 20px 0 0;padding:18px 18px calc(24px + env(safe-area-inset-bottom));
+  overflow-y:auto;overscroll-behavior:contain;
+  transform:translateY(100%);transition:transform .34s cubic-bezier(.32,.72,0,1);
+  max-width:820px;margin:0 auto
+}
+.ark.aaben{transform:translateY(0)}
+.lukkryds{float:right;position:sticky;top:0;z-index:6;border:0;background:var(--kort);color:var(--daemp);font-size:22px;line-height:1;padding:2px 4px 6px 10px}
+.ark h2{font-size:19px;padding-right:34px}
+.ark .meta{font-size:13px;color:var(--daemp);margin:3px 0 16px}
+.ark h3{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--daemp);font-weight:600;margin:20px 0 9px}
+.fakta{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--streg);border:1px solid var(--streg);border-radius:12px;overflow:hidden}
+.fakta div{background:var(--kort);padding:11px 12px}
+.fakta b{display:block;font-size:18px;font-weight:650}
+.fakta span{display:block;font-size:11px;color:var(--daemp);margin-top:1px}
+.tidl{font-size:12px;color:var(--daemp);background:var(--papir);border:1px solid var(--streg);border-radius:9px;padding:8px 10px;margin-top:10px}
+svg.graf{width:100%;height:130px;display:block;overflow:visible}
+.grafaks{font-size:10px;fill:var(--daemp)}
+
+/* ---------- faner ---------- */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;
+  background:var(--kort);border-top:1px solid var(--streg);
+  padding-bottom:env(safe-area-inset-bottom)
+}
+nav button{flex:1;border:0;background:none;padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--daemp)}
+nav button[aria-selected="true"]{color:var(--accent);font-weight:600}
+nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.tom{text-align:center;color:var(--daemp);font-size:14px;padding:26px 10px}
+.version{position:fixed;left:8px;bottom:calc(66px + env(safe-area-inset-bottom));font-size:10px;color:var(--daemp);opacity:.45;z-index:25;pointer-events:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN ======================= -->
+<div id="login" hidden>
+  <div class="boks">
+    <h1>Købshistorik</h1>
+    <p>Log ind med familiens konto — den samme som i kalenderen.</p>
+    <label for="l-mail">E-mail</label>
+    <input id="l-mail" type="email" autocomplete="username" inputmode="email">
+    <label for="l-kode">Kodeord</label>
+    <input id="l-kode" type="password" autocomplete="current-password">
+    <button id="l-knap">Log ind</button>
+    <div id="l-fejl" class="fejl" hidden></div>
+  </div>
+</div>
+
+<!-- ======================= INDLÆSNING ======================= -->
+<div id="hent" hidden>
+  <div class="bar"><i id="hent-bar"></i></div>
+  <p id="hent-tekst">Henter købshistorikken …</p>
+</div>
+
+<!-- ======================= RAMME ======================= -->
+<header>
+  <div class="titel">
+    <h1 id="h-titel">Overblik</h1>
+    <span class="periode" id="h-periode"></span>
+  </div>
+</header>
+
+<main>
+  <!-- OVERBLIK -->
+  <section class="side vis" id="side-overblik">
+    <div class="nogletal" id="ov-tal"></div>
+    <div class="kort">
+      <h2>Forbrug pr. måned</h2>
+      <div class="maaneder" id="ov-maaneder"></div>
+    </div>
+    <div class="kort">
+      <h2>Hvad pengene går til</h2>
+      <div class="stak" id="ov-stak"></div>
+      <div class="grpliste" id="ov-grupper"></div>
+    </div>
+    <div class="kort">
+      <h2>Dem I køber oftest</h2>
+      <div id="ov-top"></div>
+    </div>
+  </section>
+
+  <!-- VARER -->
+  <section class="side" id="side-varer">
+    <div class="vaerktoej">
+      <input class="soeg" id="v-soeg" type="search" placeholder="Søg efter en vare" autocomplete="off">
+      <div class="chips" id="v-grupper"></div>
+      <div class="chips" id="v-sorter"></div>
+    </div>
+    <div class="kort" id="v-liste"></div>
+  </section>
+
+  <!-- ORDRER -->
+  <section class="side" id="side-ordrer">
+    <div class="kort" id="o-liste"></div>
+  </section>
+
+  <!-- FUND -->
+  <section class="side" id="side-fund">
+    <div class="kort">
+      <h2>Sparet på tilbud</h2>
+      <div id="f-rabat"></div>
+    </div>
+    <div class="kort">
+      <h2>Ikke købt længe</h2>
+      <p class="fundtekst">Varer I ellers køber regelmæssigt, men som har ladet vente på sig.</p>
+      <div id="f-mangler"></div>
+    </div>
+    <div class="kort">
+      <h2>Prisen er steget</h2>
+      <p class="fundtekst">Første køb mod seneste køb. Tilbudskøb tæller med, så et enkelt godt tilbud kan trække.</p>
+      <div id="f-priser"></div>
+    </div>
+    <div class="kort">
+      <h2>Dyreste vaner</h2>
+      <p class="fundtekst">Hvad I har brugt flest penge på i alt.</p>
+      <div id="f-dyre"></div>
+    </div>
+    <div class="kort">
+      <h2>Kun prøvet én gang</h2>
+      <p class="fundtekst">Købt præcis én gang, aldrig igen.</p>
+      <div id="f-engang"></div>
+    </div>
+  </section>
+</main>
+
+<div class="version" id="version">v1.0.0</div>
+
+<nav role="tablist">
+  <button role="tab" aria-selected="true" data-side="overblik">
+    <svg viewBox="0 0 24 24"><path d="M3 13h4v8H3zM10 3h4v18h-4zM17 9h4v12h-4z"/></svg>Overblik</button>
+  <button role="tab" aria-selected="false" data-side="varer">
+    <svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>Varer</button>
+  <button role="tab" aria-selected="false" data-side="ordrer">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Ordrer</button>
+  <button role="tab" aria-selected="false" data-side="fund">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>Fund</button>
+</nav>
+
+<div class="slor" id="slor"></div>
+<div class="ark" id="ark"><button class="lukkryds" id="ark-luk" aria-label="Luk">✕</button><div id="ark-krop"></div></div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   INDSTILLINGER — de to linjer skal være de samme som i kalenderens
+   index.html. Kopier dem derfra.
+   ===================================================================== */
+const SB_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
+const SB_NOEGLE = "SÆT_ANON_NØGLEN_IND_HER";
+
+/* =====================================================================
+   1. LOGIN OG HENTNING
+   ===================================================================== */
+const GEM = "historik-session";
+let session = null;
+
+const el = id => document.getElementById(id);
+
+function gemSession(s){
+  session = s;
+  try{ localStorage.setItem(GEM, JSON.stringify({a:s.access_token, r:s.refresh_token})); }catch(e){}
+}
+function glemSession(){
+  session = null;
+  try{ localStorage.removeItem(GEM); }catch(e){}
+}
+
+async function authKald(krop, grant){
+  const svar = await fetch(SB_URL+"/auth/v1/token?grant_type="+grant, {
+    method:"POST",
+    headers:{"Content-Type":"application/json", apikey:SB_NOEGLE},
+    body:JSON.stringify(krop)
+  });
+  const data = await svar.json().catch(()=>({}));
+  if(!svar.ok) throw new Error(data.error_description || data.msg || data.message || "Login mislykkedes");
+  return data;
+}
+
+async function logInd(mail, kode){
+  const s = await authKald({email:mail, password:kode}, "password");
+  gemSession(s);
+}
+
+async function forny(){
+  let gemt = null;
+  try{ gemt = JSON.parse(localStorage.getItem(GEM)||"null"); }catch(e){}
+  if(!gemt || !gemt.r) return false;
+  try{
+    const s = await authKald({refresh_token:gemt.r}, "refresh_token");
+    gemSession(s);
+    return true;
+  }catch(e){ glemSession(); return false; }
+}
+
+/* Ét REST-kald. Prøver én fornyelse hvis nøglen er udløbet. */
+async function rest(sti, ekstraHoved, andenGang){
+  const hoved = Object.assign({
+    apikey: SB_NOEGLE,
+    Authorization: "Bearer " + (session ? session.access_token : "")
+  }, ekstraHoved||{});
+  const svar = await fetch(SB_URL+"/rest/v1/"+sti, {headers:hoved});
+  if(svar.status === 401 && !andenGang){
+    if(await forny()) return rest(sti, ekstraHoved, true);
+  }
+  if(!svar.ok){
+    const t = await svar.text().catch(()=> "");
+    throw new Error("Databasen svarede "+svar.status+(t? ": "+t.slice(0,120):""));
+  }
+  return svar;
+}
+
+/* Henter alle rækker i hold af 1000 — Supabase sender aldrig flere ad gangen. */
+async function hentAlle(tabel, felter, sortering, fremskridt){
+  const grund = tabel+"?select="+encodeURIComponent(felter)+"&order="+sortering;
+  const foerste = await rest(grund+"&limit=1000&offset=0", {Prefer:"count=exact", Range:"0-999"});
+  const raekker = await foerste.json();
+  const omfang = foerste.headers.get("content-range") || "";
+  const ialt = Number((omfang.split("/")[1]||"").trim()) || raekker.length;
+  if(fremskridt) fremskridt(raekker.length, ialt);
+
+  const rest_hold = [];
+  for(let start = 1000; start < ialt; start += 1000) rest_hold.push(start);
+
+  let hentet = raekker.length;
+  const dele = await Promise.all(rest_hold.map(async start => {
+    const s = await rest(grund+"&limit=1000&offset="+start);
+    const d = await s.json();
+    hentet += d.length;
+    if(fremskridt) fremskridt(hentet, ialt);
+    return d;
+  }));
+  return raekker.concat(...dele);
+}
+
+/* =====================================================================
+   2. DATA
+   ===================================================================== */
+let ORDRER = [];   // {id, leveret(Date), beloeb}
+let LINJER = [];   // {ordre_id, produkt_id, navn, beskrivelse, antal, beloeb, rabat, gruppe, dato}
+let VARER = [];    // samlet pr. produkt_id
+let GRUPPER = [];  // {navn, kr, farve}
+let FOERSTE = null, SIDSTE = null;
+
+const GRUPPEFARVER = {
+  "Køl":"#4F7A9E", "Kolonial":"#B08325", "Grønt":"#5B8A4E", "Kød & fisk":"#A8503E",
+  "Pleje":"#8A6BA8", "Frost":"#5FA8B8", "Drikke":"#C07A3E", "Husholdning":"#7A8B6E",
+  "Kiosk":"#B85F84", "Vin":"#8E4A5C", "Blomster & tilbehør":"#C98BA8", "Inspiration":"#9A948C"
+};
+const grpFarve = g => GRUPPEFARVER[g] || "#9A948C";
+
+async function hentData(){
+  const bar = el("hent-bar"), tekst = el("hent-tekst");
+  const saet = (n, ialt) => {
+    bar.style.width = Math.round(100*n/Math.max(ialt,1))+"%";
+    tekst.textContent = "Henter varelinjer … "+n.toLocaleString("da-DK")+" af "+ialt.toLocaleString("da-DK");
+  };
+
+  tekst.textContent = "Henter ordrer …";
+  // BEMÆRK: aldrig select=* på nemlig_ordrer — kolonnen "raa" er ca. 30 kB pr. ordre.
+  const o = await hentAlle("nemlig_ordrer", "id,leveret,beloeb", "leveret.desc");
+  ORDRER = o.map(r => ({id:r.id, leveret:new Date(r.leveret), beloeb:Number(r.beloeb)||0}))
+            .filter(r => !isNaN(r.leveret));
+  ORDRER.sort((a,b)=> b.leveret - a.leveret);
+
+  const l = await hentAlle(
+    "nemlig_ordrelinjer",
+    "ordre_id,produkt_id,produkt_navn,beskrivelse,antal,beloeb,rabat,hovedgruppe",
+    "id.asc", saet);
+
+  const datoer = {};
+  ORDRER.forEach(r => datoer[r.id] = r.leveret);
+
+  LINJER = l.map(r => ({
+    ordre_id: r.ordre_id,
+    produkt_id: r.produkt_id,
+    navn: r.produkt_navn || "Uden navn",
+    beskrivelse: r.beskrivelse || "",
+    antal: Number(r.antal)||0,
+    beloeb: Number(r.beloeb)||0,
+    rabat: Number(r.rabat)||0,
+    gruppe: r.hovedgruppe || "Andet",
+    dato: datoer[r.ordre_id] || null
+  })).filter(r => r.dato);
+
+  FOERSTE = ORDRER.length ? ORDRER[ORDRER.length-1].leveret : new Date();
+  SIDSTE  = ORDRER.length ? ORDRER[0].leveret : new Date();
+
+  byg();
+}
+
+/* --- saml varelinjer til varer. GRUPPERES PÅ VARENUMMER, aldrig på navn:
+       Nemlig omdøber varer løbende (5019859 hed "Letmælk", nu "Letmælk 1,5%"). --- */
+function byg(){
+  const kort = new Map();
+  LINJER.forEach(l => {
+    let v = kort.get(l.produkt_id);
+    if(!v){
+      v = {id:l.produkt_id, navn:l.navn, beskrivelse:l.beskrivelse, gruppe:l.gruppe,
+           navne:new Set(), koeb:[], gange:0, stk:0, kr:0, rabat:0};
+      kort.set(l.produkt_id, v);
+    }
+    v.navne.add(l.navn);
+    v.gange++; v.stk += l.antal; v.kr += l.beloeb; v.rabat += l.rabat;
+    // Prisen regnes af beløbet, ikke af kolonnen stykpris: ved mængderabat
+    // er stykpris rundet af (6 stk. for 40 kr. står som 6,67).
+    v.koeb.push({dato:l.dato, antal:l.antal, beloeb:l.beloeb, rabat:l.rabat,
+                 pris: l.antal ? l.beloeb/l.antal : l.beloeb, ordre:l.ordre_id});
+    if(l.dato >= (v.sidsteDato||0)){        // nyeste navn vinder
+      v.sidsteDato = l.dato; v.navn = l.navn; v.beskrivelse = l.beskrivelse; v.gruppe = l.gruppe;
+    }
+  });
+
+  VARER = [...kort.values()];
+  VARER.forEach(v => {
+    v.koeb.sort((a,b)=> a.dato - b.dato);
+    v.foersteDato = v.koeb[0].dato;
+    v.snitpris = v.stk ? v.kr / v.stk : 0;
+    v.interval = medianInterval(v.koeb);
+    v.dageSiden = Math.round((Date.now() - v.sidsteDato) / 86400000);
+    v.tidligere = [...v.navne].filter(n => n !== v.navn);
+  });
+  VARER.sort((a,b)=> b.gange - a.gange);
+
+  const gkort = new Map();
+  LINJER.forEach(l => gkort.set(l.gruppe, (gkort.get(l.gruppe)||0) + l.beloeb));
+  GRUPPER = [...gkort.entries()].map(([navn,kr]) => ({navn, kr, farve:grpFarve(navn)}))
+             .sort((a,b)=> b.kr - a.kr);
+}
+
+function medianInterval(koeb){
+  if(koeb.length < 2) return null;
+  const d = [];
+  for(let i=1;i<koeb.length;i++) d.push((koeb[i].dato - koeb[i-1].dato)/86400000);
+  d.sort((a,b)=>a-b);
+  const m = Math.floor(d.length/2);
+  return d.length % 2 ? d[m] : (d[m-1]+d[m])/2;
+}
+
+/* =====================================================================
+   3. FORMATERING
+   ===================================================================== */
+const kr = n => Math.round(n).toLocaleString("da-DK") + " kr.";
+const kr2 = n => n.toLocaleString("da-DK",{minimumFractionDigits:2, maximumFractionDigits:2}) + " kr.";
+const dato = d => d.toLocaleDateString("da-DK",{day:"numeric", month:"short", year:"numeric"});
+const datoKort = d => d.toLocaleDateString("da-DK",{day:"numeric", month:"short"});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function siden(dage){
+  if(dage <= 0) return "i dag";
+  if(dage === 1) return "i går";
+  if(dage < 14) return "for "+dage+" dage siden";
+  if(dage < 60) return "for "+Math.round(dage/7)+" uger siden";
+  if(dage < 365) return "for "+Math.round(dage/30)+" måneder siden";
+  const aar = dage/365;
+  return "for "+(aar < 1.5 ? "et år" : Math.round(aar)+" år")+" siden";
+}
+function intervalTekst(dage){
+  if(dage == null) return "kun købt én gang";
+  if(dage < 10) return "cirka hver uge";
+  if(dage < 18) return "cirka hver 14. dag";
+  if(dage < 45) return "cirka hver måned";
+  if(dage < 120) return "et par gange om året";
+  return "sjældent";
+}
+
+/* Rytmestriben: ét mærke pr. køb, placeret på tidslinjen fra første til
+   seneste ordre. Signaturen i det her site — man kan se rytmen uden at læse. */
+function rytme(koeb, stor){
+  const t0 = FOERSTE.getTime(), t1 = SIDSTE.getTime(), spand = Math.max(t1-t0, 1);
+  const maerker = koeb.map(k => {
+    const p = Math.max(0, Math.min(100, 100*(k.dato.getTime()-t0)/spand));
+    return '<i style="left:calc('+p.toFixed(2)+'% - 1px)"></i>';
+  }).join("");
+  return '<div class="rytme'+(stor?" stor":"")+'">'+maerker+'</div>';
+}
+
+/* =====================================================================
+   4. OVERBLIK
+   ===================================================================== */
+function tegnOverblik(){
+  const ialt = ORDRER.reduce((s,o)=> s+o.beloeb, 0);
+  const rabat = LINJER.reduce((s,l)=> s+l.rabat, 0);
+  const maaneder = Math.max(1, (SIDSTE - FOERSTE)/86400000/30.44);
+
+  el("ov-tal").innerHTML =
+    kortTal(kr(ialt), "brugt i alt") +
+    kortTal(ORDRER.length, "leveringer") +
+    kortTal(kr(ialt/ORDRER.length), "pr. levering") +
+    kortTal(kr(ialt/maaneder), "pr. måned");
+
+  el("h-periode").textContent = dato(FOERSTE)+" – "+dato(SIDSTE);
+
+  /* Søjler pr. måned */
+  const pr = new Map();
+  ORDRER.forEach(o => {
+    const n = o.leveret.getFullYear()+"-"+String(o.leveret.getMonth()+1).padStart(2,"0");
+    pr.set(n, (pr.get(n)||0) + o.beloeb);
+  });
+  const noegler = [...pr.keys()].sort();
+  const alle = [];
+  if(noegler.length){
+    let d = new Date(noegler[0]+"-01T12:00:00");
+    const slut = new Date(noegler[noegler.length-1]+"-01T12:00:00");
+    while(d <= slut){
+      const n = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      alle.push({n, kr:pr.get(n)||0, d:new Date(d)});
+      d.setMonth(d.getMonth()+1);
+    }
+  }
+  const top = Math.max(...alle.map(m=>m.kr), 1);
+  el("ov-maaneder").innerHTML = alle.map(m => {
+    const jan = m.d.getMonth() === 0;
+    return '<button class="maaned'+(jan?" aar":"")+'" title="'+esc(m.n)+': '+kr(m.kr)+'">'+
+           '<i style="height:'+Math.max(2, 100*m.kr/top).toFixed(1)+'%"></i>'+
+           (jan ? '<b>'+m.d.getFullYear()+'</b>' : '')+'</button>';
+  }).join("");
+  const strib = el("ov-maaneder");
+  requestAnimationFrame(()=> strib.scrollLeft = strib.scrollWidth);
+
+  /* Fordeling */
+  const gIalt = GRUPPER.reduce((s,g)=> s+g.kr, 0) || 1;
+  el("ov-stak").innerHTML = GRUPPER.map(g =>
+    '<i style="width:'+(100*g.kr/gIalt).toFixed(2)+'%;background:'+g.farve+'"></i>').join("");
+  el("ov-grupper").innerHTML = GRUPPER.map(g =>
+    '<div class="grprk"><span class="prik" style="background:'+g.farve+'"></span>'+
+    '<span class="navn">'+esc(g.navn)+'</span>'+
+    '<span class="kr tal">'+kr(g.kr)+' · '+Math.round(100*g.kr/gIalt)+' %</span></div>').join("");
+
+  /* Oftest købt */
+  el("ov-top").innerHTML = VARER.slice(0,10).map(varerk).join("");
+}
+
+const kortTal = (b, s) => '<div><b class="tal">'+b+'</b><span>'+s+'</span></div>';
+
+/* =====================================================================
+   5. VARER
+   ===================================================================== */
+let vGruppe = "alle", vSort = "gange", vSoegning = "";
+
+const SORTERINGER = [
+  {n:"gange", t:"Oftest købt",  f:(a,b)=> b.gange-a.gange},
+  {n:"kr",    t:"Dyrest i alt", f:(a,b)=> b.kr-a.kr},
+  {n:"nyest", t:"Sidst købt",   f:(a,b)=> b.sidsteDato-a.sidsteDato},
+  {n:"aeldst",t:"Længst siden", f:(a,b)=> a.sidsteDato-b.sidsteDato},
+  {n:"navn",  t:"Navn",         f:(a,b)=> a.navn.localeCompare(b.navn,"da")}
+];
+
+function tegnVarefiltre(){
+  el("v-grupper").innerHTML =
+    '<button class="chip" data-g="alle" aria-pressed="true">Alle grupper</button>' +
+    GRUPPER.map(g => '<button class="chip" data-g="'+esc(g.navn)+'" aria-pressed="false">'+esc(g.navn)+'</button>').join("");
+  el("v-sorter").innerHTML = SORTERINGER.map(s =>
+    '<button class="chip" data-s="'+s.n+'" aria-pressed="'+(s.n===vSort)+'">'+s.t+'</button>').join("");
+
+  el("v-grupper").onclick = e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    vGruppe = b.dataset.g;
+    [...el("v-grupper").children].forEach(c => c.setAttribute("aria-pressed", c===b));
+    tegnVarer();
+  };
+  el("v-sorter").onclick = e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    vSort = b.dataset.s;
+    [...el("v-sorter").children].forEach(c => c.setAttribute("aria-pressed", c===b));
+    tegnVarer();
+  };
+  el("v-soeg").oninput = e => { vSoegning = e.target.value.trim().toLowerCase(); tegnVarer(); };
+}
+
+function tegnVarer(){
+  let liste = VARER;
+  if(vGruppe !== "alle") liste = liste.filter(v => v.gruppe === vGruppe);
+  if(vSoegning) liste = liste.filter(v =>
+    v.navn.toLowerCase().includes(vSoegning) ||
+    v.beskrivelse.toLowerCase().includes(vSoegning) ||
+    [...v.navne].some(n => n.toLowerCase().includes(vSoegning)));
+  liste = [...liste].sort(SORTERINGER.find(s=>s.n===vSort).f);
+
+  const vist = liste.slice(0, 300);
+  el("v-liste").innerHTML = vist.length
+    ? vist.map(varerk).join("") +
+      (liste.length > vist.length ? '<div class="tom">Viser de 300 første af '+liste.length+'. Søg for at finde resten.</div>' : "")
+    : '<div class="tom">Ingen varer passer på søgningen.</div>';
+}
+
+function varerk(v){
+  return '<button class="rk" data-vare="'+esc(v.id)+'">'+
+    '<div class="krop">'+
+      '<div class="navn">'+esc(v.navn)+'</div>'+
+      '<div class="under">'+v.gange+' gange · sidst '+siden(v.dageSiden)+'</div>'+
+      rytme(v.koeb)+
+    '</div>'+
+    '<div class="hoejre"><b class="tal">'+kr(v.kr)+'</b><span class="tal">'+kr2(v.snitpris)+'/stk.</span></div>'+
+    '<span class="pil">›</span></button>';
+}
+
+/* =====================================================================
+   6. ORDRER
+   ===================================================================== */
+function tegnOrdrer(){
+  el("o-liste").innerHTML = ORDRER.map(o => {
+    const l = LINJER.filter(x => x.ordre_id === o.id);
+    const sp = l.reduce((s,x)=> s+x.rabat, 0);
+    return '<button class="rk" data-ordre="'+esc(o.id)+'">'+
+      '<div class="krop">'+
+        '<div class="navn">'+dato(o.leveret)+'</div>'+
+        '<div class="under">'+l.length+' varer'+(sp>0 ? ' · sparet '+kr(sp) : '')+'</div>'+
+      '</div>'+
+      '<div class="hoejre"><b class="tal">'+kr(o.beloeb)+'</b></div>'+
+      '<span class="pil">›</span></button>';
+  }).join("");
+}
+
+/* =====================================================================
+   7. FUND
+   ===================================================================== */
+function tegnFund(){
+  /* Sparet */
+  const rabat = LINJER.reduce((s,l)=> s+l.rabat, 0);
+  const ialt = ORDRER.reduce((s,o)=> s+o.beloeb, 0);
+  const medRabat = [...VARER].filter(v => v.rabat > 0).sort((a,b)=> b.rabat-a.rabat).slice(0,8);
+  el("f-rabat").innerHTML =
+    '<div class="nogletal" style="margin-bottom:12px">'+
+      kortTal(kr(rabat), "sparet på tilbud") +
+      kortTal(Math.round(100*rabat/(ialt+rabat))+" %", "af hvad varerne kostede") +
+    '</div>' + medRabat.map(v => enkeltRk(v, kr(v.rabat), "sparet")).join("");
+
+  /* Ikke købt længe */
+  const mangler = VARER
+    .filter(v => v.gange >= 5 && v.interval && v.interval < 90 && v.dageSiden > v.interval*1.8)
+    .sort((a,b)=> (b.dageSiden/b.interval) - (a.dageSiden/a.interval)).slice(0,10);
+  el("f-mangler").innerHTML = mangler.length
+    ? mangler.map(v => enkeltRk(v, siden(v.dageSiden), intervalTekst(v.interval))).join("")
+    : '<div class="tom">Intet at bemærke — I er ajour med de faste varer.</div>';
+
+  /* Prisudvikling: snit af de to første køb mod de to seneste */
+  const priser = VARER.filter(v => v.gange >= 4 &&
+      (v.sidsteDato - v.foersteDato)/86400000 >= 180)
+    .map(v => {
+      const f = v.koeb.slice(0,2), s = v.koeb.slice(-2);
+      const fp = f.reduce((a,k)=>a+k.pris,0)/f.length;
+      const sp = s.reduce((a,k)=>a+k.pris,0)/s.length;
+      return Object.assign({}, v, {foer:fp, nu:sp, pct: fp ? 100*(sp-fp)/fp : 0});
+    })
+    .filter(v => Math.abs(v.pct) >= 8)
+    .sort((a,b)=> b.pct - a.pct);
+  const op = priser.slice(0,7), ned = priser.slice(-4).reverse().filter(v=>v.pct<0);
+  el("f-priser").innerHTML =
+    op.map(v => enkeltRk(v, '<span class="maerke op">+'+Math.round(v.pct)+' %</span>',
+        kr2(v.foer)+" → "+kr2(v.nu))).join("") +
+    (ned.length ? '<h3 style="margin:18px 0 8px">Og billigere</h3>' +
+      ned.map(v => enkeltRk(v, '<span class="maerke ned">'+Math.round(v.pct)+' %</span>',
+        kr2(v.foer)+" → "+kr2(v.nu))).join("") : "");
+
+  /* Dyreste vaner */
+  el("f-dyre").innerHTML = [...VARER].sort((a,b)=> b.kr-a.kr).slice(0,10)
+    .map(v => enkeltRk(v, kr(v.kr), v.gange+" gange")).join("");
+
+  /* Prøvet én gang */
+  const engang = VARER.filter(v => v.gange === 1 && v.kr >= 25 && v.dageSiden > 120)
+    .sort((a,b)=> b.kr-a.kr).slice(0,10);
+  el("f-engang").innerHTML = engang.length
+    ? engang.map(v => enkeltRk(v, kr(v.kr), siden(v.dageSiden))).join("")
+    : '<div class="tom">Ingenting her.</div>';
+}
+
+function enkeltRk(v, hoejre, under){
+  return '<button class="rk" data-vare="'+esc(v.id)+'">'+
+    '<div class="krop">'+
+      '<div class="navn">'+esc(v.navn)+'</div>'+
+      '<div class="under">'+(under||"")+'</div>'+
+    '</div>'+
+    '<div class="hoejre"><b class="tal">'+hoejre+'</b></div>'+
+    '<span class="pil">›</span></button>';
+}
+
+/* =====================================================================
+   8. ARK — varedetalje og ordredetalje
+   ===================================================================== */
+function aabnArk(html){
+  el("ark-krop").innerHTML = html;
+  el("ark").scrollTop = 0;
+  el("ark").classList.add("aaben");
+  el("slor").classList.add("aaben");
+  requestAnimationFrame(()=> el("ark").scrollTop = 0);
+}
+function lukArk(){
+  el("ark").classList.remove("aaben");
+  el("slor").classList.remove("aaben");
+}
+
+function visVare(id){
+  const v = VARER.find(x => x.id === id); if(!v) return;
+  const priser = v.koeb.map(k => k.pris);
+  const min = Math.min(...priser), max = Math.max(...priser);
+
+  let html = "<h2>"+esc(v.navn)+"</h2>"+
+    '<div class="meta">'+esc(v.beskrivelse || v.gruppe)+" · varenr. "+esc(v.id)+"</div>"+
+    '<div class="fakta">'+
+      '<div><b class="tal">'+v.gange+'</b><span>gange købt</span></div>'+
+      '<div><b class="tal">'+v.stk.toLocaleString("da-DK")+'</b><span>stk. i alt</span></div>'+
+      '<div><b class="tal">'+kr(v.kr)+'</b><span>brugt i alt</span></div>'+
+      '<div><b class="tal">'+kr2(v.snitpris)+'</b><span>gennemsnit pr. stk.</span></div>'+
+    '</div>';
+
+  if(v.tidligere.length)
+    html += '<div class="tidl">Har også heddet '+v.tidligere.map(esc).join(", ")+
+            '. Samlet her, fordi varenummeret er det samme.</div>';
+
+  html += "<h3>Rytme</h3>"+ rytme(v.koeb, true)+
+    '<div class="rytmeaar"><span>'+dato(FOERSTE)+'</span><span>'+dato(SIDSTE)+'</span></div>'+
+    '<p style="font-size:14px;color:var(--daemp);margin:10px 0 0">Købes '+intervalTekst(v.interval)+
+    '. Sidst '+siden(v.dageSiden)+', den '+dato(v.sidsteDato)+'.</p>';
+
+  if(v.gange >= 3){
+    html += "<h3>Pris pr. stk. over tid</h3>" + prisGraf(v.koeb) +
+      '<p style="font-size:12px;color:var(--daemp);margin:8px 0 0">Laveste '+kr2(min)+
+      ', højeste '+kr2(max)+'. Prisen er regnet af det betalte beløb, så tilbud trækker den ned.</p>';
+  }
+
+  html += "<h3>Hvert køb</h3>" + v.koeb.slice().reverse().map(k =>
+    '<button class="rk" data-ordre="'+esc(k.ordre)+'">'+
+      '<div class="krop"><div class="navn">'+dato(k.dato)+'</div>'+
+      '<div class="under">'+k.antal+' stk. à '+kr2(k.pris)+(k.rabat>0 ? ' · sparet '+kr(k.rabat) : '')+'</div></div>'+
+      '<div class="hoejre"><b class="tal">'+kr2(k.beloeb)+'</b></div>'+
+      '<span class="pil">›</span></button>').join("");
+
+  aabnArk(html);
+}
+
+function prisGraf(koeb){
+  const B = 320, H = 110, pad = 6;
+  const t0 = koeb[0].dato.getTime(), t1 = koeb[koeb.length-1].dato.getTime();
+  const spand = Math.max(t1-t0, 1);
+  const p = koeb.map(k=>k.pris);
+  let lav = Math.min(...p), hoej = Math.max(...p);
+  if(hoej - lav < 0.01){ lav -= 1; hoej += 1; }
+  const x = k => pad + (B-2*pad) * (k.dato.getTime()-t0)/spand;
+  const y = k => H - pad - (H-2*pad) * (k.pris-lav)/(hoej-lav);
+
+  const linje = koeb.map((k,i)=> (i?"L":"M")+x(k).toFixed(1)+" "+y(k).toFixed(1)).join(" ");
+  const prikker = koeb.map(k =>
+    '<circle cx="'+x(k).toFixed(1)+'" cy="'+y(k).toFixed(1)+'" r="2.6" fill="var(--accent)"/>').join("");
+
+  return '<svg class="graf" viewBox="0 0 '+B+' '+(H+16)+'" preserveAspectRatio="none" role="img" '+
+    'aria-label="Prisudvikling fra '+dato(koeb[0].dato)+' til '+dato(koeb[koeb.length-1].dato)+'">'+
+    '<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(B-pad)+'" y2="'+(H-pad)+'" stroke="var(--streg)" stroke-width="1"/>'+
+    '<path d="'+linje+'" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round"/>'+
+    prikker +
+    '<text class="grafaks" x="'+pad+'" y="'+(H+12)+'">'+datoKort(koeb[0].dato)+'</text>'+
+    '<text class="grafaks" x="'+(B-pad)+'" y="'+(H+12)+'" text-anchor="end">'+datoKort(koeb[koeb.length-1].dato)+'</text>'+
+    '<text class="grafaks" x="'+pad+'" y="'+(pad+8)+'">'+kr2(hoej)+'</text>'+
+    '</svg>';
+}
+
+function visOrdre(id){
+  const o = ORDRER.find(x => x.id === id); if(!o) return;
+  const l = LINJER.filter(x => x.ordre_id === id).sort((a,b)=> b.beloeb - a.beloeb);
+  const varesum = l.reduce((s,x)=> s+x.beloeb, 0);
+  const sparet = l.reduce((s,x)=> s+x.rabat, 0);
+  const gebyr = o.beloeb - varesum;
+
+  let html = "<h2>Levering "+dato(o.leveret)+"</h2>"+
+    '<div class="meta">'+o.leveret.toLocaleTimeString("da-DK",{hour:"2-digit",minute:"2-digit"})+
+    " · ordre "+esc(o.id)+"</div>"+
+    '<div class="fakta">'+
+      '<div><b class="tal">'+kr(o.beloeb)+'</b><span>betalt i alt</span></div>'+
+      '<div><b class="tal">'+l.length+'</b><span>varelinjer</span></div>'+
+      '<div><b class="tal">'+kr(varesum)+'</b><span>varer</span></div>'+
+      '<div><b class="tal">'+kr(gebyr)+'</b><span>levering og gebyrer</span></div>'+
+    '</div>';
+  if(sparet > 0)
+    html += '<div class="tidl">Sparet '+kr(sparet)+' på tilbud i denne levering.</div>';
+
+  html += "<h3>Varer</h3>" + l.map(x =>
+    '<button class="rk" data-vare="'+esc(x.produkt_id)+'">'+
+      '<div class="krop"><div class="navn">'+esc(x.navn)+'</div>'+
+      '<div class="under">'+x.antal+' stk.'+(x.beskrivelse ? " · "+esc(x.beskrivelse) : "")+'</div></div>'+
+      '<div class="hoejre"><b class="tal">'+kr2(x.beloeb)+'</b>'+
+      (x.rabat>0 ? '<span>sparet '+kr(x.rabat)+'</span>' : '')+'</div>'+
+      '<span class="pil">›</span></button>').join("");
+
+  aabnArk(html);
+}
+
+/* =====================================================================
+   9. NAVIGATION
+   ===================================================================== */
+const TITLER = {overblik:"Overblik", varer:"Varer", ordrer:"Leveringer", fund:"Fund"};
+
+function skiftSide(navn){
+  document.querySelectorAll(".side").forEach(s => s.classList.toggle("vis", s.id === "side-"+navn));
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.side === navn));
+  el("h-titel").textContent = TITLER[navn];
+  window.scrollTo(0,0);
+}
+
+document.querySelector("nav").addEventListener("click", e => {
+  const b = e.target.closest("button[data-side]"); if(!b) return;
+  skiftSide(b.dataset.side);
+});
+
+/* Ét sted der fanger alle tryk på varer og ordrer — også inde i arket. */
+document.addEventListener("click", e => {
+  const vare = e.target.closest("[data-vare]");
+  if(vare){ visVare(vare.dataset.vare); return; }
+  const ordre = e.target.closest("[data-ordre]");
+  if(ordre){ visOrdre(ordre.dataset.ordre); return; }
+});
+
+el("slor").addEventListener("click", lukArk);
+el("ark-luk").addEventListener("click", lukArk);
+document.addEventListener("keydown", e => { if(e.key === "Escape") lukArk(); });
+
+/* Tilbage-knappen lukker arket i stedet for at forlade siden.
+   Skridtet lægges NÅR arket åbnes — Chrome på Android springer historik-
+   skridt over, der er lagt uden at brugeren har rørt skærmen. */
+let skridt = 0;
+const gamleAabn = aabnArk;
+aabnArk = function(html){
+  gamleAabn(html);
+  if(skridt === 0){ history.pushState({ark:1}, ""); skridt = 1; }
+};
+const gamleLuk = lukArk;
+lukArk = function(){
+  gamleLuk();
+  if(skridt === 1){ skridt = 0; if(history.state && history.state.ark) history.back(); }
+};
+window.addEventListener("popstate", () => {
+  if(skridt === 1){ skridt = 0; gamleLuk(); }
+});
+
+/* =====================================================================
+   10. OPSTART
+   ===================================================================== */
+function visLogin(besked){
+  el("hent").hidden = true;
+  el("login").hidden = false;
+  if(besked){ el("l-fejl").textContent = besked; el("l-fejl").hidden = false; }
+  try{ el("l-mail").value = localStorage.getItem("historik-mail") || ""; }catch(e){}
+  el("l-mail").focus();
+}
+
+el("l-knap").addEventListener("click", async () => {
+  const mail = el("l-mail").value.trim(), kode = el("l-kode").value;
+  if(!mail || !kode){ el("l-fejl").textContent = "Skriv både e-mail og kodeord."; el("l-fejl").hidden = false; return; }
+  el("l-knap").disabled = true; el("l-knap").textContent = "Logger ind …"; el("l-fejl").hidden = true;
+  try{
+    await logInd(mail, kode);
+    try{ localStorage.setItem("historik-mail", mail); }catch(e){}
+    el("login").hidden = true;
+    await start();
+  }catch(err){
+    el("l-fejl").textContent = String(err.message||err);
+    el("l-fejl").hidden = false;
+    el("l-knap").disabled = false; el("l-knap").textContent = "Log ind";
+  }
+});
+el("l-kode").addEventListener("keydown", e => { if(e.key === "Enter") el("l-knap").click(); });
+
+async function start(){
+  el("hent").hidden = false;
+  try{
+    await hentData();
+    tegnOverblik();
+    tegnVarefiltre();
+    tegnVarer();
+    tegnOrdrer();
+    tegnFund();
+    el("hent").hidden = true;
+  }catch(err){
+    el("hent-tekst").textContent = "Kunne ikke hente data: " + String(err.message||err);
+  }
+}
+
+(async function(){
+  if(SB_NOEGLE.indexOf("SÆT_") === 0){
+    el("hent").hidden = false;
+    el("hent-tekst").textContent = "Sæt SB_NOEGLE i toppen af filen — kopier anon-nøglen fra kalenderens index.html.";
+    return;
+  }
+  if(await forny()){ await start(); }
+  else visLogin();
+})();
+</script>
+</body>
+</html>
