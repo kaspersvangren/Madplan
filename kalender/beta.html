@@ -1060,7 +1060,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 
    De må ALDRIG tones ned eller få streg over navnet. De skal frem. */
 /* Grøn venstrekant på det der ryger med i kurven. Under Faste indkøb og
-   Tjek om vi har er det de få man har valgt TIL; under Fra madplanen er
+   Tjek om vi mangler er det de få man har valgt TIL; under Fra madplanen er
    det næsten alt, og dér er det fravalget der er undtagelsen — derfor
    får det afsnit også en svag baggrund, så man kan se hele blokken som
    én ting frem for at læse linje for linje.
@@ -2018,7 +2018,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.60.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.61.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2992,7 +2992,7 @@ function aabnRet(id){
         +   (lovet ? lovet + " lovet væk · " + Math.max(0, lager - lovet) + " ledig" + (lager - lovet === 1 ? "" : "e") : "")
         + '</div>';
 
-  h += gruppe("Skal købes", "koeb") + gruppe("Tjek om vi har", "tjek");
+  h += gruppe("Skal købes", "koeb") + gruppe("Tjek om vi mangler", "tjek");
 
   // Skærmlåsen giver kun mening når opskriften står i appen — et link
   // åbner en anden side, og dér gælder vores lås alligevel ikke.
@@ -3124,7 +3124,7 @@ function tegnIngRaekker(){
     +   '<select class="i-enhed">' + ENHEDER.map(e =>
           '<option value="'+e+'"'+(e === (i.enhed||"") ? " selected" : "")+'>'+(e || "uden enhed")+'</option>').join("") + '</select>'
     +   '<select class="i-kategori"><option value="koeb"'+(i.kategori==="koeb"?" selected":"")+'>Skal købes</option>'
-    +   '<option value="tjek"'+(i.kategori==="tjek"?" selected":"")+'>Tjek om vi har</option></select>'
+    +   '<option value="tjek"'+(i.kategori==="tjek"?" selected":"")+'>Tjek om vi mangler</option></select>'
     + '</div>'
     + '</div>').join("");
 }
@@ -3963,7 +3963,7 @@ function beregnIndkoeb(fredag){
   }
 
   /* Bruges den samme vare af én ret der siger "skal købes" og en anden der
-     siger "tjek om vi har", vinder SKAL KØBES. Den strengeste går forud:
+     siger "tjek om vi mangler", vinder SKAL KØBES. Den strengeste går forud:
      glemmer man at tjekke, står man uden varen, mens et overflødigt køb
      kun koster en dåse hakkede tomater.
 
@@ -4021,7 +4021,7 @@ function renderIndkoeb(){
 
   h += '<div class="ikort">'
     +   '<button class="ihoved" data-fold="tjek" aria-expanded="' + foldTjek + '">' + pil
-    +     'Tjek om vi har<span class="antal">' + tjek.length + '</span></button>'
+    +     'Tjek om vi mangler<span class="antal">' + tjek.length + '</span></button>'
     +   (foldTjek ? tjek.map(vare).join("") : "")
     + '</div>';
 
@@ -6455,7 +6455,7 @@ function nemByg(){
      med den mængde ugens retter kræver, og allerede tilvalgt.
 
      FEJL rettet: omdirigeringen kørte først kun på "Skal købes". Men SEKS
-     af de otte markerede varer står som "Tjek om vi har" i opskrifterne —
+     af de otte markerede varer står som "Tjek om vi mangler" i opskrifterne —
      remoulade, æg, ketchup, oliven, olivenolie — så de gled forbi og blev
      liggende i tjek-afsnittet. Markeringen skal slå BEGGE kategorier. */
   const erAltid = l => Boolean(l.kort && l.kort.koeb_altid);
@@ -6473,7 +6473,7 @@ function nemByg(){
   for(const l of fraKoeb.concat(fraTjekAlle).filter(erAltid)){
     const haves = altidMedBehov.find(x => nemNoegle(x.navn) === nemNoegle(l.navn));
     if(!haves){
-      /* Kommer behovet KUN fra "tjek om vi har", ved appen ikke om varen
+      /* Kommer behovet KUN fra "tjek om vi mangler", ved appen ikke om varen
          skal købes — så den sættes ikke til med et tal, men markeres som
          uafklaret og spærrer knappen indtil man selv svarer. Er den også
          på "skal købes", er svaret givet: den skal købes. */
@@ -6605,7 +6605,7 @@ function nemTilstand(l){
   const p = nemArk.priser[id];
   if(p && !p.paaLager) return "udsolgt";
   /* Tredje blokerende tilstand: en fast vare som ugens retter bruger, men
-     hvor behovet KUN kom fra "tjek om vi har". Der ved appen ikke om varen
+     hvor behovet KUN kom fra "tjek om vi mangler". Der ved appen ikke om varen
      skal købes — det gør man selv. Linjen starter uden tal ("?") og
      spærrer knappen, indtil man har trykket plus eller minus. Ingen dialog,
      ingen overlay: det er de samme to knapper som alle andre linjer. */
@@ -6737,8 +6737,15 @@ function nemTegn(){
        "Fra madplanen" er med her: dér er alt valgt fra start, så kanten
        viser at det ligger klar, og forsvinder så snart man vælger fra. */
     const linjeValgt = l.medtaget && !l.spring && !l.uafklaret;
+    /* Fadningen følger MEDTAGET, ikke antallet — samme rettelse som den
+       grønne kant fik i 2.55.0, og af samme grund: er varen kortlagt,
+       sætter nemAntal() bagefter et tal ud fra ugens retter, også på
+       linjer man ikke har sat flueben ved. Under "Tjek om vi mangler" stod
+       de derfor i fuld styrke, som om de skulle med.
+       I "Fra madplanen" er der intet flueben, men minusknappen sætter
+       medtaget til false ved nul — så reglen holder dér også. */
     return '<div class="nemrad' + (l.uafklaret ? " kraever"
-                                 : l.antal < 1 ? " fravalgt" : "")
+                                 : !l.medtaget ? " fravalgt" : "")
                                  + (linjeValgt ? " valgt" : "")
                                  + (gruppe === "plan" ? " plan" : "") + '">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
@@ -6762,7 +6769,7 @@ function nemTegn(){
              dér er en tom linje værre end en selvfølgelighed. */
           : (under
               ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>'
-              : l.antal < 1 ? '<span class="under">tages ikke med</span>' : ""))
+              : !l.medtaget ? '<span class="under">tages ikke med</span>' : ""))
       /* "Ikke købt i N dage" — kun på faste varer, kun når rytmen er
          brudt, og kun med antallet af dage. Rytmen selv afgør OM linjen
          vises, men skrives ikke ud: den fylder uden at hjælpe, når man
@@ -6912,7 +6919,7 @@ function nemTegn(){
 
   let h = nemKurvAfsnit();
   h += afsnit("Fra madplanen", nemArk.plan, "plan");
-  h += afsnit("Tjek om vi har", nemArk.tjek, "tjek");
+  h += afsnit("Tjek om vi mangler", nemArk.tjek, "tjek");
   h += afsnitDelt("Faste indkøb", nemArk.faste, "faste");
   h += afsnit("Øvrigt", nemArk.ekstra, "ekstra");
 
