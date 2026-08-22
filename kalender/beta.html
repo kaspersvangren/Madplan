@@ -979,6 +979,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nemvalg-back{z-index:60}
 #nemerstat-back{z-index:66}
 #nembyt-back{z-index:65}
+#nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
 #nemkort-back{z-index:70}
 /* Muligheder for den samme ingrediens. Billede, navn, pakke og pris i
    én række, så to salathoveder kan sammenlignes uden at læse. */
@@ -1076,6 +1077,24 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemfund .koebt{font-size:11px;font-weight:600;color:var(--mad);
   background:var(--mad-bg);border-radius:999px;padding:1px 7px;
   margin-left:6px;white-space:nowrap;vertical-align:1px}
+
+/* Standardvaren i variantlisten. Grøn venstrekant som i indkøbsarket, så
+   det er samme sprog begge steder: grøn = den her er valgt. */
+.nembytrad.erstandard{border-left:3px solid var(--mad);padding-left:7px}
+.nembytrad .stdmaerke{font-size:11px;font-weight:700;color:var(--mad);
+  background:var(--mad-bg);border-radius:999px;padding:1px 7px;
+  margin-left:6px;white-space:nowrap}
+/* Venstre del af variantrækken åbner omregningen. Knappen er hele
+   navneområdet frem for et ikon mere — der er allerede to knapper til
+   højre, og en tredje ville klemme rækken på en telefon. */
+.nembytrad .aabnstyk{display:flex;align-items:center;gap:11px;flex:1;min-width:0;
+  background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.nembytrad .omregning{font-size:11.5px;color:var(--mad);font-weight:600}
+.nembytrad .saetstyk{font-size:11.5px;color:var(--muted);text-decoration:underline}
+.nembytrad .goerstd{font-size:11px;font-weight:600;color:var(--muted);
+  background:none;border:1px solid var(--line);border-radius:999px;
+  padding:3px 9px;white-space:nowrap;cursor:pointer;flex:none}
+.nembytrad .goerstd:hover{color:var(--ink);border-color:var(--muted)}
 
 /* Allerede i brug. Dæmpet med vilje: det er en oplysning, ikke en
    advarsel — man må gerne vælge den samme vare igen. */
@@ -1742,6 +1761,25 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Nemlig: omregning for EN enkelt variant.
+     Ligger for sig, fordi omregningen ikke er den samme for alle varianter:
+     et 3-pak bacon og et enkelt bacon skal ikke dele tal. -->
+<div class="backdrop" id="nemvariant-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Omregning</h2>
+    <div class="meta" id="nemvariant-meta"></div>
+    <div class="nemstyk">
+      <span class="etiket">1 vare svarer til</span>
+      <div id="nemvariant-liste"></div>
+      <button type="button" class="nemstyktilfoej" id="nemvariant-ny">+ Tilføj enhed</button>
+      <span class="nemstykhint" id="nemvariant-hint"></span>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="nemvariant-luk">Færdig</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: erstat en vare, KUN for denne uge -->
 <div class="backdrop" id="nemerstat-back">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -1976,7 +2014,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.55.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.57.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6082,6 +6120,146 @@ function nemLinjeEkstra(grund, navn){
    er dem man KAN skifte til — eller tage en af hver af — i indkøbsarket.
    Hvert alternativ er et helt produkt, så det bærer sin egen
    pakkestørrelse med sig.                                             */
+/* Gør en variant til standardvare og sender den gamle standard ned i
+   listen. Før skulle man søge den nye frem igen og huske selv at lægge den
+   gamle ind som variant — og glemte man det, forsvandt den lydløst.
+
+   De to former er IKKE ens: standardvaren ligger i søgeresultatets form
+   (id, navn), mens varianterne ligger i den gemte form (produkt_id,
+   produkt_navn) med deres egen pakkestørrelse. Derfor oversættes der
+   begge veje her. Pakkestørrelsen står i formularfelterne, ikke på
+   objektet, så den skal læses og skrives med.
+
+   `nemValg.styk` røres IKKE: omregningen "1 vare = 3 pakker" hører til
+   VAREN, ikke til det produkt der tilfældigvis er standard lige nu. */
+function nemAltGoerStandard(i){
+  if(!nemValg || !Array.isArray(nemValg.alt)) return;
+  const ny = nemValg.alt[i];
+  const gl = nemValg.valgt;
+  if(!ny || !gl) return;
+
+  const m = document.getElementById("nemvalg-maengde");
+  const e = document.getElementById("nemvalg-enhed");
+
+  /* Den hidtidige standard ned i listen — med den pakkestørrelse der
+     står i felterne NU, ikke den den havde da den blev valgt.
+     RETTET i 2.57.0: omregningen følger MED. Den hører til produktet, ikke
+     til varen — et 3-pak og et enkeltpak kan ikke dele tal. Før blev
+     varens omregning stående på den nye standard, som så arvede et tal
+     der passede på noget helt andet. */
+  const gammel = {
+    produkt_id: String(gl.id),
+    produkt_navn: gl.navn || "",
+    pakke_maengde: m.value === "" ? null : Number(String(m.value).replace(",", ".")),
+    pakke_enhed: e.value || "",
+    styk: (Array.isArray(nemValg.styk) && nemValg.styk.length) ? nemValg.styk : null,
+    billede: gl.billede || null,
+    undergruppe: gl.undergruppe || null,
+    hovedgruppe: gl.hovedgruppe || null
+  };
+
+  nemValg.valgt = {
+    id: ny.produkt_id,
+    navn: ny.produkt_navn || "",
+    billede: ny.billede || null,
+    undergruppe: ny.undergruppe || null,
+    hovedgruppe: ny.hovedgruppe || null
+  };
+  m.value = (ny.pakke_maengde ?? "") === "" ? "" : String(ny.pakke_maengde);
+  if(ny.pakke_enhed && ENHEDER.includes(ny.pakke_enhed)) e.value = ny.pakke_enhed;
+  /* Den nye standards egen omregning op i varen. Har den ingen, står der
+     INGEN — bedre end at arve et tal fra et produkt med anden pakning. */
+  nemValg.styk = Array.isArray(ny.styk) ? ny.styk.slice() : [];
+
+  /* Bytter plads frem for at lægge bagerst: rækkefølgen i listen er hans
+     egen, og et bytte skal ikke rode op i den. */
+  nemValg.alt[i] = gammel;
+  nemStykTegn();          // varens omregningsfelt viser nu den nyes tal
+  nemAltTegn();
+  nemValgTegnFund();     // "købt"- og "i brug"-mærkerne kan have skiftet
+}
+
+/* Standardvaren tegnet som en række i samme liste som varianterne. */
+function nemStandardRad(){
+  const v = nemValg && nemValg.valgt;
+  if(!v) return "";
+  const m = document.getElementById("nemvalg-maengde");
+  const e = document.getElementById("nemvalg-enhed");
+  const maengde = m && m.value ? (m.value + " " + ((e && e.value) || "")).trim() : "";
+  return '<div class="nembytrad med erstandard">'
+    + (v.billede ? '<img src="' + esc(nemBillede(v.billede, 120)) + '" alt="" loading="lazy">'
+                 : '<span style="width:44px;flex:none"></span>')
+    + '<span class="v"><span class="n">' + esc(v.navn || v.id)
+    +   '<span class="stdmaerke">standard</span></span>'
+    + (maengde ? '<span class="u">' + esc(maengde) + '</span>' : "")
+    + '</span></div>';
+}
+
+/* ---------- Omregning for én variant ----------
+   Åbnes fra variantlisten. Arbejder på en KOPI, så man kan lukke uden at
+   have ændret noget utilsigtet; først "Færdig" skriver tilbage. */
+let nemVariant = null;
+
+function nemVariantAabn(i){
+  if(!nemValg || !Array.isArray(nemValg.alt)) return;
+  const a = nemValg.alt[i];
+  if(!a) return;
+  nemVariant = {
+    i,
+    raekker: Array.isArray(a.styk) ? a.styk.map(x => ({ enhed: x.enhed, antal: x.antal })) : []
+  };
+  document.getElementById("nemvariant-meta").textContent =
+    (a.produkt_navn || a.produkt_id)
+    + (a.pakke_maengde ? " · " + tal(Number(a.pakke_maengde)) + " " + (a.pakke_enhed || "") : "");
+  nemVariantTegn();
+  show("nemvariant-back");
+}
+
+function nemVariantTegn(){
+  const liste = document.getElementById("nemvariant-liste");
+  if(!liste || !nemVariant) return;
+  liste.innerHTML = nemVariant.raekker.map((r, i) =>
+      '<div class="nemstykrad">'
+    +   '<input type="number" step="any" min="0" inputmode="decimal" data-vstykantal="' + i + '" value="'
+    +     (r.antal != null ? esc(r.antal) : "") + '">'
+    +   '<select data-vstykenhed="' + i + '">'
+    +     ENHEDER.filter(e => e).map(e =>
+          '<option value="' + e + '"' + (e === r.enhed ? " selected" : "") + '>' + e + '</option>').join("")
+    +   '</select>'
+    +   '<button type="button" class="vaek" data-vstykvaek="' + i + '" aria-label="Fjern linjen">'
+    +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+    +   '</button>'
+    + '</div>').join("");
+  document.getElementById("nemvariant-hint").textContent =
+    "Udfyld kun hvis DENNE variant pakkes anderledes end standardvaren — "
+    + "fx et 3-pak, hvor standarden er enkeltpakket. Står feltet tomt, "
+    + "regnes der på pakkestørrelsen alene.";
+}
+
+/* Skriver tilbage i varianten UDEN at lukke. Tomme og halvfærdige linjer
+   smides væk, og er der intet tilbage, gemmes NULL — så ser en ældre
+   udgave af filen præcis det den plejer.
+
+   Adskilt fra lukningen med vilje: TILBAGE-KNAPPEN lukker alle ark på én
+   gang gennem arkLukAlle(), og uden det her ville et tryk dér smide
+   omregningen væk i stilhed. Derfor kaldes den begge steder. */
+function nemVariantSkriv(){
+  if(!nemVariant || !nemValg || !Array.isArray(nemValg.alt)) return;
+  const a = nemValg.alt[nemVariant.i];
+  if(!a) return;
+  const rene = nemVariant.raekker
+    .map(x => ({ enhed: String(x.enhed || "").toLowerCase(), antal: Number(x.antal) }))
+    .filter(x => x.enhed && Number.isFinite(x.antal) && x.antal > 0);
+  a.styk = rene.length ? rene : null;
+}
+
+function nemVariantGem(){
+  nemVariantSkriv();
+  nemVariant = null;
+  hide("nemvariant-back");
+  nemAltTegn();
+}
+
 function nemAltTegn(){
   const felt = document.getElementById("nemvalg-altfelt");
   const liste = document.getElementById("nemvalg-altliste");
@@ -6090,18 +6268,31 @@ function nemAltTegn(){
   felt.hidden = document.getElementById("nemvalg-detalje").hidden;
 
   const alt = (nemValg && Array.isArray(nemValg.alt)) ? nemValg.alt : [];
-  liste.innerHTML = alt.length ? alt.map((a, i) =>
+  /* Standardvaren står ØVERST i samme liste. Det er hele pointen: man
+     kan se hvad der er hvad, og bytte om uden at søge varen frem igen. */
+  liste.innerHTML = nemStandardRad() + (alt.length ? alt.map((a, i) =>
       '<div class="nembytrad med">'
+    + '<button type="button" class="aabnstyk" data-altstyk="' + i + '">'
     + (a.billede ? '<img src="' + esc(nemBillede(a.billede, 120)) + '" alt="" loading="lazy">'
                  : '<span style="width:44px;flex:none"></span>')
     + '<span class="v"><span class="n">' + esc(a.produkt_navn || a.produkt_id) + '</span>'
     + (a.pakke_maengde
         ? '<span class="u">' + esc(tal(Number(a.pakke_maengde)) + " " + (a.pakke_enhed || "")) + '</span>'
         : "")
-    + '</span>'
+    /* Omregningen står under navnet, så man kan se på listen hvilke
+       varianter der er sat op — og trykke sig ind på dem der ikke er. */
+    + (Array.isArray(a.styk) && a.styk.length
+        ? '<span class="omregning">1 vare = '
+          + esc(a.styk.map(x => tal(Number(x.antal)) + " " + x.enhed).join(" · ")) + '</span>'
+        : '<span class="saetstyk">sæt omregning</span>')
+    + '</span></button>'
+    /* Vises kun når der ER en standard at bytte med. */
+    + (nemValg && nemValg.valgt
+        ? '<button type="button" class="goerstd" data-altstandard="' + i + '">gør til standard</button>'
+        : "")
     + '<button type="button" class="maerke" data-altvaek="' + i + '" aria-label="Fjern">'
     +   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
-    + '</button></div>').join("") : "";
+    + '</button></div>').join("") : "");
 
   /* Knappen lægger den vare der lige er markeret i søgeresultatet til.
      Er det den samme som standardvalget, giver det ingen mening. */
@@ -6113,8 +6304,8 @@ function nemAltTegn(){
     + '>+ Gem \u201c' + esc((v && v.navn) || "den valgte vare") + '\u201d som alternativ</button>';
 
   hint.textContent = alt.length
-    ? "I indkøbsarket kan du skifte mellem dem eller tage en af hver. "
-      + "Valget gælder kun den uge."
+    ? "Den øverste er standardvaren. I indkøbsarket kan du skifte mellem "
+      + "dem eller tage en af hver; valget gælder kun den uge."
     : "Søg en vare frem ovenfor og gem den her, hvis den også kan bruges — "
       + "fx både hjertesalat og iceberg til \u201csalat\u201d.";
 }
@@ -7448,7 +7639,14 @@ async function nemValgGem(){
        intet tilbage, skrives NULL — saa ser en aeldre udgave af filen
        praecis det den plejer. */
     koeb_altid: !nemValg.fastVare && document.getElementById("nemvalg-altid").checked,
-    alternativer: (nemValg.alt && nemValg.alt.length) ? nemValg.alt : null,
+    /* Standardvaren må ALDRIG også ligge som variant: så står den to gange
+       i Varianter-arket, med hver sit antal. Fire varer havde den dublet
+       inden 2.57.0. Filtreret her, hvor alle veje ind mødes. */
+    alternativer: (() => {
+      const std = String(nemValg.valgt.id);
+      const r = (nemValg.alt || []).filter(a => String(a.produkt_id) !== std);
+      return r.length ? r : null;
+    })(),
     styk: (() => {
       const r = (nemValg.styk || [])
         .map(x => ({ enhed: String(x.enhed || "").toLowerCase(), antal: Number(x.antal) }))
@@ -7817,9 +8015,36 @@ document.getElementById("nemvalg-altliste").addEventListener("click", ev => {
     nemAltTegn();
     return;
   }
+  const st = ev.target.closest("[data-altstyk]");
+  if(st){ nemVariantAabn(Number(st.dataset.altstyk)); return; }
+  const std = ev.target.closest("[data-altstandard]");
+  if(std){ nemAltGoerStandard(Number(std.dataset.altstandard)); return; }
   const v = ev.target.closest("[data-altvaek]");
   if(v){ nemValg.alt.splice(Number(v.dataset.altvaek), 1); nemAltTegn(); }
 });
+
+/* Omregningsarket. Samme mønster som varens eget stykfelt. */
+document.getElementById("nemvariant-liste").addEventListener("input", ev => {
+  if(!nemVariant) return;
+  const a = ev.target.closest("[data-vstykantal]");
+  if(a){ nemVariant.raekker[Number(a.dataset.vstykantal)].antal = a.value; return; }
+});
+document.getElementById("nemvariant-liste").addEventListener("change", ev => {
+  if(!nemVariant) return;
+  const e = ev.target.closest("[data-vstykenhed]");
+  if(e){ nemVariant.raekker[Number(e.dataset.vstykenhed)].enhed = e.value; return; }
+});
+document.getElementById("nemvariant-liste").addEventListener("click", ev => {
+  if(!nemVariant) return;
+  const v = ev.target.closest("[data-vstykvaek]");
+  if(v){ nemVariant.raekker.splice(Number(v.dataset.vstykvaek), 1); nemVariantTegn(); }
+});
+document.getElementById("nemvariant-ny").onclick = () => {
+  if(!nemVariant) return;
+  nemVariant.raekker.push({ enhed: "stk", antal: "" });
+  nemVariantTegn();
+};
+document.getElementById("nemvariant-luk").onclick = () => nemVariantGem();
 
 document.getElementById("nemvalg-stykliste").addEventListener("click", ev => {
   const v = ev.target.closest("[data-stykvaek]");
@@ -8061,6 +8286,13 @@ let egenBack  = 0;   // hvor mange popstates vi selv har udløst
 const arkAabne = () => document.querySelectorAll(".backdrop.open").length;
 
 function arkLukAlle(){
+  /* Omregningsarket holder sine ændringer i en kopi indtil der trykkes
+     Færdig. Lukkes stakken med tilbage-knappen, skal de skrives ned
+     først — ellers forsvinder de uden at nogen får besked. */
+  if(typeof nemVariantSkriv === "function" && typeof nemVariant !== "undefined" && nemVariant){
+    nemVariantSkriv();
+    nemVariant = null;
+  }
   document.querySelectorAll(".backdrop.open").forEach(b => b.classList.remove("open"));
   if(typeof closeDropdown === "function") closeDropdown();
 }
