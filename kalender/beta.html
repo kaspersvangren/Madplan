@@ -2052,7 +2052,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.64.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.65.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7186,14 +7186,59 @@ function nemBilligere(l){
   return { bedst, nu, spar, alle: bud };
 }
 
+/* Hvad ÉN grundenhed koster i den handel man faktisk laver.
+
+   Regnet af den samlede sum og den samlede mængde, ikke af listeprisen:
+   så indgår mængderabatten. "3 for 50" gør hvert gram billigere, og det
+   skal tælle med, ellers lyver tallet.
+
+   Enhederne SKAL kunne sammenlignes, og der er tre tilfælde:
+     · samme familie (g/kg, eller ml/cl/dl/l) → regnes til gram eller
+       milliliter og vises pr. kg / pr. liter, som Nemlig selv gør
+     · ingen familie, men nøjagtig samme ord ("stk" mod "stk") → vises
+       pr. det ord
+     · alt andet ("stk" mod "g", "pakke" mod "stk") → NULL. En pakke af én
+       vare er ikke det samme som en pakke af en anden, og et gæt her
+       ville være værre end tavshed
+   Svarer `maal` med, så to bud kun sammenlignes når de måler det samme. */
+function nemEnhedsPris(m, antal, sum){
+  const pm = Number(m && m.pakke_maengde);
+  if(!pm || !isFinite(pm) || pm <= 0) return null;
+  if(!isFinite(sum) || !isFinite(antal) || antal <= 0) return null;
+  const e = String((m && m.pakke_enhed) || "").toLowerCase().trim();
+  const fam = nemFamilie(e);
+  if(fam){
+    const grund = nemTilGrund(pm, e);          // gram eller milliliter
+    if(!grund || grund <= 0) return null;
+    return { maal: fam === "vaegt" ? "kg" : "l",
+             pris: sum / (antal * grund) * 1000 };
+  }
+  if(!e) return null;
+  return { maal: e, pris: sum / (antal * pm) };
+}
+
 /* Kort tekst til linjen: hvad man skulle købe i stedet, og hvad det koster. */
 function nemBilligereTekst(b){
   const m = b.bedst.m;
   const pakke = m.pakke_maengde
     ? tal(Number(m.pakke_maengde)) + " " + (m.pakke_enhed || "") : "";
-  return "billigere: " + b.bedst.antal + " × " + (pakke || m.produkt_navn || "vare")
+  let ud = "billigere: " + b.bedst.antal + " × " + (pakke || m.produkt_navn || "vare")
     + " = " + nemKr(b.bedst.sum) + " mod " + nemKr(b.nu.sum)
     + " · spar " + nemKr(b.spar);
+
+  /* Færrest kroner er ikke altid bedst køb. Skal man bruge 100 g, slår en
+     lille dyr pakke en stor billig, fordi totalen er lavere — men prisen
+     pr. kilo kan være dobbelt så høj, og så betaler man for at få mindre.
+     Hagen nævnes KUN når den er der: er det foreslåede også billigst pr.
+     kilo, er forslaget godt hele vejen igennem, og teksten skal ikke
+     vokse. Kan enhederne ikke sammenlignes, siges der intet. */
+  const eNy = nemEnhedsPris(m, b.bedst.antal, b.bedst.sum);
+  const eNu = nemEnhedsPris(b.nu.m, b.nu.antal, b.nu.sum);
+  if(eNy && eNu && eNy.maal === eNu.maal && eNy.pris > eNu.pris){
+    ud += " — men " + nemKr(eNy.pris) + " kr/" + eNy.maal
+        + " mod " + nemKr(eNu.pris);
+  }
+  return ud;
 }
 
 /* Hvad koster det, der er valgt? Regnes af NØJAGTIG samme liste som den
