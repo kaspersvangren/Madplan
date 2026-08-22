@@ -884,8 +884,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* Sat til nul: linjen bliver stående, så man kan skrue op igen, men den
    træder tydeligt tilbage. Antalsknapperne beholder fuld styrke — det er
    dem man skal ramme for at fortryde. */
+/* Fravalgt = dæmpet, IKKE overstreget. Stregen sagde "den her er afvist",
+   men et fravalg er bare et fravalg — man kan slå det til igen med det
+   samme. Dæmpningen, det tomme flueben og nullet til højre siger det
+   allerede tre gange; stregen gjorde linjen sværere at læse uden at
+   tilføje noget. Gælder ALLE afsnit. */
 .nemrad.fravalgt > .v, .nemrad.fravalgt .nembilknap{opacity:.45}
-.nemrad.fravalgt .navn{text-decoration:line-through}
 .nemrad .navn{display:block}
 .nemrad .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemrad .under.gaet{color:var(--holiday)}
@@ -2014,7 +2018,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.59.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.60.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6748,9 +6752,17 @@ function nemTegn(){
           ? '<span class="under kraevertekst">'
             + esc(l.kilder ? "skal bruges til " + l.kilder : "fast vare")
             + ' — køb eller lad være?</span>'
-          : l.antal < 1
-          ? '<span class="under">tages ikke med</span>'
-          : (under ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>' : ""))
+          /* Underteksten bliver STÅENDE når man fravælger. Før blev den
+             erstattet af "tages ikke med", og så forsvandt oplysningen om
+             hvilken ret varen hører til — netop dét man skal bruge for at
+             vurdere om fravalget var rigtigt. Dæmpningen viser i forvejen
+             at linjen ikke ryger med.
+             "tages ikke med" står kun tilbage hvor der ellers slet ikke
+             ville stå noget, fx en fast vare uden ret knyttet til sig —
+             dér er en tom linje værre end en selvfølgelighed. */
+          : (under
+              ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>'
+              : l.antal < 1 ? '<span class="under">tages ikke med</span>' : ""))
       /* "Ikke købt i N dage" — kun på faste varer, kun når rytmen er
          brudt, og kun med antallet af dage. Rytmen selv afgør OM linjen
          vises, men skrives ikke ud: den fylder uden at hjælpe, når man
