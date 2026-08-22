@@ -1054,15 +1054,17 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    ruller. Med op til 51 faste varer ville fyldt rød bund larme for meget.
 
    De må ALDRIG tones ned eller få streg over navnet. De skal frem. */
-/* Grøn venstrekant på det man har valgt til under Faste indkøb og Tjek
-   om vi har. Begge afsnit starter fravalgt, så kanten er den hurtige
-   måde at se hvad man allerede har taget stilling til — uden at læse
-   fluebenene ét for ét. Kun kanten, ikke resten af linjen.
+/* Grøn venstrekant på det der ryger med i kurven. Under Faste indkøb og
+   Tjek om vi har er det de få man har valgt TIL; under Fra madplanen er
+   det næsten alt, og dér er det fravalget der er undtagelsen — derfor
+   får det afsnit også en svag baggrund, så man kan se hele blokken som
+   én ting frem for at læse linje for linje.
    VIGTIGT: .kraever står EFTER denne regel og vinder derfor, når en
    linje både er valgt og spærrer knappen. Rød skal aldrig kunne
    overtrumfes af grøn. */
 .nemrad.valgt{border-left:4px solid var(--mad);border-radius:0 10px 10px 0;
   padding-left:8px}
+.nemrad.valgt.plan{background:color-mix(in srgb, var(--mad-bg) 55%, transparent)}
 
 /* Rytmelinjen: en fast vare de køber jævnligt, som ikke er købt længe.
    Tavs som standard — den står kun der når mønsteret faktisk er brudt. */
@@ -1074,6 +1076,13 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemfund .koebt{font-size:11px;font-weight:600;color:var(--mad);
   background:var(--mad-bg);border-radius:999px;padding:1px 7px;
   margin-left:6px;white-space:nowrap;vertical-align:1px}
+
+/* Allerede i brug. Dæmpet med vilje: det er en oplysning, ikke en
+   advarsel — man må gerne vælge den samme vare igen. */
+.nemfund .brugt{font-size:11px;font-weight:600;border-radius:999px;
+  padding:1px 7px;margin-left:6px;white-space:nowrap;vertical-align:1px;
+  color:var(--muted);background:var(--line)}
+.nemfund .brugt.standard{color:var(--tekst)}
 
 .nemrad.kraever{border:1px solid color-mix(in srgb, var(--holiday) 45%, transparent);
   border-left:4px solid var(--holiday);border-radius:11px;
@@ -1967,7 +1976,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.54.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.55.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5531,6 +5540,30 @@ try{
   const r = JSON.parse(localStorage.getItem(NEMFOLD_NOEGLE) || "[]");
   if(Array.isArray(r)) nemFoldet = new Set(r.map(String));
 }catch(e){}
+/* Faste indkøb rummer 50+ varer fordelt på Køl, Brød, Tørvarer og så
+   videre. Åbner man arket midt i det, skal man scrolle forbi det hele for
+   at nå Øvrigt. Derfor foldes kategorierne sammen HVER gang arket åbnes —
+   ikke bare første gang. Man kan folde ud undervejs, men næste åbning
+   starter forfra.
+   Kun undergrupperne under "faste" røres. Hvad brugeren har gjort ved de
+   andre afsnit ligger urørt i localStorage. */
+function nemFoldFaste(){
+  if(!nemArk || !Array.isArray(nemArk.faste)) return;
+  nemArk.faste.forEach(l => {
+    /* Nøglen SKAL dannes præcis som i afsnitDelt — hovedgruppe, ikke
+       undergruppe — ellers lander der nøgler i sættet som ingen kasse
+       hedder, og alt står åbent uden at noget fejler. Prisopslaget kan
+       mangle her, fordi foldningen sker før nemHentPriser er kørt; så
+       falder den tilbage på det gemte felt, som er det samme afsnitDelt
+       bruger i det tilfælde. */
+    const pr = (nemArk.priser && l.kort && l.kort.produkt_id)
+             ? nemArk.priser[String(l.kort.produkt_id)] : null;
+    const g = (l.kort && l.kort.hovedgruppe) || (pr && pr.hovedgruppe) || "Øvrigt";
+    nemFoldet.add("faste/" + g);
+  });
+  try{ localStorage.setItem(NEMFOLD_NOEGLE, JSON.stringify([...nemFoldet])); }catch(e){}
+}
+
 function nemFoldSkift(gruppe){
   if(nemFoldet.has(gruppe)) nemFoldet.delete(gruppe); else nemFoldet.add(gruppe);
   try{ localStorage.setItem(NEMFOLD_NOEGLE, JSON.stringify([...nemFoldet])); }catch(e){}
@@ -6464,13 +6497,17 @@ function nemTegn(){
        var valgt fra, samtidig med at spørgsmålstegnet sagde at der IKKE
        var taget stilling. To modsatte beskeder på samme linje. Uafklaret
        skal fremhæves, ikke tones ned. */
-    /* Valgt-kanten gælder kun de to afsnit hvor man selv vælger til;
-       under "Fra madplanen" er ALT valgt, og så ville hver eneste linje
-       få en grøn kant og signalet forsvinde. */
-    const erValgt = vaelges && l.antal >= 1 && !l.uafklaret;
+    /* Grøn kant = "den her ryger med". Betingelsen er FLUEBENET, ikke
+       antallet: er varen kortlagt, sætter nemAntal() bagefter et tal ud
+       fra ugens retter, også når linjen er fravalgt — og så fik en
+       fravalgt tjek-vare kant, hvilket var forkert.
+       "Fra madplanen" er med her: dér er alt valgt fra start, så kanten
+       viser at det ligger klar, og forsvinder så snart man vælger fra. */
+    const linjeValgt = l.medtaget && !l.spring && !l.uafklaret;
     return '<div class="nemrad' + (l.uafklaret ? " kraever"
                                  : l.antal < 1 ? " fravalgt" : "")
-                                 + (erValgt ? " valgt" : "") + '">'
+                                 + (linjeValgt ? " valgt" : "")
+                                 + (gruppe === "plan" ? " plan" : "") + '">'
       + (vaelges ? '<input type="checkbox" data-nemvalgt="' + gruppe + ':' + i + '"'
                    + (l.medtaget ? " checked" : "") + '>' : "")
       + (bil ? '<button class="nembilknap" data-nemkort="' + gruppe + ':' + i + '">'
@@ -6942,6 +6979,7 @@ function nemIKurv(produktId){
 /* ---------- Åbn og luk ---------- */
 async function nemAabn(){
   nemByg();
+  nemFoldFaste();      // skal ligge EFTER nemByg: kategorierne kommer derfra
   show("nem-back");
   nemTegn();
   await Promise.all([nemHentPriser(), nemHentKurv()]);
@@ -7208,6 +7246,34 @@ async function nemBerigFund(fund){
   return fund;
 }
 
+/* Varenumre der allerede er i brug, og hvad de bruges SOM. Bygges på ny
+   ved hvert opslag, så den ikke kan nå at blive forældet.
+   Pointen er at man kan se det MENS man mapper: uden det opdager man
+   først bagefter at varen allerede lå som variant et andet sted. */
+function nemBrugteNumre(){
+  const kort = new Map();
+  (nemligVarer || []).forEach(v => {
+    if(v.produkt_id) kort.set(String(v.produkt_id), { rolle: "standard", vare: v.navn });
+    (Array.isArray(v.alternativer) ? v.alternativer : []).forEach(a => {
+      const id = a && a.produkt_id;
+      /* Er nummeret både standard ét sted og variant et andet, vinder
+         standard: det er den stærkeste binding at kende til. */
+      if(id && !kort.has(String(id))) kort.set(String(id), { rolle: "variant", vare: v.navn });
+    });
+  });
+  return kort;
+}
+
+/* Mærket der siger at varen allerede er i brug. Navnet på den vare den
+   hører til kommer med — "variant" alene efterlader spørgsmålet om
+   hvilken vare det er en variant AF. */
+function nemBrugtMaerke(v, kort){
+  const b = kort && kort.get(String(v && v.id));
+  if(!b) return "";
+  return '<span class="brugt ' + b.rolle + '">' + esc(b.rolle)
+       + ' · ' + esc(b.vare) + '</span>';
+}
+
 /* Mærket der vises på en træffer man har købt før. */
 function nemKoebtMaerke(v){
   if(!v || !v.koebt) return "";
@@ -7270,6 +7336,9 @@ function nemSoegeGruppe(){
 }
 
 function nemValgTegnFund(){
+  /* Bygges her frem for i hver enkelt linje: opslaget går gennem alle
+     varer og deres varianter, og det skal ikke gøres 15 gange. */
+  const brugte = nemBrugteNumre();
   const ud = document.getElementById("nemvalg-fund");
   if(!nemValg.fund.length){ ud.innerHTML = '<div class="nemtom">Ingen varer fundet.</div>'; return; }
 
@@ -7313,7 +7382,7 @@ function nemValgTegnFund(){
                      + '" alt="" loading="lazy">' : "")
       + '<span class="v"><span>' + esc(v.navn)
       + (v.favorit ? ' <span class="favorit">★</span>' : "")
-      + nemKoebtMaerke(v) + '</span>'
+      + nemKoebtMaerke(v) + nemBrugtMaerke(v, brugte) + '</span>'
       + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
       + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
