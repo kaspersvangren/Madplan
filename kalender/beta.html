@@ -935,6 +935,29 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    Navnet får lov at krympe først; mærkerne falder ned på næste linje. */
 .nemfund .n{display:flex;flex-wrap:wrap;align-items:center;gap:5px;
   min-width:0;line-height:1.35}
+/* ---------- Valgt to steder ---------- */
+.nemdelt{border:1px solid var(--line);border-radius:12px;padding:12px;
+  margin-bottom:12px}
+.nemdelt h3{font-size:15px;margin:0 0 8px}
+.nemdelt .kilde{display:flex;justify-content:space-between;gap:10px;
+  font-size:13px;color:var(--muted);padding:3px 0}
+.nemdelt .kilde b{font-weight:600;color:var(--ink)}
+.nemdelt .ialt{font-size:13px;font-weight:600;color:var(--mad);
+  padding:6px 0 2px;border-top:1px solid var(--line);margin-top:6px}
+.nemdelt .valg{display:flex;align-items:center;gap:8px;margin-top:10px;
+  flex-wrap:wrap}
+.nemdelt .valg button{font-size:13px;font-weight:600;padding:7px 14px;
+  border:1px solid var(--line);border-radius:999px;background:none;
+  color:var(--muted);cursor:pointer}
+/* Det aktive valg markeres, så man kan se hvad man har svaret på — ellers
+   ender man med at lede efter den ene blok man mangler. */
+.nemdelt .valg button.aktiv{background:var(--mad-bg);color:var(--mad);
+  border-color:var(--mad)}
+.nemdelt .ret{display:flex;align-items:center;gap:2px;margin-left:auto}
+.nemdelt .ret button{min-width:38px;text-align:center}
+.nemdelt .ret .tal{min-width:34px;text-align:center;font-weight:600;
+  font-size:15px;color:var(--ink)}
+
 /* Rækken med "Brug som standard". Ligger mellem søgeresultatet og
    detaljerne, så den er dét man møder efter at have markeret en vare. */
 #nemvalg-rolle{margin:10px 0 2px}
@@ -998,6 +1021,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nemvalg-back{z-index:60}
 #nemerstat-back{z-index:66}
 #nembyt-back{z-index:65}
+#nemdelt-back{z-index:58}      /* over selve indkøbsarket, under de andre */
 #nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
 #nemkort-back{z-index:70}
 /* Muligheder for den samme ingrediens. Billede, navn, pakke og pris i
@@ -1725,6 +1749,24 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Nemlig: varer der er valgt to steder.
+     Oprundingen sker PR. LINJE, før antallene lægges sammen: 600 g bliver
+     til 2 pakker og 300 g til 1, altså 3 pakker til et behov på 900 g.
+     Rundet op på det samlede behov ville det være 2.
+     Appen retter det IKKE selv — den viser regnestykket her, lige før der
+     sendes, og han bestemmer. Samme regel som ved billigere variant. -->
+<div class="backdrop" id="nemdelt-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Valgt to steder</h2>
+    <div class="meta">Tag stilling til hver vare, før der sendes.</div>
+    <div id="nemdelt-krop"></div>
+    <div class="actions">
+      <button class="btn" id="nemdelt-retur">Tilbage</button>
+      <button class="btn primary" id="nemdelt-send">Læg i kurven</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: vælg vare -->
 <div class="backdrop" id="nemvalg-back">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -2052,7 +2094,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.65.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.66.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7272,8 +7314,86 @@ function nemMindstekoeb(){
 }
 
 /* Det der faktisk sendes: alt fra madplanen plus det der er sat flueben ved. */
+/* ---------- Varer der er valgt to steder ----------
+   Finder de varenumre der optræder på mere end én VALGT linje, og regner
+   ud hvad det samlede behov egentlig kræver.
+
+   Hvorfor det er nødvendigt: oprundingen sker pr. linje. Skal én ret bruge
+   600 g og en anden 300 g, bliver det 2 + 1 = 3 pakker à 500 g — altså
+   1.500 g til et behov på 900 g. Rundet op på de 900 g er svaret 2.
+
+   Regnestykket kan KUN laves når alle linjer i gruppen har et behov der
+   kan regnes om til pakker. Falder bare én ud — en fast vare uden behov,
+   eller en linje hvor enhederne ikke kan sammenlignes — svares der null
+   for det samlede behov, og så vises kun antallene. Et halvt regnestykke
+   er værre end ingen. */
+function nemDelteVarer(){
+  const grupper = new Map();
+  nemAlleLinjer().forEach(l => {
+    if(l.spring || !l.medtaget) return;
+    if(nemTilstand(l) !== "klar") return;
+    const id = String(l.kort.produkt_id);
+    if(!grupper.has(id)) grupper.set(id, []);
+    grupper.get(id).push(l);
+  });
+
+  const ud = [];
+  for(const [produktId, linjer] of grupper){
+    if(linjer.length < 2) continue;
+
+    const sum = linjer.reduce((n, l) => n + l.antal, 0);
+
+    /* Det samlede behov, hvis alle linjer kan regnes om. Pakkestørrelsen
+       tages fra hver linjes EGEN vare: to varer kan i princippet have
+       forskellig pakkestørrelse registreret for samme varenummer, og så
+       giver et fælles regnestykke ikke mening. */
+    let behovGrund = 0, pakkeGrund = null, maal = null, kanRegnes = true;
+    for(const l of linjer){
+      if(l.behov == null || l.gaet){ kanRegnes = false; break; }
+      const pm = Number(l.kort.pakke_maengde);
+      if(!pm || pm <= 0){ kanRegnes = false; break; }
+      const be = String(l.enhed || "").toLowerCase().trim();
+      const pe = String(l.kort.pakke_enhed || "").toLowerCase().trim();
+      const fb = nemFamilie(be), fp = nemFamilie(pe);
+      let bg, pg, m;
+      if(fb && fp && fb === fp){
+        bg = nemTilGrund(l.behov, be); pg = nemTilGrund(pm, pe);
+        m = fb;
+      } else if(!fb && !fp && be && be === pe){
+        bg = l.behov; pg = pm; m = be;
+      } else { kanRegnes = false; break; }
+      if(!bg || !pg || pg <= 0){ kanRegnes = false; break; }
+      if(maal === null){ maal = m; pakkeGrund = pg; }
+      else if(maal !== m || pakkeGrund !== pg){ kanRegnes = false; break; }
+      behovGrund += bg;
+    }
+
+    const behovAntal = kanRegnes
+      ? Math.max(1, Math.ceil(behovGrund / pakkeGrund)) : null;
+
+    ud.push({
+      produktId, linjer,
+      navn: (linjer[0].kort && linjer[0].kort.produkt_navn) || linjer[0].navn,
+      sum, behovAntal,
+      behovGrund: kanRegnes ? behovGrund : null,
+      pakkeGrund: kanRegnes ? pakkeGrund : null,
+      maal,
+      /* Startpunktet er det man allerede har valgt. Appen ændrer INTET af
+         sig selv — den viser bare hvad regnestykket siger. */
+      antal: sum,
+      valg: null                       // null | "behold" | "ret"
+    });
+  }
+  return ud;
+}
+
 function nemSendeliste(){
   const ud = new Map();
+  /* Har han taget stilling til en delt vare, er DET tallet — ikke summen
+     af linjerne. Er dialogen ikke i brug, ligger kortet tomt og alt går
+     som før. */
+  const besluttet = new Map(
+    (nemDelt || []).filter(g => g.valg).map(g => [String(g.produktId), g.antal]));
   nemAlleLinjer().forEach(l => {
     if(l.spring || !l.medtaget) return;
     if(nemTilstand(l) !== "klar") return;
@@ -7285,6 +7405,7 @@ function nemSendeliste(){
       ud.set(e.produkt_id, (ud.get(e.produkt_id) || 0) + e.antal);
     });
   });
+  besluttet.forEach((antal, id) => { if(ud.has(id)) ud.set(id, antal); });
   return [...ud.entries()].map(([produktId, antal]) => ({ produktId, antal }));
 }
 
@@ -7398,6 +7519,78 @@ async function nemFjernFraKurv(produktId){
     status.className = "nemstatus fejl";
     status.textContent = "Kunne ikke fjerne: " + (err.message || err);
   }
+}
+
+/* ---------- Dialogen ---------- */
+let nemDelt = null;
+
+/* Måleordet skrives ud som man siger det: gram og milliliter for de små
+   enheder, ellers enhedens eget ord. */
+function nemDeltMaal(m){
+  return m === "vaegt" ? "gram" : m === "rum" ? "ml" : m;
+}
+
+function nemDeltTegn(){
+  const krop = document.getElementById("nemdelt-krop");
+  const send = document.getElementById("nemdelt-send");
+  if(!krop || !nemDelt) return;
+
+  krop.innerHTML = nemDelt.map((g, i) => {
+    const linjer = g.linjer.map(l => {
+      const maengde = (g.maal && l.behov != null)
+        ? " / " + tal(l.behov) + " " + (l.enhed || "") : "";
+      const hvor = l.kilder ? " (" + l.kilder + ")" : " (fast vare)";
+      return '<div class="kilde"><span>' + esc(storNavn(l.navn)) + esc(hvor) + '</span>'
+        + '<b>' + l.antal + " stk" + esc(maengde) + '</b></div>';
+    }).join("");
+
+    /* Kun når hele gruppen kan regnes om, står der et samlet behov. */
+    const ialt = g.behovAntal != null
+      ? '<div class="ialt">Samlet behov: ' + g.behovAntal + ' stk / '
+        + tal(Math.round(g.behovGrund * 100) / 100) + ' ' + esc(nemDeltMaal(g.maal))
+        + (g.behovAntal !== g.sum ? ' — valgt: ' + g.sum + ' stk' : "")
+        + '</div>'
+      : '<div class="ialt">Valgt i alt: ' + g.sum + ' stk</div>';
+
+    return '<div class="nemdelt">'
+      + '<h3>' + esc(storNavn(g.navn)) + ' valgt ' + g.linjer.length + ' steder</h3>'
+      + linjer + ialt
+      + '<div class="valg">'
+      +   '<button type="button" data-deltbehold="' + i + '"'
+      +     (g.valg === "behold" ? ' class="aktiv"' : "") + '>Behold</button>'
+      +   '<span class="ret">'
+      +     '<button type="button" data-delttrin="' + i + ':-1" aria-label="Færre">−</button>'
+      +     '<span class="tal' + (g.valg === "ret" ? " aktiv" : "") + '">' + g.antal + '</span>'
+      +     '<button type="button" data-delttrin="' + i + ':1" aria-label="Flere">+</button>'
+      +   '</span>'
+      + '</div></div>';
+  }).join("");
+
+  /* Send er spærret indtil HVER blok har fået et aktivt svar. Appen må
+     ikke vælge for ham — heller ikke ved at lade ham trykke videre. */
+  const mangler = nemDelt.filter(g => !g.valg).length;
+  send.disabled = mangler > 0;
+  send.textContent = mangler > 0
+    ? "Mangler " + mangler + " svar" : "Læg i kurven";
+}
+
+/* "Ret" markeres af sig selv når tallet er et ANDET end det man havde
+   valgt. Sættes det tilbage, forsvinder markeringen igen — dét er hvad
+   Behold er til, hans ord. */
+function nemDeltTrin(i, retning){
+  const g = nemDelt && nemDelt[i];
+  if(!g) return;
+  g.antal = Math.max(1, g.antal + retning);
+  g.valg = (g.antal === g.sum) ? null : "ret";
+  nemDeltTegn();
+}
+
+function nemDeltBehold(i){
+  const g = nemDelt && nemDelt[i];
+  if(!g) return;
+  g.antal = g.sum;          // Behold betyder: som du havde valgt det
+  g.valg = "behold";
+  nemDeltTegn();
 }
 
 async function nemSend(){
@@ -8032,7 +8225,40 @@ function nemStandOpdater(){
 document.getElementById("nem-luk").onclick   = () => { hide("nem-back"); nemArk = null; };
 document.getElementById("nem-send").onclick  = async () => {
   if(nemArk && nemArk.sendt){ window.open("https://www.nemlig.com/basket", "_blank"); return; }
+  /* Er en vare valgt to steder, skal han se regnestykket først. Er der
+     ingen, sker der præcis som før — dialogen kommer slet ikke. */
+  const delte = nemDelteVarer();
+  if(delte.length){
+    nemDelt = delte;
+    nemDeltTegn();
+    show("nemdelt-back");
+    return;
+  }
+  nemDelt = null;
   await nemSend();
+};
+
+document.getElementById("nemdelt-krop").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-deltbehold]");
+  if(b){ nemDeltBehold(Number(b.dataset.deltbehold)); return; }
+  const t = ev.target.closest("[data-delttrin]");
+  if(t){
+    const [i, r] = t.dataset.delttrin.split(":");
+    nemDeltTrin(Number(i), Number(r));
+  }
+});
+
+/* Tilbage: beslutningerne smides væk, så man ikke sender noget man tror
+   man har fortrudt. */
+document.getElementById("nemdelt-retur").onclick = () => {
+  hide("nemdelt-back");
+  nemDelt = null;
+};
+
+document.getElementById("nemdelt-send").onclick = async () => {
+  hide("nemdelt-back");
+  await nemSend();
+  nemDelt = null;          // beslutningerne gælder kun denne afsendelse
 };
 
 document.getElementById("nem-krop").addEventListener("click", async ev => {
