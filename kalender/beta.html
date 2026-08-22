@@ -603,9 +603,16 @@ html[data-theme="dark"] .ev.fdag{background:rgba(230,90,90,.10)}
 /* ---------- Flydende knap ---------- */
 
 /* ---------- Dialoger ---------- */
-.backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40}
+/* --tast er tastaturets højde, målt mens det er fremme (0 ellers).
+   Arkene sidder i bunden af skærmen, så uden det her lander et LAVT ark
+   helt bag tastaturet: søger man i Nemlig-varer og får ét hit, krymper
+   arket, og så er både resultatet OG tællelinjen skjult. Man kan ikke
+   engang se OM der er hits uden at lukke tastaturet.
+   Afstanden i bunden løfter arket op, og max-height trækkes tilsvarende
+   ned, så et højt ark ikke bare ryger ud over toppen i stedet. */
+.backdrop{position:fixed;inset:0;background:rgba(20,22,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:40;padding-bottom:var(--tast,0px)}
 .backdrop.open{display:flex}
-.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:calc(92dvh / var(--z,1));overflow-y:auto;overscroll-behavior:contain}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:calc((92dvh - var(--tast,0px)) / var(--z,1));overflow-y:auto;overscroll-behavior:contain}
 /* Kun opskriftsarket glider op i stedet for at poppe frem — de andre ark
    roeres ikke. En keyframe-animation virker ogsaa naar elementet gaar
    fra display:none til flex (en transition kraever en synlig startvaerdi
@@ -2094,7 +2101,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.67.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.68.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -8801,6 +8808,42 @@ window.addEventListener("popstate", () => {
   }
   /* 3. Står vi hjemme, gør vi ingenting, og browseren forlader appen. */
 });
+
+/* ---------- Plads til tastaturet ----------
+   Telefonens tastatur ændrer ikke window.innerHeight, men det gør
+   visualViewport — forskellen ER tastaturets højde.
+
+   To ting der ellers går galt:
+   · `body{zoom:var(--z)}` skalerer ALT inde i body, så en målt højde i
+     skærmpixels skal deles med zoomen for at blive den rigtige afstand
+     inde i arket. Uden det rammer løftet skævt for netop dem der har
+     skruet på zoom
+   · adresselinjen i Chrome glider ind og ud og giver småudsving på
+     nogle titalls pixels. Under 80 regnes derfor som "intet tastatur",
+     så arkene ikke hopper mens man scroller */
+function tastaturSync(){
+  const vv = window.visualViewport;
+  let px = 0;
+  if(vv){
+    px = window.innerHeight - vv.height - vv.offsetTop;
+    if(!isFinite(px) || px < 80) px = 0;
+  }
+  const z = Number(getComputedStyle(document.documentElement)
+              .getPropertyValue("--z")) || 1;
+  document.documentElement.style.setProperty("--tast",
+    (px > 0 ? px / z : 0) + "px");
+}
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize", tastaturSync);
+  window.visualViewport.addEventListener("scroll", tastaturSync);
+}
+/* Også ved fokus: på Android kommer resize nogle gange FØR tastaturet er
+   helt oppe, og så måles der for lidt. */
+document.addEventListener("focusin", ev => {
+  if(ev.target.matches("input, textarea, select")) setTimeout(tastaturSync, 300);
+});
+document.addEventListener("focusout", () => setTimeout(tastaturSync, 300));
 
 const show = id => {
   const back = document.getElementById(id);
