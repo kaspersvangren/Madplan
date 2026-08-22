@@ -935,6 +935,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    Navnet får lov at krympe først; mærkerne falder ned på næste linje. */
 .nemfund .n{display:flex;flex-wrap:wrap;align-items:center;gap:5px;
   min-width:0;line-height:1.35}
+/* Rækken med "Brug som standard". Ligger mellem søgeresultatet og
+   detaljerne, så den er dét man møder efter at have markeret en vare. */
+#nemvalg-rolle{margin:10px 0 2px}
+#nemvalg-rolle button{width:100%}
 .nemfund .pris{flex:none;font-variant-numeric:tabular-nums;font-weight:600}
 .nemfund .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemfund .udsolgt{color:var(--holiday);font-weight:600}
@@ -1731,6 +1735,15 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       <button id="nemvalg-soeg">Søg</button>
     </div>
     <div id="nemvalg-fund"></div>
+    <!-- "Brug som standard" står HER, lige under det man har markeret, og
+         IKKE nede i variantlisten. To grunde:
+         1. Variantlisten ligger inde i #nemvalg-detalje, som er skjult
+            indtil der ER en standard. Lå knappen dér, kunne en ny vare
+            aldrig kortlægges — man kunne markere en træffer og så ingenting.
+         2. Knappen hører til MARKERINGEN, ikke til varianterne. -->
+    <div id="nemvalg-rolle" hidden>
+      <button type="button" class="nemstyktilfoej" id="nemvalg-som-std"></button>
+    </div>
     <div id="nemvalg-detalje" hidden>
       <div class="nemnavn">
         <span class="etiket">Navn i appen</span>
@@ -2039,7 +2052,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.63.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.64.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6307,8 +6320,25 @@ function nemValgSaetStandard(v){
   document.getElementById("nemvalg-detalje").hidden = false;
   nemStykTegn();
   nemAltTegn();
+  nemRolleTegn();
   nemNavneVarsel();
   nemValgTegnFund();
+}
+
+/* Knappen der gør den markerede træffer til standardvare. Den bor uden
+   for #nemvalg-detalje, fordi detaljen er skjult indtil der ER en
+   standard — og så kunne man aldrig komme i gang med en ny vare.
+   Hele rækken skjules når der intet er markeret: en knap der ikke kan
+   trykkes og ikke siger hvorfor, er værre end ingen knap. */
+function nemRolleTegn(){
+  const felt = document.getElementById("nemvalg-rolle");
+  const knap = document.getElementById("nemvalg-som-std");
+  if(!felt || !knap) return;
+  const v = nemValg && nemValg.markeret;
+  const erStandard = v && nemValg.valgt && String(nemValg.valgt.id) === String(v.id);
+  felt.hidden = !v || !!erStandard;
+  if(v) knap.textContent = "\u2605 Brug \u201c" + ((v.navn) || "den markerede vare")
+                         + "\u201d som standard";
 }
 
 function nemAltTegn(){
@@ -6351,17 +6381,13 @@ function nemAltTegn(){
     +   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
     + '</button></div>').join("") : "");
 
-  /* To knapper til den vare der er MARKERET i søgeresultatet — én pr.
-     rolle. Begge betyder altid det samme, uanset om varen er ny eller har
-     været kortlagt før; det er hele pointen med adskillelsen. */
+  /* Kun "gem som variant" hører til her. "Brug som standard" tegnes af
+     nemRolleTegn() uden for detaljen — se forklaringen i markuppen. */
   const v = nemValg && nemValg.markeret;
   const alleredeInde = v && alt.some(a => String(a.produkt_id) === String(v.id));
   const erStandard = v && nemValg.valgt && String(nemValg.valgt.id) === String(v.id);
   const navn = esc((v && v.navn) || "den markerede vare");
 
-  liste.innerHTML += '<button type="button" class="nemstyktilfoej" id="nemvalg-som-std"'
-    + ((!v || erStandard) ? " disabled style=\"opacity:.45\"" : "")
-    + '>\u2605 Brug \u201c' + navn + '\u201d som standard</button>';
   liste.innerHTML += '<button type="button" class="nemstyktilfoej" id="nemvalg-alt-ny"'
     + ((!v || alleredeInde || erStandard) ? " disabled style=\"opacity:.45\"" : "")
     + '>+ Gem \u201c' + navn + '\u201d som variant</button>';
@@ -7362,6 +7388,7 @@ async function nemSend(){
 function nemValgAaben(opsaet){
   nemValg = Object.assign({ fund: [], valgt: null, markeret: null, raekke: null,
                             navn: "", sti: null, fastVare:false }, opsaet);
+  document.getElementById("nemvalg-rolle").hidden = true;
   document.getElementById("nemvalg-titel").textContent =
     nemValg.raekke ? "Ret vare" : "Vælg vare";
   document.getElementById("nemvalg-meta").textContent =
@@ -7612,6 +7639,7 @@ function nemSoegeGruppe(){
 }
 
 function nemValgTegnFund(){
+  nemRolleTegn();     // knappen hører til markeringen og følger den
   /* Bygges her frem for i hver enkelt linje: opslaget går gennem alle
      varer og deres varianter, og det skal ikke gøres 15 gange. */
   const brugte = nemBrugteNumre();
@@ -8117,17 +8145,19 @@ document.getElementById("nemvalg-stykliste").addEventListener("change", ev => {
 /* Gem den vare der lige er markeret i soegeresultatet som alternativ.
    Hele produktet gemmes, ikke bare nummeret — saa har alternativet sin
    egen pakkestoerrelse med, og indkoebsarket kan regne paa den. */
+/* Sæt den markerede som standard. Den hidtidige standard ryger IKKE
+   automatisk ned i variantlisten — den skal man selv gemme, hvis man vil
+   beholde den. At gætte på det ville lave varianter man ikke bad om. */
+document.getElementById("nemvalg-rolle").addEventListener("click", ev => {
+  if(!nemValg) return;
+  if(!ev.target.closest("#nemvalg-som-std")) return;
+  const v = nemValg.markeret;
+  if(!v) return;
+  nemValgSaetStandard(v);
+});
+
 document.getElementById("nemvalg-altliste").addEventListener("click", ev => {
   if(!nemValg) return;
-  /* Sæt den markerede som standard. Den hidtidige standard ryger IKKE
-     automatisk ned i variantlisten — den skal man selv gemme, hvis man
-     vil beholde den. At gætte på det ville lave varianter man ikke bad om. */
-  if(ev.target.closest("#nemvalg-som-std")){
-    const v = nemValg.markeret;
-    if(!v) return;
-    nemValgSaetStandard(v);
-    return;
-  }
   if(ev.target.closest("#nemvalg-alt-ny")){
     const v = nemValg.markeret;
     if(!v) return;
