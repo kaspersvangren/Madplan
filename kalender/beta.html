@@ -2014,7 +2014,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.57.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.58.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6174,6 +6174,9 @@ function nemAltGoerStandard(i){
   /* Bytter plads frem for at lægge bagerst: rækkefølgen i listen er hans
      egen, og et bytte skal ikke rode op i den. */
   nemValg.alt[i] = gammel;
+  /* Markeringen i søgningen skal ikke pege på noget der ikke længere er
+     standard — ellers står knapperne og tilbyder en rolle varen har. */
+  nemValg.markeret = null;
   nemStykTegn();          // varens omregningsfelt viser nu den nyes tal
   nemAltTegn();
   nemValgTegnFund();     // "købt"- og "i brug"-mærkerne kan have skiftet
@@ -6260,12 +6263,41 @@ function nemVariantGem(){
   nemAltTegn();
 }
 
+/* Gør en markeret træffer til standardvare. Pakkestørrelsen fyldes ud
+   herfra — ikke ved markeringen — så felterne altid hører til den vare
+   der faktisk er standard. */
+function nemValgSaetStandard(v){
+  if(!nemValg || !v) return;
+  nemValg.valgt = v;
+  const m = document.getElementById("nemvalg-maengde");
+  const e = document.getElementById("nemvalg-enhed");
+  if(v.pakkeGaet && v.pakkeGaet.maengde){
+    m.value = v.pakkeGaet.maengde;
+    if(v.pakkeGaet.enhed && ENHEDER.includes(v.pakkeGaet.enhed)) e.value = v.pakkeGaet.enhed;
+  }
+  /* Var varen også gemt som variant, ville den stå to gange. */
+  if(Array.isArray(nemValg.alt)){
+    nemValg.alt = nemValg.alt.filter(a => String(a.produkt_id) !== String(v.id));
+  }
+  document.getElementById("nemvalg-detalje").hidden = false;
+  nemStykTegn();
+  nemAltTegn();
+  nemNavneVarsel();
+  nemValgTegnFund();
+}
+
 function nemAltTegn(){
   const felt = document.getElementById("nemvalg-altfelt");
   const liste = document.getElementById("nemvalg-altliste");
   const hint = document.getElementById("nemvalg-althint");
   if(!felt || !liste) return;
-  felt.hidden = document.getElementById("nemvalg-detalje").hidden;
+  /* MÅ IKKE følge detaljen som de øvrige felter: fra 2.58.0 ligger
+     "Brug som standard" HER. Ved en ny vare er detaljen skjult indtil der
+     ER en standard, og fulgte feltet med, kunne man aldrig trykke
+     knappen — varen ville være umulig at kortlægge. Feltet vises derfor
+     så snart der er noget at gøre ved. */
+  felt.hidden = !(nemValg && (nemValg.valgt || nemValg.markeret
+                              || (Array.isArray(nemValg.alt) && nemValg.alt.length)));
 
   const alt = (nemValg && Array.isArray(nemValg.alt)) ? nemValg.alt : [];
   /* Standardvaren står ØVERST i samme liste. Det er hele pointen: man
@@ -6294,14 +6326,20 @@ function nemAltTegn(){
     +   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
     + '</button></div>').join("") : "");
 
-  /* Knappen lægger den vare der lige er markeret i søgeresultatet til.
-     Er det den samme som standardvalget, giver det ingen mening. */
-  const v = nemValg && nemValg.valgt;
+  /* To knapper til den vare der er MARKERET i søgeresultatet — én pr.
+     rolle. Begge betyder altid det samme, uanset om varen er ny eller har
+     været kortlagt før; det er hele pointen med adskillelsen. */
+  const v = nemValg && nemValg.markeret;
   const alleredeInde = v && alt.some(a => String(a.produkt_id) === String(v.id));
-  const erStandard = v && nemValg.raekke && String(nemValg.raekke.produkt_id) === String(v.id);
+  const erStandard = v && nemValg.valgt && String(nemValg.valgt.id) === String(v.id);
+  const navn = esc((v && v.navn) || "den markerede vare");
+
+  liste.innerHTML += '<button type="button" class="nemstyktilfoej" id="nemvalg-som-std"'
+    + ((!v || erStandard) ? " disabled style=\"opacity:.45\"" : "")
+    + '>\u2605 Brug \u201c' + navn + '\u201d som standard</button>';
   liste.innerHTML += '<button type="button" class="nemstyktilfoej" id="nemvalg-alt-ny"'
     + ((!v || alleredeInde || erStandard) ? " disabled style=\"opacity:.45\"" : "")
-    + '>+ Gem \u201c' + esc((v && v.navn) || "den valgte vare") + '\u201d som alternativ</button>';
+    + '>+ Gem \u201c' + navn + '\u201d som variant</button>';
 
   hint.textContent = alt.length
     ? "Den øverste er standardvaren. I indkøbsarket kan du skifte mellem "
@@ -7282,7 +7320,8 @@ async function nemSend(){
    Vælg vare
    ================================================================== */
 function nemValgAaben(opsaet){
-  nemValg = Object.assign({ fund: [], valgt: null, raekke: null, navn: "", sti: null, fastVare:false }, opsaet);
+  nemValg = Object.assign({ fund: [], valgt: null, markeret: null, raekke: null,
+                            navn: "", sti: null, fastVare:false }, opsaet);
   document.getElementById("nemvalg-titel").textContent =
     nemValg.raekke ? "Ret vare" : "Vælg vare";
   document.getElementById("nemvalg-meta").textContent =
@@ -7554,7 +7593,9 @@ function nemValgTegnFund(){
        ellers vælger et klik den forkerte vare, så snart filtret skjuler
        noget. nemValgVaelg slår op i nemValg.fund. */
     const i = nemValg.fund.indexOf(v);
-    const valgt = nemValg.valgt && String(nemValg.valgt.id) === String(v.id);
+    /* To forskellige ting nu: den man har markeret, og den der ER
+       standard. Før var de samme variabel, og det var netop fejlen. */
+    const valgt = nemValg.markeret && String(nemValg.markeret.id) === String(v.id);
 
     // Mærke og Nemligs egen varebeskrivelse. Beskrivelsen gentager tit
     // mærket til sidst — det klippes væk, så linjen bliver til at læse.
@@ -7582,19 +7623,26 @@ function nemValgTegnFund(){
   }).join("");
 }
 
+/* ÆNDRET i 2.58.0: et klik i søgeresultatet MARKERER kun. Det gør ikke
+   længere varen til standard.
+
+   Før var `nemValg.valgt` både "markeret i søgningen" OG "standardvaren".
+   Ville man gemme en træffer som variant, skulle man først klikke den —
+   og dermed var standarden allerede skiftet, uden at man havde bedt om
+   det. Han fandt det, fordi 2.56.0 begyndte at VISE standarden i listen.
+   Nu vælger man selv rollen bagefter: "brug som standard" eller "gem som
+   variant". Ét tryk mere ved den allerførste kortlægning, til gengæld
+   skifter ingenting af sig selv. */
 function nemValgVaelg(i){
   const v = nemValg.fund[i];
   if(!v) return;
-  nemValg.valgt = v;
-  const m = document.getElementById("nemvalg-maengde");
-  const e = document.getElementById("nemvalg-enhed");
-  if(v.pakkeGaet && v.pakkeGaet.maengde){
-    m.value = v.pakkeGaet.maengde;
-    if(v.pakkeGaet.enhed && ENHEDER.includes(v.pakkeGaet.enhed)) e.value = v.pakkeGaet.enhed;
-  }
+  nemValg.markeret = v;
   const navnFelt = document.getElementById("nemvalg-navn");
   if(!navnFelt.value.trim()) navnFelt.value = v.navn || "";
-  document.getElementById("nemvalg-detalje").hidden = false;
+  /* Felterne hører til STANDARDVAREN, så de åbner sig først når der er
+     valgt en. Ellers ville man sidde og rette pakkestørrelse på noget der
+     endnu ikke er knyttet til varen. */
+  document.getElementById("nemvalg-detalje").hidden = !nemValg.valgt;
   /* FEJL i 2.35.0, fundet af ham 20. august: begge felter skjuler sig med
      `felt.hidden = detalje.hidden` og blev KUN tegnet når arket åbnedes.
      Lagde man en vare ind for foerste gang, var detaljen skjult ved
@@ -7617,7 +7665,11 @@ function nemValgVaelg(i){
 
 async function nemValgGem(){
   if(!nemValg.valgt){
-    document.getElementById("nemvalg-status").textContent = "Vælg en vare først.";
+    const st = document.getElementById("nemvalg-status");
+    st.className = "nemstatus fejl";
+    st.textContent = nemValg.markeret
+      ? "Tryk \u201cBrug som standard\u201d for at knytte varen til navnet."
+      : "Søg en vare frem og vælg den først.";
     return;
   }
   const navn = (document.getElementById("nemvalg-navn").value || nemValg.navn
@@ -7999,8 +8051,17 @@ document.getElementById("nemvalg-stykliste").addEventListener("change", ev => {
    egen pakkestoerrelse med, og indkoebsarket kan regne paa den. */
 document.getElementById("nemvalg-altliste").addEventListener("click", ev => {
   if(!nemValg) return;
+  /* Sæt den markerede som standard. Den hidtidige standard ryger IKKE
+     automatisk ned i variantlisten — den skal man selv gemme, hvis man
+     vil beholde den. At gætte på det ville lave varianter man ikke bad om. */
+  if(ev.target.closest("#nemvalg-som-std")){
+    const v = nemValg.markeret;
+    if(!v) return;
+    nemValgSaetStandard(v);
+    return;
+  }
   if(ev.target.closest("#nemvalg-alt-ny")){
-    const v = nemValg.valgt;
+    const v = nemValg.markeret;
     if(!v) return;
     if(!Array.isArray(nemValg.alt)) nemValg.alt = [];
     nemValg.alt.push({
