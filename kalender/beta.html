@@ -2014,7 +2014,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.58.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.59.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7986,10 +7986,32 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
     if(l) nemValgAaben({ navn: l.navn, sti: loes.dataset.nemloes, raekke: l.kort || null });
     return;
   }
+  /* ÆNDRET i 2.59.0. Før åbnede et tryk på navnet ALTID kortlægningen —
+     altså den permanente ændring af varen, for alle uger — og gjorde
+     ingenting, hvis varen ikke var kortlagt endnu.
+
+     Det var vendt om: det nemmeste tryk førte til den største handling,
+     mens det man som regel vil fra listen (skifte for DENNE uge) krævede
+     en knap. Nu fører navnet hen til det der passer til linjen:
+
+       ikke kortlagt        → kortlægningen; der er ikke andet at gøre
+       flere muligheder     → Varianter
+       kun én mulighed      → udskift for denne uge
+
+     Kortlægningen af en vare der ALLEREDE er kortlagt nås fra Varer-listen
+     i menuen — den vej findes i forvejen og er uændret. */
   const red = ev.target.closest("[data-nemred]");
   if(red){
-    const { l } = nemLinje(red.dataset.nemred);
-    if(l && l.kort) nemValgAaben({ navn: l.navn, sti: red.dataset.nemred, raekke: l.kort });
+    const sti = red.dataset.nemred;
+    const { l } = nemLinje(sti);
+    if(!l) return;
+    if(!l.kort){
+      nemValgAaben({ navn: l.navn, sti, raekke: null });
+    } else if(nemMuligheder(nemFind(l.navn) || l.kort).length > 1){
+      nemBytAaben(sti);
+    } else {
+      nemUdskiftAaben(sti);
+    }
     return;
   }
   if(ev.target.closest("#nem-tilfoej-knap")){
@@ -8177,13 +8199,16 @@ document.getElementById("nembyt-krop").addEventListener("click", ev => {
   const i = b.dataset.bytrin.lastIndexOf(":");
   nemBytTrin(b.dataset.bytrin.slice(0, i), Number(b.dataset.bytrin.slice(i + 1)));
 });
-/* Passer ingen af de gemte, aabnes den almindelige soegning — dér kan en
-   ny vare bade vaelges og gemmes som alternativ til naeste gang. */
+/* ÆNDRET i 2.59.0: passer ingen af de gemte, åbnes UDSKIFT FOR DENNE UGE
+   — ikke kortlægningen. Før var det den samme skævhed som på navnet: man
+   stod midt i et valg der kun gjaldt ugen, og endte i en permanent
+   ændring af varen. Udskift-arket gemmer i forvejen det man vælger som
+   variant, så vejen til "næste gang" er der stadig. */
 document.getElementById("nembyt-soeg").onclick = () => {
   if(!nemByt) return;
-  const sti = nemByt.sti, navn = nemByt.navn, grund = nemByt.grund;
+  const sti = nemByt.sti;
   hide("nembyt-back"); nemByt = null;
-  nemValgAaben({ navn, sti, raekke: grund });
+  nemUdskiftAaben(sti);
 };
 
 document.getElementById("menu-nemlig").onclick = () => {
