@@ -812,7 +812,13 @@ html[data-theme="dark"] .levflue.klar{color:#6DBE86}
 .err{color:var(--holiday);font-size:13px;margin-top:6px;display:none}
 .err.show{display:block}
 .menu-row{display:flex;width:100%;align-items:center;gap:11px;padding:14px 4px;font-size:15px;border-bottom:1px solid var(--line);text-align:left}
-.menu-row:last-of-type{border-bottom:none}
+/* button, ikke bare .menu-row: :last-of-type gælder PR. ELEMENTTYPE, og
+   historik-rækken er det eneste <a> i menuen — den ville derfor tælle som
+   "sidste af sin type" og miste sin skillelinje midt i listen. */
+button.menu-row:last-of-type{border-bottom:none}
+/* Rækken til historikken er et rigtigt link og ikke en knap, så den skal
+   have knappernes farve og manglende understregning tilbage. */
+a.menu-row{color:var(--ink);text-decoration:none}
 
 /* ---------- Ferie ---------- */
 .feriestribe{height:5px;background:var(--ferie);flex:none}
@@ -924,6 +930,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemfund.valgt{background:var(--chip)}
 .nemfund input[type=radio]{width:19px;height:19px;flex:none;margin-top:3px;accent-color:var(--ink)}
 .nemfund .v{flex:1;min-width:0}
+/* Navn og mærker på én linje der MÅ brydes. Mærkerne har white-space:nowrap
+   — uden ombrydning her skubbede de sig ind under prisen på en telefon.
+   Navnet får lov at krympe først; mærkerne falder ned på næste linje. */
+.nemfund .n{display:flex;flex-wrap:wrap;align-items:center;gap:5px;
+  min-width:0;line-height:1.35}
 .nemfund .pris{flex:none;font-variant-numeric:tabular-nums;font-weight:600}
 .nemfund .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .nemfund .udsolgt{color:var(--holiday);font-weight:600}
@@ -1672,6 +1683,16 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       Nemlig-varer
       <span class="stand" id="nemlig-stand">—</span>
     </button>
+    <!-- Købshistorikken er sit EGET site, ikke et ark i appen: den er til
+         at sidde og grave i, ikke til at bruge midt i et indkøb. Derfor et
+         almindeligt link — så kan det åbnes i en ny fane, kopieres og
+         bogmærkes som alt andet.
+         Stien er relativ, fordi historik.html ligger i samme mappe som
+         beta.html og index.html. Flyttes filen, skal den her rettes med. -->
+    <a class="menu-row" id="menu-historik" href="historik.html" target="_blank" rel="noopener">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      Købshistorik
+    </a>
     <button class="menu-row" id="menu-reload">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>
       Hent data forfra
@@ -2018,7 +2039,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.61.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.63.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5905,7 +5926,7 @@ function nemErstatTegn(){
       return '<button class="nemfund" data-nemerstatvalg="' + i + '"'
         + (v.paaLager ? "" : " disabled style=\"opacity:.5\"") + '>'
         + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120)) + '" alt="" loading="lazy">' : "")
-        + '<span class="v"><span>' + esc(v.navn) + nemKoebtMaerke(v) + '</span>'
+        + '<span class="v"><span class="n">' + esc(v.navn) + nemKoebtMaerke(v) + '</span>'
         + '<span class="under">' + esc([v.maerke, v.beskrivelse].filter(Boolean).join(" · "))
         + (kilo ? " · " + esc(kilo) : "")
         + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span></span>'
@@ -7513,14 +7534,20 @@ function nemBrugteNumre(){
   return kort;
 }
 
-/* Mærket der siger at varen allerede er i brug. Navnet på den vare den
-   hører til kommer med — "variant" alene efterlader spørgsmålet om
-   hvilken vare det er en variant AF. */
+/* Mærket der siger at varen allerede er i brug.
+
+   Navnet på den vare den hører til kommer med — "variant" alene efterlader
+   spørgsmålet om hvilken vare det er en variant AF. MEN står man i netop
+   den vare, ved man det godt: så stod der "standard · Brombær" på hver
+   eneste træffer under Brombær, og mærket blev så bredt at det løb ind i
+   prisen. Derfor udelades navnet dér. */
 function nemBrugtMaerke(v, kort){
   const b = kort && kort.get(String(v && v.id));
   if(!b) return "";
+  const her = nemValg && nemValg.navn
+    && nemNoegle(b.vare) === nemNoegle(nemValg.navn);
   return '<span class="brugt ' + b.rolle + '">' + esc(b.rolle)
-       + ' · ' + esc(b.vare) + '</span>';
+       + (her ? "" : " · " + esc(b.vare)) + '</span>';
 }
 
 /* Mærket der vises på en træffer man har købt før. */
@@ -7631,8 +7658,8 @@ function nemValgTegnFund(){
       + '<input type="radio" ' + (valgt ? "checked" : "") + ' tabindex="-1">'
       + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
                      + '" alt="" loading="lazy">' : "")
-      + '<span class="v"><span>' + esc(v.navn)
-      + (v.favorit ? ' <span class="favorit">★</span>' : "")
+      + '<span class="v"><span class="n">' + esc(v.navn)
+      + (v.favorit ? '<span class="favorit">★</span>' : "")
       + nemKoebtMaerke(v) + nemBrugtMaerke(v, brugte) + '</span>'
       + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
       + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
@@ -8934,6 +8961,10 @@ document.getElementById("menu-btn").onclick = async () => {
   show("menu-back");
 };
 document.getElementById("menu-close").onclick = () => hide("menu-back");
+/* Historikken åbner i sin egen fane. Menuen lukkes, så den ikke står åben
+   bagved, når man vender tilbage til appen. INGEN preventDefault — linket
+   skal stadig virke som et link. */
+document.getElementById("menu-historik").addEventListener("click", () => hide("menu-back"));
 document.getElementById("menu-reload").onclick = async () => { hide("menu-back"); await hentAlt(); };
 
 /* =======================================================================
