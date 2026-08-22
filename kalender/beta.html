@@ -2094,7 +2094,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.66.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.67.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7329,26 +7329,50 @@ function nemMindstekoeb(){
    er værre end ingen. */
 function nemDelteVarer(){
   const grupper = new Map();
+  const laeg = (id, post) => {
+    const n = String(id);
+    if(!grupper.has(n)) grupper.set(n, []);
+    grupper.get(n).push(post);
+  };
+
   nemAlleLinjer().forEach(l => {
     if(l.spring || !l.medtaget) return;
     if(nemTilstand(l) !== "klar") return;
-    const id = String(l.kort.produkt_id);
-    if(!grupper.has(id)) grupper.set(id, []);
-    grupper.get(id).push(l);
+    laeg(l.kort.produkt_id, {
+      l, antal: l.antal, ekstra: false,
+      varenavn: (l.kort && l.kort.produkt_navn) || l.navn
+    });
+    /* RETTET i 2.67.0: har man taget EN AF HVER i Varianter, køber linjen
+       flere varenumre — og sendelisten sender dem alle. Så de skal også
+       med her, ellers varsles der kun om den ene. Han fandt det: fransk
+       postej og hamburgerryg ligger begge under "pålæg" og er begge faste
+       varer, men kun hamburgerryg blev opdaget. */
+    nemEkstraKlar(l).forEach(e => {
+      laeg(e.produkt_id, {
+        l, antal: e.antal, ekstra: true,
+        varenavn: e.produkt_navn || l.navn
+      });
+    });
   });
 
   const ud = [];
-  for(const [produktId, linjer] of grupper){
-    if(linjer.length < 2) continue;
+  for(const [produktId, poster] of grupper){
+    if(poster.length < 2) continue;
 
-    const sum = linjer.reduce((n, l) => n + l.antal, 0);
+    const linjer = poster.map(p => p.l);
+    const sum = poster.reduce((n, p) => n + p.antal, 0);
+
+    /* Deler en linje sit behov ud på flere varenumre, kan behovet ikke
+       tilskrives ét af dem — de dækker det jo tilsammen. Så udgår
+       regnestykket, og der vises kun antal. */
+    const harEkstra = poster.some(p => p.ekstra);
 
     /* Det samlede behov, hvis alle linjer kan regnes om. Pakkestørrelsen
        tages fra hver linjes EGEN vare: to varer kan i princippet have
        forskellig pakkestørrelse registreret for samme varenummer, og så
        giver et fælles regnestykke ikke mening. */
-    let behovGrund = 0, pakkeGrund = null, maal = null, kanRegnes = true;
-    for(const l of linjer){
+    let behovGrund = 0, pakkeGrund = null, maal = null, kanRegnes = !harEkstra;
+    for(const l of (harEkstra ? [] : linjer)){
       if(l.behov == null || l.gaet){ kanRegnes = false; break; }
       const pm = Number(l.kort.pakke_maengde);
       if(!pm || pm <= 0){ kanRegnes = false; break; }
@@ -7372,8 +7396,8 @@ function nemDelteVarer(){
       ? Math.max(1, Math.ceil(behovGrund / pakkeGrund)) : null;
 
     ud.push({
-      produktId, linjer,
-      navn: (linjer[0].kort && linjer[0].kort.produkt_navn) || linjer[0].navn,
+      produktId, linjer, poster,
+      navn: poster[0].varenavn,
       sum, behovAntal,
       behovGrund: kanRegnes ? behovGrund : null,
       pakkeGrund: kanRegnes ? pakkeGrund : null,
@@ -7536,12 +7560,17 @@ function nemDeltTegn(){
   if(!krop || !nemDelt) return;
 
   krop.innerHTML = nemDelt.map((g, i) => {
-    const linjer = g.linjer.map(l => {
+    const linjer = g.poster.map(p => {
+      const l = p.l;
       const maengde = (g.maal && l.behov != null)
         ? " / " + tal(l.behov) + " " + (l.enhed || "") : "";
       const hvor = l.kilder ? " (" + l.kilder + ")" : " (fast vare)";
-      return '<div class="kilde"><span>' + esc(storNavn(l.navn)) + esc(hvor) + '</span>'
-        + '<b>' + l.antal + " stk" + esc(maengde) + '</b></div>';
+      /* Kommer bidraget fra "en af hver", siges det — ellers ser det ud
+         som om den samme linje er talt med to gange. */
+      const som = p.ekstra ? " · som variant" : "";
+      return '<div class="kilde"><span>' + esc(storNavn(l.navn)) + esc(hvor)
+        + esc(som) + '</span>'
+        + '<b>' + p.antal + " stk" + esc(maengde) + '</b></div>';
     }).join("");
 
     /* Kun når hele gruppen kan regnes om, står der et samlet behov. */
@@ -7553,7 +7582,7 @@ function nemDeltTegn(){
       : '<div class="ialt">Valgt i alt: ' + g.sum + ' stk</div>';
 
     return '<div class="nemdelt">'
-      + '<h3>' + esc(storNavn(g.navn)) + ' valgt ' + g.linjer.length + ' steder</h3>'
+      + '<h3>' + esc(storNavn(g.navn)) + ' valgt ' + g.poster.length + ' steder</h3>'
       + linjer + ialt
       + '<div class="valg">'
       +   '<button type="button" data-deltbehold="' + i + '"'
