@@ -2118,7 +2118,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.70.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.71.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6764,9 +6764,15 @@ async function nemHentGratis(){
     nemArk.gratis = fund.map(v => {
       nemArk.priser[String(v.id)] = v;        // så priser og tilbud virker
       const valgt = valgtFoer.has(String(v.id));
+      /* Beskrivelsen er varens mængde og mærke, fx "10 g / Pure Garden".
+         Den skal STÅ PÅ LINJEN: mange af gaverne er så små prøver at man
+         er ligeglad, og det skal kunne ses uden at åbne noget.
+         Lagt i `kilder`, fordi det er det felt underteksten falder tilbage
+         på når linjen ikke har et behov. */
+      const maal = String(v.beskrivelse || "").replace(/\s*\/\s*/g, " · ");
       return {
         navn: v.navn,
-        behov: null, enhed: "", kilder: "", gaet: false, spring: false,
+        behov: null, enhed: "", kilder: maal, gaet: false, spring: false,
         uafklaret: false,
         kort: {
           produkt_id: String(v.id),
@@ -7283,8 +7289,10 @@ function nemLeveringsAfsnit(){
         '<button type="button" data-nemlev="' + d + '"'
         + (d === valgt ? ' class="aktiv"' : "") + '>' + esc(navn(d)) + '</button>').join("")
     + '</div>'
-    + '<div class="nemlevnote">Styrer kun hvad der vises som udsolgt — '
-    + 'leveringstiden vælger du selv hos Nemlig.</div>';
+    /* Kort nok til én linje på en telefon. Den lange udgave forklarede
+       også at leveringstiden vælges hos Nemlig — rigtigt, men det er ikke
+       noget man har brug for at læse hver gang. */
+    + '<div class="nemlevnote">Styrer kun hvad der vises som udsolgt.</div>';
 }
 
 function nemSumAfsnit(){
@@ -8567,6 +8575,15 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
     const sti = red.dataset.nemred;
     const { l } = nemLinje(sti);
     if(!l) return;
+    /* En gave kan ikke erstattes af noget som helst — den er dét den er,
+       og der er ingen kortlægning, standard eller varianter bag den. Et
+       tryk viser derfor varekortet, som er det eneste der giver mening. */
+    if(l.erGratis){
+      const p = nemArk.priser[String(l.kort.produkt_id)];
+      if(p) nemKortVis(p, "Gratis lige nu");
+      show("nemkort-back");
+      return;
+    }
     if(!l.kort){
       nemValgAaben({ navn: l.navn, sti, raekke: null });
     } else if(nemMuligheder(nemFind(l.navn) || l.kort).length > 1){
