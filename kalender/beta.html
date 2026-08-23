@@ -944,16 +944,21 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   min-width:0;line-height:1.35}
 /* ---------- Valgt to steder ---------- */
 /* ---------- Leveringsdagen ---------- */
-.nemlev{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  font-size:13px;color:var(--muted);padding:2px 4px 10px}
-.nemlev b{color:var(--ink);font-weight:600}
-.nemlev button{font-size:12px;font-weight:600;color:var(--muted);
+/* Én linje, ikke tre. Første udgave skrev "Leveres tors. 3. sep." og
+   gentog så alle tre datoer i knapperne — så brød den på en telefon.
+   Nu: ordet "Leveres", tre korte knapper, og forklaringen som en lille
+   linje under. Datoen står i den valgte knap, så den behøver ikke stå to
+   gange. */
+.nemlev{display:flex;align-items:center;gap:6px;padding:2px 4px 9px}
+.nemlev .ord{font-size:13px;color:var(--muted);flex:none}
+.nemlev button{font-size:12.5px;font-weight:600;color:var(--muted);
   background:none;border:1px solid var(--line);border-radius:999px;
-  padding:4px 11px;cursor:pointer}
+  padding:5px 0;cursor:pointer;flex:1;min-width:0;white-space:nowrap;
+  text-overflow:ellipsis;overflow:hidden}
 .nemlev button.aktiv{background:var(--mad-bg);color:var(--mad);
   border-color:var(--mad)}
-.nemlev .note{flex-basis:100%;font-size:11.5px;color:var(--muted);
-  opacity:.85;padding-top:2px}
+.nemlevnote{font-size:11.5px;color:var(--muted);opacity:.8;
+  padding:0 4px 10px;line-height:1.35}
 
 .nemdelt{border:1px solid var(--line);border-radius:12px;padding:12px;
   margin-bottom:12px}
@@ -2113,7 +2118,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.69.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.70.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5791,12 +5796,19 @@ function nemUgeGem(alt){
 const NEM_LEVERINGSDAG = 4;          // torsdag, deres faste dag
 
 function nemStandardLevering(){
-  /* Første torsdag på eller efter ugens start. INDKØBSUGEN BEGYNDER
-     FREDAG (naesteFredag), så torsdag er ugens SIDSTE dag — 21.-27. august
-     er fredag til torsdag. Regnet frem fra ugedagen i stedet for med et
-     fast antal dage, så det holder hvis ugestarten en dag laves om. */
-  const d = new Date(indkoebUge);
-  d.setDate(d.getDate() + ((NEM_LEVERINGSDAG - d.getDay() + 7) % 7));
+  /* Næstkommende torsdag regnet fra I DAG — ikke fra den uge man kigger
+     på. Jeg bandt den først til indkoebUge, og så pegede den 11 dage ud i
+     fremtiden når man planlagde næste uges mad. Det er forkert af to
+     grunde: man bestiller til den førstkommende levering uanset hvilken
+     uges madplan man sidder i, og Nemlig kan slet ikke svare så langt ude.
+     MÅLT: gaver kan leveres til og med 8 dage ude, derefter er alt udsolgt.
+
+     Er det torsdag i dag, tages i morgen: dagens levering er forlængst
+     lukket, og så er fredag den første man kan nå. */
+  const nu = new Date();
+  const d = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
+  if(d.getDay() === NEM_LEVERINGSDAG) d.setDate(d.getDate() + 1);
+  else d.setDate(d.getDate() + ((NEM_LEVERINGSDAG - d.getDay() + 7) % 7));
   return iso(d);
 }
 
@@ -7259,16 +7271,20 @@ function nemLeveringsAfsnit(){
     d.setDate(d.getDate() + forskyd);
     dage.push(iso(d));
   }
+  /* Kort form: "to. 3/9". Fuldt månedsnavn gjorde knapperne for brede til
+     tre ved siden af hinanden på en telefon. */
   const navn = i => {
     const d = new Date(i);
-    return d.toLocaleDateString("da-DK", { weekday: "short", day: "numeric", month: "short" });
+    return d.toLocaleDateString("da-DK", { weekday: "short" }).replace(".", "")
+      + " " + d.getDate() + "/" + (d.getMonth() + 1);
   };
-  return '<div class="nemlev"><span>Leveres <b>' + esc(navn(valgt)) + '</b></span>'
+  return '<div class="nemlev"><span class="ord">Leveres</span>'
     + dage.map(d =>
         '<button type="button" data-nemlev="' + d + '"'
         + (d === valgt ? ' class="aktiv"' : "") + '>' + esc(navn(d)) + '</button>').join("")
-    + '<span class="note">Styrer kun hvad der vises som udsolgt — '
-    + 'leveringstiden vælger du selv hos Nemlig.</span></div>';
+    + '</div>'
+    + '<div class="nemlevnote">Styrer kun hvad der vises som udsolgt — '
+    + 'leveringstiden vælger du selv hos Nemlig.</div>';
 }
 
 function nemSumAfsnit(){
