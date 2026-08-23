@@ -25,6 +25,7 @@ const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejsepla
 const BUDDINGE_TORV   = "A=1@O=Buddinge Torv (Gladsaxe Ringvej)@X=12491752@Y=55741939@U=86@L=11@";
 const GLADSAXE_RÅDHUS = "A=1@O=Gladsaxe Rådhus (Letbane)@X=12493487@Y=55743026@U=86@L=8603420@";
 const HERLEV_ST       = "A=1@O=Herlev St.@X=12443678@Y=55718917@U=86@L=8600706@";
+const HERLEV_LETBANE  = "A=1@O=Herlev St. (Letbane)@X=12440432@Y=55720131@U=86@L=8603414@";
 const HUSUM_ST        = "A=1@O=Husum St.@X=12464029@Y=55709407@U=86@L=8600705@";
 const ØLSTYKKE_ST     = "A=1@O=Ølstykke St.@X=12159708@Y=55795640@U=86@L=8600712@";
 
@@ -46,7 +47,7 @@ const RUTER = [
     produkter: S_BUS,   gangtid: 2, varsel: 6 },
 
   { lokalId: GLADSAXE_RÅDHUS, lokalNavn: "Gladsaxe Rådhus",
-    skiftId: HERLEV_ST,       skiftNavn: "Herlev",
+    skiftAf: HERLEV_LETBANE,  skiftPå: HERLEV_ST,  skiftNavn: "Herlev",
     produkter: LETBANE, gangtid: 4, varsel: 4, fra: "2026-08-22" }
 ];
 
@@ -526,17 +527,28 @@ async function opdater(){
 
   try{
     const alle = [];
+    const svigt = [];
     await Promise.all(brug.map(async rute => {
+      /* Letbanen holder ikke ved selve stationen. skiftAf er der du
+         står af, skiftPå er der du står på. Er de ikke sat, er det
+         samme sted begge veje.                                      */
+      const af = rute.skiftAf || rute.skiftId;
+      const på = rute.skiftPå || rute.skiftId;
       const varsel = hjemad ? rute.varsel : VARSEL_HJEMMEFRA;
-      let et, to_;
-      if(hjemad){
-        et  = await hentBen(rute.lokalId, rute.skiftId, rute.produkter, 1);
-        to_ = await hentBen(rute.skiftId, HJEM.id,      S_TOG,          1+EKSTRA_SIDER);
-      }else{
-        et  = await hentBen(HJEM.id,      rute.skiftId, S_TOG,          1);
-        to_ = await hentBen(rute.skiftId, rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
+      try{
+        let et, to_;
+        if(hjemad){
+          et  = await hentBen(rute.lokalId, af,          rute.produkter, 1);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          1+EKSTRA_SIDER);
+        }else{
+          et  = await hentBen(HJEM.id,      på,          S_TOG,          1);
+          to_ = await hentBen(af,           rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
+        }
+        kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
+      }catch(e){
+        /* én rute der fejler må ikke tømme hele tavlen */
+        svigt.push(rute.skiftNavn + " (" + (e.message||e) + ")");
       }
-      kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
     }));
 
     const kasser = grupper(alle)
@@ -561,7 +573,11 @@ async function opdater(){
       });
     }
     $("#fod").textContent = "Opdateret "+urTekst(nu)+". Data fra Rejseplanen.";
-    sætPuls("");
+    sætPuls(svigt.length ? "gal" : "");
+    if(svigt.length){
+      visBesked("Én vej kunne ikke hentes",
+        "Resten af tavlen er hentet og vist. Det der svigtede: " + svigt.join("; "));
+    }
 
     tegnDrift(await hentDrift());
   }catch(e){
