@@ -2118,7 +2118,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.72.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.73.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6543,6 +6543,15 @@ const nemKr = n => (n == null ? "" : Number(n).toFixed(2).replace(".", ","));
 function nemTilbudTekst(k){
   if(!k) return "";
   const hale = (k.slutter && k.visSlut !== false) ? " · " + nemDato(k.slutter) : "";
+  /* En gave er ikke et tilbud, og "nu 0,00 · før 8,95 · spar 8,95" siger
+     tre gange det samme. Normalprisen er det eneste der er værd at vide —
+     den fortæller om prøven er stor nok til at gide.
+     Udløbsdatoen udelades HELT: kampagnen står til 31. december, hvilket
+     ikke kan passe for en vare der skiftes ud løbende, og en dato man ikke
+     kan stole på er værre end ingen. */
+  if(k.slags === "gratis"){
+    return "gratis" + (k.foer ? " · normalt " + nemKr(k.foer) : "");
+  }
   if(k.slags === "mange"){
     return k.antal + " for " + nemKr(k.samletPris)
       + (k.spar ? " · spar " + nemKr(k.spar) : "") + hale;
