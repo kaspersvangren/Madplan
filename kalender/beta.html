@@ -2118,7 +2118,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.71.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.72.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6726,8 +6726,14 @@ async function nemHentPriser(){
     const { data, error } = await sb.functions.invoke("nemlig-tjek",
       { body: { ider: unikke, levering: nemLevering() } });
     if(error) throw error;
+    /* ERSTATTER hele listen — derfor skal gavernes egne oplysninger
+       lægges ind IGEN bagefter. De kommer fra nemlig-gratis og står ikke i
+       dette svar, så uden det her forsvandt de i det øjeblik priserne kom
+       hjem: varekortet faldt tilbage på navn og varenummer alene, uden
+       pris, mærke og beskrivelse. */
     nemArk.priser     = data.fundet || {};
     nemArk.findesIkke = data.findesIkke || [];
+    nemGratisPriserIgen();
   }catch(err){
     nemArk.fejl = "Kunne ikke hente priser: " + (err.message || err);
   }
@@ -6789,13 +6795,25 @@ async function nemHentGratis(){
         maxAntal: (v.kampagne && v.kampagne.maxAntal) || 1,
         medtaget: !!valgt,
         antal: valgt ? 1 : 0,
-        erGratis: true
+        erGratis: true,
+        /* Hele varen gemmes med, så den kan lægges i prislisten igen når
+           nemHentPriser erstatter den. */
+        vare: v
       };
     });
     nemTegn();
   }catch(err){
     /* Tavst med vilje — se forklaringen ovenfor. */
   }
+}
+
+/* Lægger gavernes oplysninger i prislisten igen. nemHentPriser erstatter
+   hele listen med sit eget svar, og gaverne står ikke i det svar. */
+function nemGratisPriserIgen(){
+  if(!nemArk || !Array.isArray(nemArk.gratis)) return;
+  nemArk.gratis.forEach(l => {
+    if(l.vare) nemArk.priser[String(l.vare.id)] = l.vare;
+  });
 }
 
 const nemAlleLinjer = () =>
