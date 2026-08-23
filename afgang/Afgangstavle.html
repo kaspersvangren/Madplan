@@ -39,16 +39,12 @@ const S_BUS = 64, LETBANE = 2048, S_TOG = 16;
 
 const RUTER = [
   { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
-    skiftId: HERLEV_ST,       skiftNavn: "Herlev",
-    produkter: S_BUS,   gangtid: 6, varsel: 6, til: "2026-08-22" },
-
-  { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
     skiftId: HUSUM_ST,        skiftNavn: "Husum",
     produkter: S_BUS,   gangtid: 2, varsel: 6 },
 
   { lokalId: GLADSAXE_RÅDHUS, lokalNavn: "Gladsaxe Rådhus",
     skiftAf: HERLEV_LETBANE,  skiftPå: HERLEV_ST,  skiftNavn: "Herlev",
-    produkter: LETBANE, gangtid: 4, varsel: 4, fra: "2026-08-22" }
+    produkter: LETBANE, gangtid: 4, varsel: 4 }
 ];
 
 const HJEM = { id: ØLSTYKKE_ST, navn: "Ølstykke" };
@@ -60,7 +56,7 @@ const VARSEL_HJEMMEFRA = 7;
    steder — ellers fanger man vejarbejde i Ishøj og på Bellahøj.
    Ord i DRIFT_BANE tæller alene, fordi de rammer hele strækningen. */
 
-const DRIFT_LINJER = ["200S","300S","Letbane","linje L","linje C","linje H"];
+const DRIFT_LINJER = ["200S","Letbane","linje L","linje C","linje H"];
 const DRIFT_STEDER = ["Buddinge Torv","Buddinge St","Gladsaxe Rådhus","Gladsaxe Ringvej",
                       "Herlev St","Husum St","Ølstykke","Ballerup","Måløv","Skovlunde","Islev"];
 const DRIFT_BANE   = ["Frederikssundbanen","Frederikssundsbanen","Hovedstadens Letbane"];
@@ -220,6 +216,8 @@ tr.sen .afg b{color:var(--forsinket);}
 .besked h3{margin:0 0 5px;font-size:14px;font-weight:600;}
 .besked code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;
   background:#eef1f4;padding:1px 5px;border-radius:2px;}
+.rolig{background:var(--flade);border:1px solid var(--hårfin);border-radius:var(--radius);
+  padding:10px 14px;margin:0 0 14px;font-size:13px;color:var(--dæmpet);}
 .fod{margin-top:20px;font-size:12px;color:var(--dæmpet);}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
@@ -527,7 +525,7 @@ async function opdater(){
 
   try{
     const alle = [];
-    const svigt = [];
+    const svigt = [], tomme = [];
     await Promise.all(brug.map(async rute => {
       /* Letbanen holder ikke ved selve stationen. skiftAf er der du
          står af, skiftPå er der du står på. Er de ikke sat, er det
@@ -546,8 +544,14 @@ async function opdater(){
         }
         kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
       }catch(e){
-        /* én rute der fejler må ikke tømme hele tavlen */
-        svigt.push(rute.skiftNavn + " (" + (e.message||e) + ")");
+        /* H890_R betyder "ingen forbindelser" — et rigtigt svar, ikke
+           en fejl. Fx når 200S ikke kører om søndagen.               */
+        const t = String(e.message||e);
+        if(t.indexOf("H890") > -1 || t.toLowerCase().indexOf("no result") > -1){
+          tomme.push(rute.skiftNavn);
+        }else{
+          svigt.push(rute.skiftNavn + " (" + t + ")");
+        }
       }
     }));
 
@@ -574,6 +578,12 @@ async function opdater(){
     }
     $("#fod").textContent = "Opdateret "+urTekst(nu)+". Data fra Rejseplanen.";
     sætPuls(svigt.length ? "gal" : "");
+    if(tomme.length){
+      const p = el("p","rolig");
+      p.textContent = "Ingen rejser over " + tomme.join(" eller ")
+        + " lige nu — den linje kører ikke på dette tidspunkt.";
+      $("#beskeder").appendChild(p);
+    }
     if(svigt.length){
       visBesked("Én vej kunne ikke hentes",
         "Resten af tavlen er hentet og vist. Det der svigtede: " + svigt.join("; "));
