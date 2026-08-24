@@ -100,8 +100,8 @@ body{background:var(--luft);color:var(--blæk);
   line-height:1.05;}
 
 /* vejret hvor du står lige nu */
-.vejrnu{margin-left:auto;display:flex;align-items:baseline;gap:5px;cursor:default;}
-.vejrikon{display:inline-block;line-height:0;vertical-align:-3px;}
+.vejrnu{margin-left:auto;display:flex;align-items:center;gap:6px;cursor:default;}
+.vejrikon{display:inline-flex;align-items:center;line-height:0;}
 .vejrikon svg{display:block;overflow:visible;}
 .vejrnu b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:19px;font-weight:600;}
@@ -163,8 +163,8 @@ tr.bånd b{
   font-size:17px;font-weight:600;}
 tr.bånd .antal{font-size:12px;color:var(--dæmpet);margin-left:9px;}
 /* vejret dér hvor du står af */
-tr.bånd .vejrder{float:right;display:inline-flex;align-items:center;gap:6px;
-  font-size:15px;color:var(--dæmpet);}
+tr.bånd .vejrder{float:right;display:inline-flex;align-items:center;gap:7px;
+  font-size:17px;color:var(--dæmpet);}
 tr.bånd .vejrder b{font-family:"IBM Plex Mono",monospace;
   font-variant-numeric:tabular-nums;font-weight:600;}
 tr.bånd .vejrder.vådt{color:var(--stram);font-weight:600;}
@@ -670,7 +670,7 @@ function tegnBånd(kasse){
   const v = vejrPå(stedDer(), kasse[0].ankomst);
   if(v){
     const w = el("span","vejrder");
-    w.appendChild(vejrIkon(v.kode, 21));
+    w.appendChild(vejrIkon(v.kode, 26));
     const wg = el("b"); wg.textContent = v.grader + "°";
     w.appendChild(wg);
     w.title = (vejret[stedDer()]||{}).navn + " kl. "
