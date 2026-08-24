@@ -64,6 +64,13 @@ const DRIFT_STEDER = ["Buddinge Torv","Buddinge St","Gladsaxe Rådhus","Gladsaxe
 const DRIFT_BANE   = ["Frederikssundbanen","Frederikssundsbanen","Hovedstadens Letbane"];
 const DRIFT_MAKS_DAGE = 30;   // længerevarende vejarbejde vises ikke
 
+/* Vejr hentes fra Open-Meteo. Ingen nøgle, ingen kvote, og det går
+   uden om Supabase-funktionen — den er kun til Rejseplanen.        */
+const VEJRSTEDER = {
+  gladsaxe: { navn: "Gladsaxe",  lat: 55.7430, lon: 12.4935 },
+  ølstykke: { navn: "Ølstykke",  lat: 55.7956, lon: 12.1597 }
+};
+
 const OPDATER_SEKUNDER = 60;
 const DVALE_MINUTTER   = 30;
 const GRUPPER_KORT     = 5;   // hvor mange ankomsttider vises normalt
@@ -85,12 +92,22 @@ body{background:var(--luft);color:var(--blæk);
   -webkit-font-smoothing:antialiased;padding:18px 16px 40px;}
 .ramme{max-width:880px;margin:0 auto;}
 
-.hoved{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+.hoved{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
   padding-bottom:12px;border-bottom:2px solid var(--blæk);}
+.titelblok{display:flex;flex-direction:column;gap:1px;}
 .hoved h1{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;
-  font-size:29px;letter-spacing:.03em;text-transform:uppercase;margin:0;}
+  font-size:29px;letter-spacing:.03em;text-transform:uppercase;margin:0;
+  line-height:1.05;}
+
+/* vejret hvor du står lige nu */
+.vejrnu{margin-left:auto;display:flex;align-items:baseline;gap:5px;cursor:default;}
+.vejrnu .tegn{font-size:19px;line-height:1;}
+.vejrnu b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:19px;font-weight:600;}
+.vejrnu .dryp{font-size:13px;}
+
 .ur{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:22px;
-  font-variant-numeric:tabular-nums;margin-left:auto;}
+  font-variant-numeric:tabular-nums;}
 .dato{color:var(--dæmpet);font-size:13px;}
 .puls{width:8px;height:8px;border-radius:50%;background:var(--letbane);
   display:inline-block;vertical-align:middle;margin-right:6px;}
@@ -144,6 +161,10 @@ tr.bånd b{
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:17px;font-weight:600;}
 tr.bånd .antal{font-size:12px;color:var(--dæmpet);margin-left:9px;}
+/* vejret dér hvor du står af */
+tr.bånd .vejrder{float:right;font-size:13px;color:var(--dæmpet);
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
+tr.bånd .vejrder.vådt{color:var(--stram);font-weight:600;}
 tbody.kasse tr:not(.bånd) + tr td{border-top:1px dotted #e7ecf1;}
 tbody.kasse tr.bånd + tr td{border-top:none;}
 tr.knap{opacity:.55;}
@@ -227,8 +248,11 @@ tr.sen .afg b{color:var(--forsinket);}
 <body>
 <div class="ramme">
   <header class="hoved">
-    <h1 id="titel">Hjem</h1>
-    <span class="dato" id="dato"></span>
+    <div class="titelblok">
+      <h1 id="titel">Hjem</h1>
+      <span class="dato" id="dato"></span>
+    </div>
+    <span class="vejrnu" id="vejrnu"></span>
     <span class="ur"><span class="puls" id="puls"></span><span id="ur">--:--</span></span>
   </header>
 
@@ -279,6 +303,82 @@ function tilDato(dato,tid){
 }
 const minutter=(a,b)=>Math.round((b-a)/60000);
 const varighedTekst = m => m>=60 ? Math.floor(m/60)+" t "+(m%60)+" m" : m+" min";
+
+/* ── vejr ──────────────────────────────────────────────── */
+/* Open-Meteos vejrkoder, samlet i de grupper der giver mening at
+   se forskel på, når man skal beslutte sig for en jakke.          */
+function vejrTegn(kode){
+  if(kode === 0)                    return "☀";
+  if(kode === 1 || kode === 2)      return "⛅";
+  if(kode === 3)                    return "☁";
+  if(kode === 45 || kode === 48)    return "🌫";
+  if(kode >= 51 && kode <= 57)      return "🌦";
+  if(kode >= 61 && kode <= 67)      return "🌧";
+  if(kode >= 71 && kode <= 77)      return "🌨";
+  if(kode >= 80 && kode <= 82)      return "🌧";
+  if(kode >= 85 && kode <= 86)      return "🌨";
+  if(kode >= 95)                    return "⛈";
+  return "•";
+}
+function vejrOrd(kode){
+  if(kode === 0)                    return "klart";
+  if(kode === 1 || kode === 2)      return "let skyet";
+  if(kode === 3)                    return "overskyet";
+  if(kode === 45 || kode === 48)    return "tåge";
+  if(kode >= 51 && kode <= 57)      return "finregn";
+  if(kode >= 61 && kode <= 67)      return "regn";
+  if(kode >= 71 && kode <= 77)      return "sne";
+  if(kode >= 80 && kode <= 82)      return "byger";
+  if(kode >= 85 && kode <= 86)      return "snebyger";
+  if(kode >= 95)                    return "tordenvejr";
+  return "";
+}
+
+let vejret = {};   // sted → { nu:{...}, timer:[{tid,kode,grader,nedbør}] }
+
+async function hentVejr(){
+  const nøgler = Object.keys(VEJRSTEDER);
+  const svar = await Promise.all(nøgler.map(async n => {
+    const s = VEJRSTEDER[n];
+    const u = "https://api.open-meteo.com/v1/forecast"
+      + "?latitude=" + s.lat + "&longitude=" + s.lon
+      + "&current=temperature_2m,weather_code,precipitation"
+      + "&hourly=temperature_2m,weather_code,precipitation"
+      + "&timezone=Europe%2FCopenhagen&forecast_days=2";
+    try{
+      const r = await fetch(u);
+      const d = await r.json();
+      const t = (d.hourly && d.hourly.time) || [];
+      return { navn: s.navn,
+        nu: d.current ? { kode: d.current.weather_code,
+                          grader: Math.round(d.current.temperature_2m),
+                          nedbør: d.current.precipitation } : null,
+        timer: t.map((tid,i) => ({
+          tid: tid,
+          kode: d.hourly.weather_code[i],
+          grader: Math.round(d.hourly.temperature_2m[i]),
+          nedbør: d.hourly.precipitation[i]
+        })) };
+    }catch(e){ return null; }
+  }));
+  const ud = {};
+  nøgler.forEach((n,i) => { if(svar[i]) ud[n] = svar[i]; });
+  vejret = ud;
+}
+
+/* find den time et tidspunkt falder i */
+function vejrPå(stedNøgle, tid){
+  const v = vejret[stedNøgle];
+  if(!v || !v.timer.length) return null;
+  const mærke = tid.getFullYear()+"-"+to(tid.getMonth()+1)+"-"+to(tid.getDate())
+              + "T" + to(tid.getHours()) + ":00";
+  for(let i=0;i<v.timer.length;i++){ if(v.timer[i].tid === mærke) return v.timer[i]; }
+  return null;
+}
+
+/* hvor du står nu, og hvor du lander */
+function stedHer(){ return hjemad ? "gladsaxe" : "ølstykke"; }
+function stedDer(){ return hjemad ? "ølstykke" : "gladsaxe"; }
 
 /* ── hentning ──────────────────────────────────────────── */
 const kurv = {};
@@ -483,6 +583,21 @@ function tegnRække(r, nu){
   return tr;
 }
 
+function tegnVejrNu(){
+  const holder = $("#vejrnu");
+  holder.textContent = "";
+  const v = vejret[stedHer()];
+  if(!v || !v.nu) return;
+  const t = el("span","tegn"); t.textContent = vejrTegn(v.nu.kode);
+  const g = el("b"); g.textContent = v.nu.grader + "°";
+  holder.appendChild(t); holder.appendChild(g);
+  if(v.nu.nedbør > 0){
+    const d = el("span","dryp"); d.textContent = "💧";
+    holder.appendChild(d);
+  }
+  holder.title = v.navn + ", " + vejrOrd(v.nu.kode);
+}
+
 function tegnBånd(kasse){
   const tr = el("tr","bånd");
   const td = el("td"); td.colSpan = 5;
@@ -498,6 +613,18 @@ function tegnBånd(kasse){
     ? varighedTekst(kortest)
     : kortest + "–" + varighedTekst(længst);
   td.appendChild(e); td.appendChild(b); td.appendChild(n);
+
+  /* vejret dér hvor du står af, på det tidspunkt du står af */
+  const v = vejrPå(stedDer(), kasse[0].ankomst);
+  if(v){
+    const w = el("span","vejrder");
+    w.textContent = vejrTegn(v.kode) + " " + v.grader + "°";
+    w.title = (vejret[stedDer()]||{}).navn + " kl. "
+            + urTekst(kasse[0].ankomst) + ": " + vejrOrd(v.kode)
+            + (v.nedbør > 0 ? ", " + v.nedbør + " mm" : "");
+    if(v.nedbør > 0) w.classList.add("vådt");
+    td.appendChild(w);
+  }
   tr.appendChild(td);
   return tr;
 }
@@ -523,7 +650,7 @@ function aktiv(rute){
   return true;
 }
 function sætOverskrift(){
-  $("#titel").textContent = hjemad ? "Hjem" : "På arbejde";
+  $("#titel").textContent = hjemad ? "Hjem" : "Ud";
   $("#forklar").textContent = hjemad
     ? "Fra Gladsaxe til Ølstykke. Sorteret efter hvornår du er fremme."
     : "Fra Ølstykke til Gladsaxe. Sorteret efter hvornår du er fremme.";
@@ -531,6 +658,8 @@ function sætOverskrift(){
 
 async function opdater(){
   sætPuls("arbejder");
+  await hentVejr();
+  tegnVejrNu();
   Object.keys(kurv).forEach(k => delete kurv[k]);
   const brug = RUTER.filter(aktiv);
   const nu = new Date();
