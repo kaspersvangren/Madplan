@@ -2137,7 +2137,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.74.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.75.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6703,9 +6703,31 @@ function nemDato(iso8601){
    skrevet ind vinder (over 1 kan kun være sat i hånden), derefter det
    antal de plejer at købe, og til sidst 1. Er profilen ukendt eller
    under 1, bliver det 1 — aldrig 0, for så var fluebenet uden virkning. */
+/* Hvor mange der foreslås når man sætter flueben ved en fast vare.
+
+   ÆNDRET i 2.75.0: medianen over de seneste 12 måneder går forud for
+   typetallet over hele historikken.
+
+   HVORFOR: typetallet lader ét tal vinde med en hårsbredde. Rugbrød er
+   købt 1 stk 50 gange og 2 stk 43 gange siden september 2023, så
+   typetallet blev 1 — selv om de løber tør hver uge. Medianen siger 2.
+   Og 12 måneder slår hele historikken: banan ville få 2,5 over hele
+   tiden, men 1 over det seneste år. Medianen tåler samtidig en enkelt
+   hamstring, som ellers ville trække gennemsnittet op.
+
+   Viewet leverer kun median_12mdr når varen er købt MINDST FEM gange
+   inden for året — ellers ville en vare købt to gange få et tal ud af et
+   møntkast. Mangler den, står typetallet tilbage præcis som før, så
+   ingen vare bliver dårligere stillet end den var.
+
+   MÅLT 24. august: ti varer ændrer sig, alle OPAD. Smørbar original
+   1→4, pålæg 3→4, og rugbrød, dressing, gær, hakkede tomater,
+   Lommeletter, passata, pitabrød og tomatpuré alle 1→2.               */
 function nemStandardAntal(v){
   if(Number(v.standard_antal) > 1) return Number(v.standard_antal);
   const p = nemProfilVare.get(v.id);
+  const m = p && Number(p.median_12mdr);
+  if(m && m > 1) return m;
   const t = p && Number(p.typisk_antal);
   return (t && t > 1) ? t : (Number(v.standard_antal) || 1);
 }
@@ -7170,6 +7192,20 @@ function nemTegn(){
           const pr = nemProfilFor(l.navn);
           if(!pr || !pr.rytme_brudt) return "";
           return '<span class="under rytme">Ikke købt i ' + pr.dage_siden + ' dage</span>';
+        })()
+      /* Hvorfor står der pludselig 4 og ikke 1? Fra 2.75.0 kommer det
+         foreslåede antal fra medianen over det seneste år, og for ti
+         varer betyder det et større tal end før. Uden en linje her ville
+         fire stk. Smørbar lande i kurven uden at nogen ved hvorfor.
+         Vises kun når tallet FAKTISK kommer fra historikken — er der sat
+         et fast antal på varen i hånden, er det ikke medianens fortjeneste. */
+      + (() => {
+          if(gruppe !== "faste" || !(l.standardAntal > 1)) return "";
+          const grund = nemFind(l.navn);
+          if(grund && Number(grund.standard_antal) > 1) return "";
+          const pr = nemProfilFor(l.navn);
+          if(!pr || Number(pr.median_12mdr) !== l.standardAntal) return "";
+          return '<span class="under">Køber som regel ' + l.standardAntal + ' ad gangen</span>';
         })()
       + (() => {
           const klar = nemEkstraKlar(l), vaek = nemEkstraVaek(l);
