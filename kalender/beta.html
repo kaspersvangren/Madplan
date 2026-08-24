@@ -1047,6 +1047,7 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nembyt-back{z-index:65}
 #nemdelt-back{z-index:58}      /* over selve indkøbsarket, under de andre */
 #nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
+#nemengang-back{z-index:59}    /* over indkøbsarket, under nemvalg (60) — som kan åbnes herfra */
 #nemkort-back{z-index:70}
 /* Muligheder for den samme ingrediens. Billede, navn, pakke og pris i
    én række, så to salathoveder kan sammenlignes uden at læse. */
@@ -1900,6 +1901,24 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Nemlig: køb noget én gang. Varen gemmes IKKE i kartoteket — den lever
+     kun i denne uges liste og er væk igen næste fredag. -->
+<div class="backdrop" id="nemengang-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Køb én gang</h2>
+    <div class="meta">Varen lægges kun i denne uges liste og gemmes ikke som fast vare.</div>
+    <div class="nemsoegfelt">
+      <input type="text" id="nemengang-tekst" placeholder="Søg hos Nemlig" autocomplete="off">
+      <button id="nemengang-soeg">Søg</button>
+    </div>
+    <div id="nemengang-fund"></div>
+    <div class="actions">
+      <button class="btn" id="nemengang-fast">Opret som fast vare i stedet</button>
+      <button class="btn primary" id="nemengang-luk">Luk</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: byt til et andet produkt for DENNE uge -->
 <div class="backdrop" id="nembyt-back">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -2118,7 +2137,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.73.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.74.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3488,7 +3507,7 @@ async function gemDag(ds, felter){
    der står i kladden ind igen. Samme fremgangsmåde som ingredienserne
    på en ret — enklere end at holde styr på hvad der er ændret, og der
    er højst en håndfuld rækker pr. dag. */
-async function gemIngMark(ds, mark){
+async function gemIngMark(ds, mark, gyldige){
   const { error } = await sb.from("madplan_ingrediens").delete().eq("dato", ds);
   if(error){ vis("Kunne ikke gemme markeringerne: " + error.message); return; }
   madplanIng = madplanIng.filter(r => r.dato !== ds);
@@ -3497,7 +3516,13 @@ async function gemIngMark(ds, mark){
     const i = n.indexOf("\u0000");
     return { dato: ds, ret_id: n.slice(0, i), navn: n.slice(i + 1),
              har: !!mark[n].har, frost: !!mark[n].frost };
-  }).filter(r => r.har || r.frost);
+  }).filter(r => r.har || r.frost)
+    /* Skifter man ret MENS arket står åbent, bliver den gamle rets
+       markeringer liggende i kladden. Uden det her blev de skrevet
+       tilbage til basen og gav optøningspåmindelser om noget der ikke
+       skulle spises. Rækkerne er allerede slettet ovenfor, så det her
+       rydder samtidig op i det gamle rod. */
+    .filter(r => !gyldige || gyldige.has(r.ret_id));
 
   if(!rene.length) return;
   const { data, error: f2 } = await sb.from("madplan_ingrediens").insert(rene).select();
@@ -3578,8 +3603,12 @@ function aabnDag(ds){
     ingMark: {}
   } : tomKladde();
 
-  /* Markeringerne ind i kladden, så Fortryd virkelig fortryder. */
-  madplanIng.filter(r => r.dato === ds).forEach(r => {
+  /* Markeringerne ind i kladden, så Fortryd virkelig fortryder. Kun dem
+     der hører til dagens EGNE retter — er retten skiftet siden
+     markeringen blev sat, er den forældet og skal hverken vises eller
+     skrives tilbage til basen. */
+  const gyldigeMark = dagensRetIder(dagKladde);
+  madplanIng.filter(r => r.dato === ds && gyldigeMark.has(r.ret_id)).forEach(r => {
     dagKladde.ingMark[r.ret_id + "\u0000" + r.navn] = { har: !!r.har, frost: !!r.frost };
   });
 
@@ -3704,7 +3733,7 @@ document.getElementById("dag-gem").onclick = async () => {
     if(!foer || foer.ret_id !== k.ret_id || !!foer.helret_frost !== !!k.helret_frost)
       felter.optoening_skjult = false;
     await gemDag(aabenDag, felter);
-    await gemIngMark(aabenDag, k.ingMark);
+    await gemIngMark(aabenDag, k.ingMark, dagensRetIder(k));
     render();
   }
   knap.disabled = false; knap.textContent = "Gem";
@@ -3999,7 +4028,11 @@ function optoeningTil(ds){
   if(m.frost && m.helret_frost && !m.optoening_skjult && m.ret_navn){
     ud.push({ slags:"helret", dato:ds, navn:m.ret_navn });
   }
-  madplanIng.filter(r => r.dato === ds && r.frost && !r.optoening_skjult)
+  /* Kun markeringer der hører til en ret der FAKTISK står på dagen. Se
+     dagensRetIder længere nede for hvorfor. */
+  const gyldige = dagensRetIder(m);
+  madplanIng.filter(r => r.dato === ds && r.frost && !r.optoening_skjult
+                      && gyldige.has(r.ret_id))
     .forEach(r => ud.push({ slags:"ing", dato:ds, retId:r.ret_id, navn:r.navn }));
   return ud;
 }
@@ -4019,6 +4052,29 @@ function ingKilder(m){
 
 const ingMarkFor = (dato, retId, navn) =>
   madplanIng.find(r => r.dato === dato && r.ret_id === retId && r.navn === navn) || null;
+
+/* De ret_id der hører til en dag LIGE NU — hovedretten og tilbehøret.
+   Virker både på en madplan-række og på dagKladde, som har de samme to
+   felter.
+
+   FEJL fundet i drift 24. august, som det her retter: markeringerne er
+   nøglet på dato + ret_id + navn, men de blev aldrig ryddet når man
+   skiftede ret på en dag. optoeningTil slog kun op på DATO, så en
+   markering fra den GAMLE ret gav en optøningspåmindelse om noget der
+   slet ikke skulle spises — "tag tomatsauce op" til en dag hvor retten
+   var blevet til tærte. Indkøbslisten var ikke ramt: beregnIndkoeb slår
+   op med dagens egne kilder og ser derfor aldrig de gamle rækker.
+
+   Rækkerne overlevede, fordi aabnDag læser ALLE rækker for datoen ind i
+   kladden og gemIngMark skriver dem forfra. Derfor filtreres der tre
+   steder: ind i kladden, ud af kladden, og ved visningen.            */
+function dagensRetIder(k){
+  const s = new Set();
+  if(!k) return s;
+  if(k.ret_id) s.add(k.ret_id);
+  (Array.isArray(k.tilbehoer) ? k.tilbehoer : []).forEach(t => { if(t && t.id) s.add(t.id); });
+  return s;
+}
 
 function beregnIndkoeb(fredag){
   const koeb = new Map(), tjek = new Map(), dage = [];
@@ -5767,15 +5823,85 @@ function nemUgeAlt(){
     if(r && r.uge === uge){
       return { valg: (r.valg && typeof r.valg === "object") ? r.valg : {},
                ekstra: (r.ekstra && typeof r.ekstra === "object") ? r.ekstra : {},
+               engangs: Array.isArray(r.engangs) ? r.engangs : [],
                levering: typeof r.levering === "string" ? r.levering : null };
     }
   }catch(e){}
-  return { valg: {}, ekstra: {}, levering: null };
+  return { valg: {}, ekstra: {}, engangs: [], levering: null };
 }
 function nemUgeGem(alt){
   try{ localStorage.setItem(NEMUGE_NOEGLE,
     JSON.stringify({ uge: iso(indkoebUge), valg: alt.valg, ekstra: alt.ekstra,
+                     engangs: alt.engangs || [],
                      levering: alt.levering ?? null })); }catch(e){}
+}
+
+/* ---------- Engangsvarer ----------
+   En buket tulipaner skal købes ÉN gang. Før kunne det slet ikke lade
+   sig gøre: søgefeltet i arket åbnede kortlægningen med fastVare, så
+   varen blev en FAST vare og dukkede op hver eneste uge. Fjernede man
+   fluebenet, blev den gemt som ingrediens — og ingredienser kommer fra
+   opskrifterne, så den blev aldrig vist. Begge veje var forkerte.
+
+   VALGT af ham 24. august: engangsvarer gemmes SLET IKKE i kartoteket.
+   De lever kun i ugens hukommelse, sammen med ugens bytte og varianter,
+   og forsvinder af sig selv når der bliver ny uge — indkøbsugen begynder
+   fredag. Kartoteket bliver derfor ikke fyldt op med tulipaner.
+
+   Købet står stadig i historikken bagefter: den kommer fra Nemligs egne
+   ordrer og kender hvert varenummer, uanset om varen er kortlagt her. */
+function nemEngangs(){ return nemUgeAlt().engangs || []; }
+
+function nemEngangsSaet(vare, antal){
+  const alt = nemUgeAlt();
+  const liste = Array.isArray(alt.engangs) ? alt.engangs.slice() : [];
+  const id = String(vare && (vare.produkt_id ?? vare.id) || "");
+  if(!id) return;
+  const i = liste.findIndex(e => String(e.produkt_id) === id);
+  if(antal > 0){
+    const post = {
+      produkt_id: id,
+      produkt_navn: (vare.produkt_navn || vare.navn || "").trim() || "Vare",
+      billede: vare.billede || null,
+      hovedgruppe: vare.hovedgruppe || null,
+      undergruppe: vare.undergruppe != null ? String(vare.undergruppe) : null,
+      antal: antal
+    };
+    /* Findes den i forvejen, beholdes navn og billede fra den gang den
+       blev lagt til — et nyt opslag kan mangle dem, og så ville linjen
+       pludselig stå uden billede. */
+    if(i >= 0) liste[i] = Object.assign({}, liste[i], { antal: antal });
+    else liste.push(post);
+  } else if(i >= 0){
+    liste.splice(i, 1);
+  }
+  alt.engangs = liste;
+  nemUgeGem(alt);
+}
+
+/* Ugens engangsvarer som linjer arket kan tegne. Formen er den samme som
+   alle andre linjer, så flueben, priser, kurv og afsendelse virker uden
+   særregler — men erEngangs sætter de få steder hvor de ER forskellige:
+   der er ingen kortlægning bag, så hverken Varianter eller Udskift giver
+   mening. */
+function nemEngangsLinjer(){
+  return nemEngangs().map(e => ({
+    navn: e.produkt_navn,
+    behov: null, enhed: "", kilder: "",
+    kort: {
+      produkt_id: String(e.produkt_id),
+      produkt_navn: e.produkt_navn,
+      pakke_maengde: null, pakke_enhed: "",
+      billede: e.billede || null,
+      hovedgruppe: e.hovedgruppe || null,
+      undergruppe: e.undergruppe || null,
+      styk: null
+    },
+    ekstra: [],
+    medtaget: e.antal > 0, antal: e.antal, standardAntal: 1,
+    gaet: false, spring: false, uafklaret: false,
+    erEngangs: true
+  }));
 }
 
 /* ---------- Hvornår kommer varerne? ----------
@@ -6707,7 +6833,7 @@ function nemByg(){
     plan: fraPlan,
     tjek: fraTjek,
     faste,
-    ekstra: [],                       // engangsvarer fundet med søgefeltet
+    ekstra: nemEngangsLinjer(),       // engangsvarer fundet med søgefeltet
     gratis: [],                       // det Nemlig forærer væk lige nu
     husk: egne.map(e => e.tekst),
     priser: {},
@@ -6951,7 +7077,12 @@ function nemTegn(){
            Er varen slet ikke kortlagt, skal man derimod redigere den
            rigtigt, og så hedder knappen "find vare". */
         + '<span class="knapper">'
-        +   (tilstand === "ukendt"
+        /* En engangsvare kan ikke udskiftes — der er ingen kortlægning at
+           bytte i. Bliver den udsolgt, fjerner man den og søger noget
+           andet frem, og det er præcis hvad knappen gør. */
+        +   (l.erEngangs
+              ? '<button class="loes" data-nemengangfjern="' + gruppe + ':' + i + '">fjern</button>'
+              : tilstand === "ukendt"
               ? '<button class="loes" data-nemloes="' + gruppe + ':' + i + '">find vare</button>'
               : '<button class="loes" data-nemudskift="' + gruppe + ':' + i + '">Udskift</button>')
         +   '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">spring over</button>'
@@ -6980,7 +7111,11 @@ function nemTegn(){
     const bil = (p && p.billede) || (l.kort && l.kort.billede) || null;
     /* Knappen vises kun naar der faktisk er noget at vaelge imellem —
        ellers ville hver eneste linje faa en knap der ikke goer noget. */
-    const flere = nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
+    /* En engangsvare har ingen kortlægning bag sig, så der er hverken
+       varianter eller en standard at skifte fra. Uden det her ville et
+       tilfældigt sammenfald mellem varens navn og en kortlagt vare
+       trække fremmede varianter ind på linjen. */
+    const flere = !l.erEngangs && nemMuligheder(nemFind(l.navn) || l.kort).length > 1;
     /* FEJL rettet: en uafklaret linje står på 0 og fik derfor "fravalgt"
        — streg over navnet og "tages ikke med". Den sagde altså at varen
        var valgt fra, samtidig med at spørgsmålstegnet sagde at der IKKE
@@ -7859,6 +7994,112 @@ async function nemSend(){
 }
 
 /* ==================================================================
+   Køb én gang — engangsvarer
+
+   Et helt selvstændigt ark, ikke en tilstand i "Vælg vare". Kortlægningen
+   handler om pakkestørrelser, omregning, varianter og standardvalg — alt
+   sammen ting der ikke findes for en buket tulipaner. Man søger, trykker
+   på varen, og den ligger i Øvrigt.
+   ================================================================== */
+let nemEngang = null;   // {fund: [...]}
+
+function nemEngangAaben(tekst){
+  nemEngang = { fund: [] };
+  document.getElementById("nemengang-tekst").value = tekst || "";
+  document.getElementById("nemengang-fund").innerHTML = "";
+  show("nemengang-back");
+  if(tekst) nemEngangSoeg();
+}
+
+async function nemEngangSoeg(){
+  const tekst = document.getElementById("nemengang-tekst").value.trim();
+  if(!tekst) return;
+  const ud = document.getElementById("nemengang-fund");
+  ud.innerHTML = '<div class="nemtom">Søger…</div>';
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-soeg",
+      { body: { tekst, antal: 15, levering: nemLevering() } });
+    if(error) throw error;
+    nemEngang.fund = await nemBerigFund(data.fund || []);
+    nemEngangTegn();
+  }catch(err){
+    ud.innerHTML = '<div class="nemtom">Søgningen gik galt: ' + esc(err.message || String(err)) + '</div>';
+  }
+}
+
+function nemEngangTegn(){
+  const ud = document.getElementById("nemengang-fund");
+  if(!nemEngang){ ud.innerHTML = ""; return; }
+  if(!nemEngang.fund.length){ ud.innerHTML = '<div class="nemtom">Ingen varer fundet.</div>'; return; }
+
+  /* Hvad der allerede ligger i ugens liste — så man kan se at varen er
+     lagt til, uden at lukke arket og kigge. */
+  const alt = new Map(nemEngangs().map(e => [String(e.produkt_id), e.antal]));
+
+  ud.innerHTML = nemEngang.fund.map((v, i) => {
+    const har = alt.get(String(v.id)) || 0;
+    let besk = v.beskrivelse || "";
+    if(v.maerke) besk = besk.split("/").map(d => d.trim())
+      .filter(d => d && d.toLowerCase() !== v.maerke.toLowerCase()).join(" · ");
+    const linje2 = [v.maerke, besk].filter(Boolean).join(" · ");
+    const kilo = v.enhedspris ? nemKr(v.enhedspris) + " " + (v.enhedsmaal || "") : "";
+    const tilbud = nemTilbudTekst(v.kampagne);
+
+    return '<button class="nemfund' + (har ? " valgt" : "") + '" data-nemengangvalg="' + i + '">'
+      + (v.billede ? '<img class="nembil" src="' + esc(nemBillede(v.billede, 120))
+                     + '" alt="" loading="lazy">' : "")
+      + '<span class="v"><span class="n">' + esc(v.navn) + nemKoebtMaerke(v)
+      + (har ? '<span class="brugt standard">' + har + ' i listen</span>' : "")
+      + '</span>'
+      + '<span class="under">' + esc(linje2) + (kilo ? " · " + esc(kilo) : "")
+      + (v.paaLager ? "" : ' <span class="udsolgt">udsolgt</span>') + '</span>'
+      + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
+      + '</span>'
+      + '<span class="pris">' + nemKr(v.pris) + '</span></button>';
+  }).join("");
+}
+
+/* Et tryk lægger ÉN mere i listen. Vil man have fem, trykker man fem
+   gange — eller skruer op med plus i selve arket bagefter. */
+async function nemEngangVaelg(i){
+  const v = nemEngang && nemEngang.fund[i];
+  if(!v) return;
+  const nu = nemEngangs().find(e => String(e.produkt_id) === String(v.id));
+  nemEngangsSaet({
+    produkt_id: v.id, produkt_navn: v.navn, billede: v.billede,
+    hovedgruppe: v.hovedgruppe, undergruppe: v.undergruppe
+  }, (nu ? nu.antal : 0) + 1);
+  /* Varen skal ind i prislisten, ellers står linjen uden pris indtil
+     næste hele opdatering. Den ligger allerede i søgesvaret. */
+  if(nemArk){
+    nemArk.priser[String(v.id)] = v;
+    nemArk.ekstra = nemEngangsLinjer();
+    nemTegn();
+  }
+  nemEngangTegn();
+}
+
+document.getElementById("nemengang-soeg").onclick = () => nemEngangSoeg();
+document.getElementById("nemengang-tekst").addEventListener("keydown", ev => {
+  if(ev.key === "Enter"){ ev.preventDefault(); nemEngangSoeg(); }
+});
+document.getElementById("nemengang-fund").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-nemengangvalg]");
+  if(b) nemEngangVaelg(Number(b.dataset.nemengangvalg));
+});
+document.getElementById("nemengang-luk").onclick = () => {
+  hide("nemengang-back"); nemEngang = null;
+};
+/* Vejen videre for det den frie søgning FØR var tvunget til at være: en
+   rigtig fast vare med kortlægning. Den skal stadig kunne nås herfra. */
+document.getElementById("nemengang-fast").onclick = () => {
+  const tekst = document.getElementById("nemengang-tekst").value.trim();
+  hide("nemengang-back");
+  nemEngang = null;
+  nemValgAaben({ navn: tekst, sti: null, fastVare: true });
+};
+
+/* ==================================================================
    Vælg vare
    ================================================================== */
 function nemValgAaben(opsaet){
@@ -8545,6 +8786,14 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
           l.ekstra = nemLinjeEkstra(grund, l.navn);
         }
       }
+      /* En engangsvare bor i ugens liste, ikke i kartoteket — så antallet
+         skal skrives derhen, ellers er det væk ved næste optegning. Nul
+         betyder at varen slet ikke skal købes, og så ryger linjen helt:
+         en fravalgt engangsvare er der ingen grund til at se på. */
+      if(l.erEngangs){
+        nemEngangsSaet(l.kort, l.antal);
+        nemArk.ekstra = nemEngangsLinjer();
+      }
       nemTegn();
     }
     return;
@@ -8559,6 +8808,16 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
       nemKortVis(p || { navn: l.kort.produkt_navn, id: l.kort.produkt_id,
                         billede: l.kort.billede, hovedgruppe: l.kort.hovedgruppe },
                  "kortlagt som \u201c" + l.navn + "\u201d");
+    }
+    return;
+  }
+  const engfjern = ev.target.closest("[data-nemengangfjern]");
+  if(engfjern){
+    const { l } = nemLinje(engfjern.dataset.nemengangfjern);
+    if(l && l.kort){
+      nemEngangsSaet(l.kort, 0);
+      nemArk.ekstra = nemEngangsLinjer();
+      nemTegn();
     }
     return;
   }
@@ -8611,6 +8870,18 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
       show("nemkort-back");
       return;
     }
+    /* Samme grund som for gaverne: en engangsvare har ingen kortlægning,
+       standard eller varianter bag sig. Varekortet er det eneste der er
+       at vise — og vil man have en anden vare, fjerner man den med minus
+       og søger den nye frem. */
+    if(l.erEngangs){
+      const p = nemArk.priser[String(l.kort.produkt_id)];
+      nemKortVis(p || { navn: l.kort.produkt_navn, id: l.kort.produkt_id,
+                        billede: l.kort.billede, hovedgruppe: l.kort.hovedgruppe },
+                 "Købes én gang");
+      show("nemkort-back");
+      return;
+    }
     if(!l.kort){
       nemValgAaben({ navn: l.navn, sti, raekke: null });
     } else if(nemMuligheder(nemFind(l.navn) || l.kort).length > 1){
@@ -8620,9 +8891,14 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
     }
     return;
   }
+  /* ÆNDRET i 2.74.0. Før åbnede feltet kortlægningen med fastVare, og så
+     blev alt hvad man søgte frem til en FAST vare der kom igen hver uge.
+     Feltet bruges næsten altid til det modsatte — noget der skal købes
+     denne ene gang. Den permanente kortlægning ligger nu bag en knap
+     nede i engangs-arket og i Varer-listen i menuen. */
   if(ev.target.closest("#nem-tilfoej-knap")){
     const tekst = document.getElementById("nem-tilfoej").value.trim();
-    if(tekst) nemValgAaben({ navn: tekst, sti: null, fastVare: true });
+    nemEngangAaben(tekst);
     return;
   }
 });
