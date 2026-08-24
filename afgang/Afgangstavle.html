@@ -489,8 +489,14 @@ function tegnBånd(kasse){
   const e = el("span","etiket"); e.textContent = "Fremme";
   const b = el("b"); b.textContent = urTekst(kasse[0].ankomst);
   const n = el("span","antal");
-  n.textContent = kasse.length > 1
-    ? kasse.length + " veje" : varighedTekst(kasse[0].samlet);
+  /* rejsetiden er forskellig fra vej til vej, fordi afgangstiden er
+     det. Er der flere, vises spændet — ellers det ene tal.         */
+  const tider = kasse.map(r => r.samlet);
+  const kortest = Math.min.apply(null, tider);
+  const længst  = Math.max.apply(null, tider);
+  n.textContent = kortest === længst
+    ? varighedTekst(kortest)
+    : kortest + "–" + varighedTekst(længst);
   td.appendChild(e); td.appendChild(b); td.appendChild(n);
   tr.appendChild(td);
   return tr;
