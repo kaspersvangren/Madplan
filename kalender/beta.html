@@ -2137,7 +2137,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.75.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.76.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6819,10 +6819,32 @@ function nemByg(){
     }
   }
   /* Sættes en til nul og til igen, skal den tilbage til det UDREGNEDE
-     antal — ikke til 1. Otte æg er stadig en bakke. */
+     antal — ikke til 1. Otte æg er stadig en bakke.
+
+     ÆNDRET i 2.76.0, hans regel: der tages det STØRSTE af opskriftens
+     behov og det antal I plejer at købe. Vi må aldrig ende med for lidt.
+     Kræver opskriften 1 og I køber normalt 2, vinder de 2; kræver den 3
+     og I køber normalt 1, vinder de 3.
+
+     Det var rugbrød der afslørede hullet: retten "Rugbrød" har rugbrød
+     som eneste ingrediens UDEN mængde, så der var intet at regne på, og
+     linjen faldt tilbage på 1 — mens historikken siger 2. Medianen blev
+     aldrig spurgt, fordi den udregnede mængde altid vandt.
+
+     MÅLT 24. august: af de køb-altid-varer der findes, er det kun
+     rugbrød og mozzarella der har et vanligt antal over 1. Rettelsen er
+     altså lille i dag, men lukker hullet efterhånden som flere varer får
+     en historik.
+
+     BEMÆRK Math.max på beregnet: `foreslaaet` sættes når linjen fødes og
+     opdateres IKKE når to kategorier smeltes sammen længere oppe. Uden
+     max her ville en sammenlagt linje kunne blive trukket NED til den
+     første kildes tal.                                                */
   altidMedBehov.forEach(l => {
-    l.standardAntal = l.foreslaaet || l.antal;
-    if(l.uafklaret) l.antal = 0;
+    const beregnet = Math.max(Number(l.antal) || 0, Number(l.foreslaaet) || 0);
+    const vanligt  = nemStandardAntal(nemFind(l.navn) || l.kort || {}) || 1;
+    l.standardAntal = Math.max(beregnet, vanligt, 1);
+    l.antal = l.uafklaret ? 0 : l.standardAntal;
   });
 
   /* Dem der allerede har fået en linje ovenfra, skal ikke også hentes ind
