@@ -101,7 +101,8 @@ body{background:var(--luft);color:var(--blæk);
 
 /* vejret hvor du står lige nu */
 .vejrnu{margin-left:auto;display:flex;align-items:baseline;gap:5px;cursor:default;}
-.vejrnu .tegn{font-size:19px;line-height:1;}
+.vejrikon{display:inline-block;line-height:0;vertical-align:-3px;}
+.vejrikon svg{display:block;overflow:visible;}
 .vejrnu b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:19px;font-weight:600;}
 .vejrnu .dryp{font-size:13px;}
@@ -162,8 +163,10 @@ tr.bånd b{
   font-size:17px;font-weight:600;}
 tr.bånd .antal{font-size:12px;color:var(--dæmpet);margin-left:9px;}
 /* vejret dér hvor du står af */
-tr.bånd .vejrder{float:right;font-size:13px;color:var(--dæmpet);
-  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
+tr.bånd .vejrder{float:right;display:inline-flex;align-items:center;gap:6px;
+  font-size:15px;color:var(--dæmpet);}
+tr.bånd .vejrder b{font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;font-weight:600;}
 tr.bånd .vejrder.vådt{color:var(--stram);font-weight:600;}
 tbody.kasse tr:not(.bånd) + tr td{border-top:1px dotted #e7ecf1;}
 tbody.kasse tr.bånd + tr td{border-top:none;}
@@ -307,18 +310,68 @@ const varighedTekst = m => m>=60 ? Math.floor(m/60)+" t "+(m%60)+" m" : m+" min"
 /* ── vejr ──────────────────────────────────────────────── */
 /* Open-Meteos vejrkoder, samlet i de grupper der giver mening at
    se forskel på, når man skal beslutte sig for en jakke.          */
-function vejrTegn(kode){
-  if(kode === 0)                    return "☀";
-  if(kode === 1 || kode === 2)      return "⛅";
-  if(kode === 3)                    return "☁";
-  if(kode === 45 || kode === 48)    return "🌫";
-  if(kode >= 51 && kode <= 57)      return "🌦";
-  if(kode >= 61 && kode <= 67)      return "🌧";
-  if(kode >= 71 && kode <= 77)      return "🌨";
-  if(kode >= 80 && kode <= 82)      return "🌧";
-  if(kode >= 85 && kode <= 86)      return "🌨";
-  if(kode >= 95)                    return "⛈";
-  return "•";
+/* Ikonerne tegnes her i stedet for at bruge skrifttegn — de indbyggede
+   symboler er sorte og signalerer ingenting. Farverne: sol ravgul,
+   skyer gråblå, regn blå, sne lys blå, lyn ravgul.                  */
+const SOL = "#e0a132", SKY = "#93a2b0", REGN = "#3d7ab8", SNE = "#79aed4";
+
+function svgSol(x,y,r){
+  let ud = '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+SOL+'"/>';
+  const stråler = [[0,-1],[0,1],[-1,0],[1,0],[-.71,-.71],[.71,.71],[-.71,.71],[.71,-.71]];
+  ud += '<g stroke="'+SOL+'" stroke-width="1.6" stroke-linecap="round">';
+  stråler.forEach(d => {
+    ud += '<line x1="'+(x+d[0]*(r+1.8)).toFixed(1)+'" y1="'+(y+d[1]*(r+1.8)).toFixed(1)
+        + '" x2="'+(x+d[0]*(r+3.9)).toFixed(1)+'" y2="'+(y+d[1]*(r+3.9)).toFixed(1)+'"/>';
+  });
+  return ud + '</g>';
+}
+const SKYFORM = '<path d="M7.2 18h9.3a3.9 3.9 0 0 0 .4-7.8 5.4 5.4 0 0 0-10.3 1.6A3.3 3.3 0 0 0 7.2 18z"';
+
+function dråber(farve, antal, y){
+  let ud = '<g stroke="'+farve+'" stroke-width="1.9" stroke-linecap="round">';
+  const x = antal === 2 ? [9.5,14.5] : [8,12,16];
+  x.forEach(px => { ud += '<line x1="'+px+'" y1="'+y+'" x2="'+(px-1.2)+'" y2="'+(y+3.6)+'"/>'; });
+  return ud + '</g>';
+}
+function fnug(){
+  let ud = '<g fill="'+SNE+'">';
+  [[8.5,21],[12,22.2],[15.5,21]].forEach(pt => {
+    ud += '<circle cx="'+pt[0]+'" cy="'+pt[1]+'" r="1.15"/>';
+  });
+  return ud + '</g>';
+}
+
+function vejrTegning(kode){
+  if(kode === 0) return svgSol(12,12,5.2);
+  if(kode === 1 || kode === 2)
+    return svgSol(8.5,8.5,3.6) + SKYFORM + ' fill="'+SKY+'"/>';
+  if(kode === 3) return SKYFORM + ' fill="'+SKY+'"/>';
+  if(kode === 45 || kode === 48)
+    return SKYFORM + ' fill="'+SKY+'" opacity=".75"/>'
+      + '<g stroke="'+SKY+'" stroke-width="1.7" stroke-linecap="round">'
+      + '<line x1="6" y1="20.5" x2="18" y2="20.5"/>'
+      + '<line x1="8" y1="23" x2="16" y2="23"/></g>';
+  if(kode >= 51 && kode <= 57)
+    return SKYFORM + ' fill="'+SKY+'"/>' + dråber(REGN,2,19.5);
+  if((kode >= 61 && kode <= 67) || (kode >= 80 && kode <= 82))
+    return SKYFORM + ' fill="'+SKY+'"/>' + dråber(REGN,3,19.5);
+  if((kode >= 71 && kode <= 77) || (kode >= 85 && kode <= 86))
+    return SKYFORM + ' fill="'+SKY+'"/>' + fnug();
+  if(kode >= 95)
+    return SKYFORM + ' fill="'+SKY+'"/>'
+      + '<polygon points="12.8,18.6 9.2,23.4 11.6,23.4 10.4,27 14.6,21.6 12,21.6"'
+      + ' fill="'+SOL+'"/>';
+  return '<circle cx="12" cy="12" r="3" fill="'+SKY+'"/>';
+}
+
+/* returnerer et færdigt ikon i den ønskede størrelse */
+function vejrIkon(kode, px){
+  const span = el("span","vejrikon");
+  span.style.width = px+"px";
+  span.style.height = px+"px";
+  span.innerHTML = '<svg viewBox="0 0 24 28" width="'+px+'" height="'+px
+    + '" aria-hidden="true" focusable="false">' + vejrTegning(kode) + '</svg>';
+  return span;
 }
 function vejrOrd(kode){
   if(kode === 0)                    return "klart";
@@ -588,9 +641,8 @@ function tegnVejrNu(){
   holder.textContent = "";
   const v = vejret[stedHer()];
   if(!v || !v.nu) return;
-  const t = el("span","tegn"); t.textContent = vejrTegn(v.nu.kode);
   const g = el("b"); g.textContent = v.nu.grader + "°";
-  holder.appendChild(t); holder.appendChild(g);
+  holder.appendChild(vejrIkon(v.nu.kode, 24)); holder.appendChild(g);
   if(v.nu.nedbør > 0){
     const d = el("span","dryp"); d.textContent = "💧";
     holder.appendChild(d);
@@ -618,7 +670,9 @@ function tegnBånd(kasse){
   const v = vejrPå(stedDer(), kasse[0].ankomst);
   if(v){
     const w = el("span","vejrder");
-    w.textContent = vejrTegn(v.kode) + " " + v.grader + "°";
+    w.appendChild(vejrIkon(v.kode, 21));
+    const wg = el("b"); wg.textContent = v.grader + "°";
+    w.appendChild(wg);
     w.title = (vejret[stedDer()]||{}).navn + " kl. "
             + urTekst(kasse[0].ankomst) + ": " + vejrOrd(v.kode)
             + (v.nedbør > 0 ? ", " + v.nedbør + " mm" : "");
