@@ -22,14 +22,14 @@
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
-const BUDDINGE_TORV   = "A=1@O=Buddinge Torv (Gladsaxe Ringvej)@X=12491752@Y=55741939@U=86@L=11@";
 const GLADSAXE_RÅDHUS = "A=1@O=Gladsaxe Rådhus (Letbane)@X=12493487@Y=55743026@U=86@L=8603420@";
 const HERLEV_ST       = "A=1@O=Herlev St.@X=12443678@Y=55718917@U=86@L=8600706@";
+const GLADSAXE_RH_BUS = "A=1@O=Buddinge, Gladsaxe Rådhus (Buddinge Torv)@X=12495527@Y=55742289@U=86@L=1724@";
 const HERLEV_LETBANE  = "A=1@O=Herlev St. (Letbane)@X=12440432@Y=55720131@U=86@L=8603414@";
 const HUSUM_ST        = "A=1@O=Husum St.@X=12464029@Y=55709407@U=86@L=8600705@";
 const ØLSTYKKE_ST     = "A=1@O=Ølstykke St.@X=12159708@Y=55795640@U=86@L=8600712@";
 
-const S_BUS = 64, LETBANE = 2048, S_TOG = 16;
+const BUS = 32, LETBANE = 2048, S_TOG = 16;
 
 /* gangtid = hvor lang tid DU er om skiftet, fra bussen holder ved
              stoppestedet til du står på perronen. Rejser med mindre
@@ -38,13 +38,15 @@ const S_BUS = 64, LETBANE = 2048, S_TOG = 16;
              inden for det vindue vises dæmpet, men de vises.              */
 
 const RUTER = [
-  { lokalId: BUDDINGE_TORV,   lokalNavn: "Buddinge Torv",
-    skiftId: HUSUM_ST,        skiftNavn: "Husum",
-    produkter: S_BUS,   gangtid: 2, varsel: 6 },
-
   { lokalId: GLADSAXE_RÅDHUS, lokalNavn: "Gladsaxe Rådhus",
     skiftAf: HERLEV_LETBANE,  skiftPå: HERLEV_ST,  skiftNavn: "Herlev",
-    produkter: LETBANE, gangtid: 4, varsel: 4 }
+    produkter: LETBANE, gangtid: 4, varsel: 4 },
+
+  /* valgfri: vises kun når du trykker "Vis 166". Den kan ikke
+     konkurrere på tid og er der til når letbanen svigter.        */
+  { lokalId: GLADSAXE_RH_BUS, lokalNavn: "Gladsaxe Rådhus",
+    skiftId: HUSUM_ST,        skiftNavn: "Husum",
+    produkter: BUS,   linjer: ["166"],  gangtid: 2, varsel: 4, valgfri: true }
 ];
 
 const HJEM = { id: ØLSTYKKE_ST, navn: "Ølstykke" };
@@ -56,7 +58,7 @@ const VARSEL_HJEMMEFRA = 7;
    steder — ellers fanger man vejarbejde i Ishøj og på Bellahøj.
    Ord i DRIFT_BANE tæller alene, fordi de rammer hele strækningen. */
 
-const DRIFT_LINJER = ["200S","Letbane","linje L","linje C","linje H"];
+const DRIFT_LINJER = ["166","Letbane","linje L","linje C","linje H"];
 const DRIFT_STEDER = ["Buddinge Torv","Buddinge St","Gladsaxe Rådhus","Gladsaxe Ringvej",
                       "Herlev St","Husum St","Ølstykke","Ballerup","Måløv","Skovlunde","Islev"];
 const DRIFT_BANE   = ["Frederikssundbanen","Frederikssundsbanen","Hovedstadens Letbane"];
@@ -234,6 +236,7 @@ tr.sen .afg b{color:var(--forsinket);}
     <button id="knapVend">Vend rejsen</button>
     <button id="knapOpdater">Opdater nu</button>
     <button id="knapFlere" aria-pressed="false">Flere rejser</button>
+    <button id="knapAlt" aria-pressed="false">Vis 166</button>
   </div>
   <p class="forklar" id="forklar"></p>
 
@@ -259,7 +262,7 @@ tr.sen .afg b{color:var(--forsinket);}
 const $  = s => document.querySelector(s);
 const el = (t,k) => { const n=document.createElement(t); if(k) n.className=k; return n; };
 
-let hjemad=true, visFlere=false, sover=false, timer=null, sidsteAktivitet=Date.now();
+let hjemad=true, visFlere=false, visAlt=false, sover=false, timer=null, sidsteAktivitet=Date.now();
 
 const to = n => String(n).padStart(2,"0");
 const urTekst = d => to(d.getHours())+":"+to(d.getMinutes());
@@ -352,6 +355,8 @@ function kobl(rute, et, to_, nu, varsel){
   et.forEach(a => {
     if(a.aflyst) return;
     if(a.afgang < nu) return;                          // den er kørt
+    if(rute.linjer && !rute.linjer.some(l =>
+        String(a.linje).toUpperCase() === l.toUpperCase())) return;
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
     let b=null;
     for(let i=0;i<to_.length;i++){
@@ -505,6 +510,7 @@ const ryd = () => { $("#beskeder").textContent=""; };
 const sætPuls = t => { $("#puls").className="puls"+(t?" "+t:""); };
 
 function aktiv(rute){
+  if(rute.valgfri && !visAlt) return false;
   const d=idag();
   if(rute.fra && d < rute.fra) return false;
   if(rute.til && d >= rute.til) return false;
@@ -545,7 +551,7 @@ async function opdater(){
         kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
       }catch(e){
         /* H890_R betyder "ingen forbindelser" — et rigtigt svar, ikke
-           en fejl. Fx når 200S ikke kører om søndagen.               */
+           en fejl. Fx når 166 ikke kører på det tidspunkt.            */
         const t = String(e.message||e);
         if(t.indexOf("H890") > -1 || t.toLowerCase().indexOf("no result") > -1){
           tomme.push(rute.skiftNavn);
@@ -614,6 +620,11 @@ function start(){
 function vågn(){ sidsteAktivitet=Date.now(); if(sover){ sover=false; start(); } }
 
 $("#knapVend").addEventListener("click", ()=>{ hjemad=!hjemad; sætOverskrift(); vågn(); opdater(); });
+$("#knapAlt").addEventListener("click", e=>{
+  visAlt = !visAlt;
+  e.currentTarget.setAttribute("aria-pressed", String(visAlt));
+  vågn(); opdater();
+});
 $("#knapOpdater").addEventListener("click", ()=>{ vågn(); opdater(); });
 $("#knapFlere").addEventListener("click", e=>{
   visFlere=!visFlere;
