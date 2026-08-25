@@ -20,6 +20,8 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
+const VERSION = "3.2";
+
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
 const GLADSAXE_RÅDHUS = "A=1@O=Gladsaxe Rådhus (Letbane)@X=12493487@Y=55743026@U=86@L=8603420@";
@@ -76,7 +78,8 @@ const DVALE_MINUTTER   = 30;
 const GRUPPER_KORT     = 5;   // hvor mange ankomsttider vises normalt
 const GRUPPER_LANGT    = 12;
 const PER_SØGNING      = 6;
-const EKSTRA_SIDER     = 1;
+const EKSTRA_SIDER     = 1;   // ekstra sider normalt
+const EKSTRA_SIDER_MERE = 3;  // når du trykker "Flere rejser"
 </script>
 
 <style>
@@ -92,7 +95,7 @@ body{background:var(--luft);color:var(--blæk);
   -webkit-font-smoothing:antialiased;padding:18px 16px 40px;}
 .ramme{max-width:880px;margin:0 auto;}
 
-.hoved{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+.hoved{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
   padding-bottom:12px;border-bottom:2px solid var(--blæk);}
 .titelblok{display:flex;flex-direction:column;gap:1px;}
 .hoved h1{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;
@@ -100,7 +103,9 @@ body{background:var(--luft);color:var(--blæk);
   line-height:1.05;}
 
 /* vejret hvor du står lige nu */
-.vejrnu{margin-left:auto;display:flex;align-items:center;gap:6px;cursor:default;}
+/* vejr og ur samlet, så de står på samme midterlinje */
+.højre{margin-left:auto;display:flex;align-items:center;gap:14px;}
+.vejrnu{display:flex;align-items:center;gap:6px;cursor:default;}
 .vejrikon{display:inline-flex;align-items:center;line-height:0;}
 .vejrikon svg{display:block;overflow:visible;}
 .vejrnu b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
@@ -248,6 +253,10 @@ tr.sen .afg b{color:var(--forsinket);}
   background:#eef1f4;padding:1px 5px;border-radius:2px;}
 .rolig{background:var(--flade);border:1px solid var(--hårfin);border-radius:var(--radius);
   padding:10px 14px;margin:0 0 14px;font-size:13px;color:var(--dæmpet);}
+/* mens der hentes: listen tones ned, så knapperne kvitterer synligt */
+body.henter .kort{opacity:.45;transition:opacity .12s;}
+body.henter .knapper button{cursor:progress;}
+.kort{transition:opacity .18s;}
 .fod{margin-top:20px;font-size:12px;color:var(--dæmpet);}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
@@ -259,8 +268,10 @@ tr.sen .afg b{color:var(--forsinket);}
       <h1 id="titel">Hjem</h1>
       <span class="dato" id="dato"></span>
     </div>
-    <span class="vejrnu" id="vejrnu"></span>
-    <span class="ur"><span class="puls" id="puls"></span><span id="ur">--:--</span></span>
+    <div class="højre">
+      <span class="vejrnu" id="vejrnu"></span>
+      <span class="ur"><span class="puls" id="puls"></span><span id="ur">--:--</span></span>
+    </div>
   </header>
 
   <div class="knapper">
@@ -284,7 +295,7 @@ tr.sen .afg b{color:var(--forsinket);}
     </table>
   </div>
 
-  <p class="fod" id="fod">Data fra Rejseplanen.</p>
+  <p class="fod" id="fod">Henter …</p>
 </div>
 
 <script>
@@ -756,6 +767,7 @@ function sætOverskrift(){
 
 async function opdater(){
   sætPuls("arbejder");
+  document.body.classList.add("henter");
   await hentVejr();
   tegnVejrNu();
   Object.keys(kurv).forEach(k => delete kurv[k]);
@@ -765,6 +777,8 @@ async function opdater(){
   try{
     const alle = [];
     const svigt = [], tomme = [];
+    const førsteSider = visFlere ? 2 : 1;
+    const andetSider  = 1 + (visFlere ? EKSTRA_SIDER_MERE : EKSTRA_SIDER);
     await Promise.all(brug.map(async rute => {
       /* Letbanen holder ikke ved selve stationen. skiftAf er der du
          står af, skiftPå er der du står på. Er de ikke sat, er det
@@ -775,11 +789,13 @@ async function opdater(){
       try{
         let et, to_;
         if(hjemad){
-          et  = await hentBen(rute.lokalId, af,          rute.produkter, 1);
-          to_ = await hentBen(på,           HJEM.id,     S_TOG,          1+EKSTRA_SIDER, 1);
+          /* Flere rejser skal række længere på BEGGE ben — ellers har
+             de sidste afgange intet tog at koble til og falder ud.   */
+          et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider, 1);
         }else{
-          et  = await hentBen(HJEM.id,      på,          S_TOG,          1);
-          to_ = await hentBen(af,           rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
+          et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider);
+          to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider);
         }
         kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
       }catch(e){
@@ -815,7 +831,8 @@ async function opdater(){
         tabel.appendChild(krop);
       });
     }
-    $("#fod").textContent = "Opdateret "+urTekst(nu)+". Data fra Rejseplanen.";
+    $("#fod").textContent = "Opdateret "+urTekst(nu)+" · v"+VERSION+" · Data fra Rejseplanen."
+      + (visFlere ? " · viser flere" : "");
     sætPuls(svigt.length ? "gal" : "");
     if(tomme.length){
       const p = el("p","rolig");
@@ -835,6 +852,7 @@ async function opdater(){
       "Rejseplanen svarede ikke som forventet. Tjek forbindelsen og prøv igen om lidt.",
       String(e.message||e));
   }
+  document.body.classList.remove("henter");
 }
 
 function tikUr(){
