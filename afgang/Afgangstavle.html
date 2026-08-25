@@ -192,6 +192,9 @@ tr.sen .afg b{color:var(--forsinket);}
 .mærke.stog{background:var(--stog);color:#fff;}
 
 .sted{font-size:13.5px;white-space:nowrap;}
+/* togskift undervejs */
+.minipil{color:var(--hårfin);margin:0 3px;}
+.via{font-size:11.5px;color:var(--dæmpet);margin-left:6px;}
 .skift{font-size:13px;color:var(--dæmpet);white-space:nowrap;}
 .vent{font-family:"IBM Plex Mono",monospace;font-weight:600;}
 .vent.ok{color:var(--god);}
@@ -224,7 +227,8 @@ tr.sen .afg b{color:var(--forsinket);}
   td:nth-child(2){grid-area:l1;}
   td.sted{grid-area:sted;}
   td.skift{grid-area:skift;}
-  td:nth-child(5){grid-area:l2;}
+  td:nth-child(5){grid-area:l2;white-space:nowrap;}
+  td:nth-child(5) .via{display:none;}
   td.afg b,td.afg span{display:inline;}
   td.afg span{margin-left:8px;}
 
@@ -442,25 +446,25 @@ async function kald(url){
   if(data.errorCode) throw new Error(data.errorText||data.errorCode);
   return data;
 }
-function bygBen(fra,til,produkter,sammenhæng){
+function bygBen(fra,til,produkter,sammenhæng,skift){
   let u = FUNKTION + "?sti=trip"
     + "&rtMode=REALTIME"
     + "&originId=" + encodeURIComponent(fra)
     + "&destId="   + encodeURIComponent(til)
-    + "&products=" + produkter + "&maxChange=0&numF=" + PER_SØGNING;
+    + "&products=" + produkter + "&maxChange=" + (skift||0) + "&numF=" + PER_SØGNING;
   if(sammenhæng) u += "&context=" + encodeURIComponent(sammenhæng);
   return u;
 }
-async function hentBen(fra,til,produkter,sider){
-  const n = fra+"|"+til+"|"+produkter+"|"+sider;
+async function hentBen(fra,til,produkter,sider,skift){
+  const n = fra+"|"+til+"|"+produkter+"|"+sider+"|"+(skift||0);
   if(kurv[n]) return kurv[n];
   kurv[n] = (async () => {
-    const f = await kald(bygBen(fra,til,produkter,null));
+    const f = await kald(bygBen(fra,til,produkter,null,skift));
     let ture = Array.isArray(f.Trip)?f.Trip.slice():(f.Trip?[f.Trip]:[]);
     let s = f.scrF;
     for(let i=1;i<sider && s;i++){
       try{
-        const x = await kald(bygBen(fra,til,produkter,s));
+        const x = await kald(bygBen(fra,til,produkter,s,skift));
         ture = ture.concat(Array.isArray(x.Trip)?x.Trip:(x.Trip?[x.Trip]:[]));
         s = x.scrF;
       }catch(e){ break; }
@@ -483,8 +487,8 @@ const tidAf = (p,rt) => rt ? tilDato(p.rtDate||p.date,p.rtTime||p.time) : tilDat
 function tolkBen(trip){
   const alle=(trip.LegList&&trip.LegList.Leg)||[];
   const ben=(Array.isArray(alle)?alle:[alle]).filter(b => b.type!=="WALK" && b.Product);
-  if(ben.length!==1) return null;
-  const b=ben[0], p=produktAf(b);
+  if(ben.length < 1 || ben.length > 2) return null;
+  const b=ben[0], p=produktAf(b), sidsteBen=ben[ben.length-1];
 
   /* Tiderne måles på selve bussen eller toget: hvornår den kører fra
      stoppestedet, og hvornår den er fremme ved stoppestedet i den
@@ -492,13 +496,28 @@ function tolkBen(trip){
      og gangtiden er noget DU sætter nedenfor.                     */
   const planlagt=tidAf(b.Origin,false);
   const afgang  =tidAf(b.Origin,true) || planlagt;
-  const ankomst =tidAf(b.Destination,true) || tidAf(b.Destination,false);
+  const ankomst =tidAf(sidsteBen.Destination,true) || tidAf(sidsteBen.Destination,false);
   if(!afgang||!ankomst) return null;
+  /* to ben betyder et skift undervejs — typisk H til Ballerup og
+     videre med C. Det er ofte mere plads, selv om tiden er den samme. */
+  let videre = null;
+  if(ben.length === 2){
+    const p2 = produktAf(ben[1]);
+    const ank1 = tidAf(ben[0].Destination,true) || tidAf(ben[0].Destination,false);
+    const afg2 = tidAf(ben[1].Origin,true)      || tidAf(ben[1].Origin,false);
+    videre = {
+      linje: p2.line || (ben[1].name||"").replace(/^(Bus|S-tog|Letbane)\s+/i,"").trim(),
+      art: artAf(p2),
+      sted: (ben[0].Destination.name||"").replace(/\s+St\.$/,"").trim(),
+      vent: (ank1 && afg2) ? minutter(ank1, afg2) : null
+    };
+  }
   return {
     linje: p.line || (b.name||"").replace(/^(Bus|S-tog|Letbane)\s+/i,"").trim(),
     art: artAf(p), planlagt: planlagt, afgang: afgang, ankomst: ankomst,
     forsinkelse: minutter(planlagt,afgang),
-    aflyst: b.cancelled === true
+    aflyst: b.cancelled === true || sidsteBen.cancelled === true,
+    videre: videre
   };
 }
 
@@ -511,18 +530,30 @@ function kobl(rute, et, to_, nu, varsel){
     if(rute.linjer && !rute.linjer.some(l =>
         String(a.linje).toUpperCase() === l.toUpperCase())) return;
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
-    let b=null;
-    for(let i=0;i<to_.length;i++){
-      if(!to_[i].aflyst && to_[i].afgang >= grænse){ b=to_[i]; break; }
-    }
-    if(!b) return;
-    const vent = minutter(a.ankomst, b.afgang);
-    ud.push({
-      et:a, to:b, rute:rute, vent:vent,
-      rummelig: vent >= rute.gangtid + 3,
-      knap: minutter(nu, a.afgang) < varsel,           // næppe til at nå hjemmefra
-      afgang:a.afgang, planlagt:a.planlagt, forsinkelse:a.forsinkelse,
-      ankomst:b.ankomst, samlet:minutter(a.afgang,b.ankomst)
+    const mulige = to_.filter(x => !x.aflyst && x.afgang >= grænse);
+    if(!mulige.length) return;
+
+    /* Vælg efter tidligste ANKOMST, ikke tidligste afgang — ellers
+       vinder et tog der kører først, men er længere om det. Og behold
+       ALLE veje der lander samtidig, så du kan vælge den med plads:
+       et H til Ballerup og videre med C ankommer som regel samtidig
+       med det direkte C, men er mindre stuvet.                       */
+    let tidligst = mulige[0].ankomst;
+    mulige.forEach(x => { if(x.ankomst < tidligst) tidligst = x.ankomst; });
+
+    const set = {};
+    mulige.filter(x => +x.ankomst === +tidligst).forEach(b => {
+      const mærke = b.linje + "|" + (b.videre ? b.videre.linje : "") + "|" + (+b.afgang);
+      if(set[mærke]) return;
+      set[mærke] = true;
+      const vent = minutter(a.ankomst, b.afgang);
+      ud.push({
+        et:a, to:b, rute:rute, vent:vent,
+        rummelig: vent >= rute.gangtid + 3,
+        knap: minutter(nu, a.afgang) < varsel,         // næppe til at nå hjemmefra
+        afgang:a.afgang, planlagt:a.planlagt, forsinkelse:a.forsinkelse,
+        ankomst:b.ankomst, samlet:minutter(a.afgang,b.ankomst)
+      });
     });
   });
   return ud;
@@ -628,7 +659,20 @@ function tegnRække(r, nu){
   t4.appendChild(v);
   tr.appendChild(t4);
 
-  const t5 = el("td","linje"); t5.appendChild(mærke(r.to.linje, r.to.art));
+  const t5 = el("td","linje");
+  t5.appendChild(mærke(r.to.linje, r.to.art));
+  if(r.to.videre){
+    /* togskift undervejs — typisk H til Ballerup og videre med C */
+    const pil = el("span","minipil"); pil.textContent = "›";
+    t5.appendChild(pil);
+    t5.appendChild(mærke(r.to.videre.linje, r.to.videre.art));
+    const v = el("span","via");
+    v.textContent = "via " + r.to.videre.sted;
+    t5.appendChild(v);
+    t5.title = "Skift på " + r.to.videre.sted
+      + (r.to.videre.vent !== null ? ", " + r.to.videre.vent + " min" : "")
+      + " — som regel mere plads";
+  }
   tr.appendChild(t5);
 
 
@@ -732,7 +776,7 @@ async function opdater(){
         let et, to_;
         if(hjemad){
           et  = await hentBen(rute.lokalId, af,          rute.produkter, 1);
-          to_ = await hentBen(på,           HJEM.id,     S_TOG,          1+EKSTRA_SIDER);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          1+EKSTRA_SIDER, 1);
         }else{
           et  = await hentBen(HJEM.id,      på,          S_TOG,          1);
           to_ = await hentBen(af,           rute.lokalId, rute.produkter, 1+EKSTRA_SIDER);
