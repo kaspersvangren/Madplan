@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "4.0";
+const VERSION = "4.1";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -228,8 +228,8 @@ tr.sen .afg b{color:var(--forsinket);}
      der klemte mærkerne ind over stednavnet */
   td.afg,td.linje,td.sted,td.skift{
     display:block;width:auto;border:none;padding:0;min-width:0;}
-  .låstabel,.låstabel tbody{display:block;}
-  .låstabel td{padding:0;}
+  .trin{grid-template-columns:auto 1fr;row-gap:4px;}
+  .trinstatus{grid-column:2;text-align:left;}
   tr.bånd{display:block;padding:0;}
   tr.bånd td{display:block;width:auto;padding:7px 14px;}
 
@@ -264,6 +264,53 @@ body.henter .knapper button{cursor:progress;}
 .kort{transition:opacity .18s;}
 .fod{margin-top:20px;font-size:12px;color:var(--dæmpet);white-space:pre-line;}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
+
+/* ── den rejse du følger ──────────────────────────────── */
+.låsboks{background:var(--flade);border:1px solid var(--blæk);
+  border-radius:var(--radius);margin-bottom:16px;overflow:hidden;}
+.låstop{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;background:var(--blæk);}
+.låsmærkat{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#fff;}
+.slipknap{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45);
+  padding:3px 11px;font-size:12px;}
+.slipknap:hover{border-color:#fff;background:rgba(255,255,255,.14);}
+
+.trin{display:grid;grid-template-columns:auto 1fr auto;gap:12px;
+  align-items:center;padding:11px 16px;border-top:1px solid #eef1f4;}
+.trinmærke{display:flex;align-items:center;white-space:nowrap;}
+.trinrute{font-size:13.5px;}
+.trintider{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:12.5px;color:var(--dæmpet);}
+.trintider em{font-style:normal;color:var(--forsinket);font-weight:600;}
+.trinstatus{font-size:12px;white-space:nowrap;text-align:right;color:var(--dæmpet);}
+.trinstatus.kører{color:var(--god);font-weight:600;}
+.trinstatus.færdig{opacity:.55;}
+
+.trinskift{display:flex;justify-content:space-between;align-items:baseline;
+  gap:10px;padding:8px 16px;background:#f2f5f8;font-size:13px;
+  color:var(--dæmpet);border-top:1px solid #eef1f4;}
+.skiftdom{font-weight:600;white-space:nowrap;}
+.skiftdom.holder{color:var(--god);}
+.skiftdom.stramt{color:var(--stram);}
+.skiftdom.mistet{color:var(--aflyst);}
+.skiftdom.færdig{color:var(--dæmpet);font-weight:400;}
+
+.låsfod{display:flex;align-items:baseline;gap:10px;padding:11px 16px;
+  border-top:1px solid var(--hårfin);}
+.fodmærkat{font-family:"IBM Plex Sans Condensed",sans-serif;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dæmpet);}
+.låsfod b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:21px;font-weight:600;}
+.fodrest{font-size:12.5px;color:var(--dæmpet);margin-left:auto;}
+
+.låsalt{margin:0;padding:9px 16px;font-size:13px;color:var(--dæmpet);
+  background:#f6f8fa;border-top:1px solid #eef1f4;}
+.låstom{margin:0;padding:14px 16px;font-size:13.5px;color:var(--dæmpet);}
+tr.erlåst{display:none;}
+tr.valgbar{cursor:pointer;}
+tr.valgbar:hover td{background:#f4f7fa;}
+
 </style>
 </head>
 <body>
@@ -633,7 +680,7 @@ function kobl(rute, et, to_, nu, varsel){
   const ud=[];
   et.forEach(a => {
     if(a.aflyst) return;
-    if(a.afgang < nu && !erLåstAfgang(a)) return;      // kørt, og ikke låst
+    if(a.afgang < nu) return;                          // den er kørt
     if(rute.linjer && !rute.linjer.some(l =>
         String(a.linje).toUpperCase() === l.toUpperCase())) return;
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
@@ -758,6 +805,7 @@ function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m;
 
 function tegnRække(r, nu, ulåselig){
   const tr = el("tr");
+  if(erLåstRække(r)) tr.classList.add("erlåst");
   if(!ulåselig){
     tr.classList.add("valgbar");
     tr.title = "Tryk for at følge denne rejse";
@@ -827,92 +875,154 @@ function tegnVejrNu(){
   holder.title = v.navn + ", " + vejrOrd(v.nu.kode);
 }
 
-function tegnLås(alle, nu){
-  const holder = $("#låst");
-  holder.textContent = "";
+/* Låsens egen hentning. Den søger fra et kvarter FØR din afgang, så
+   både letbanen og toget stadig kan findes efter de er kørt — og den
+   rører ikke den almindelige liste.                                */
+async function hentLåsData(){
   if(!lås) return null;
+  const rute = RUTER.filter(r => r.skiftNavn === lås.rute)[0];
+  if(!rute) return null;
 
-  if(lås.hjemad !== hjemad){
-    const p = el("div","låsboks anden");
-    p.textContent = "Du følger en rejse den anden vej. Tryk Vend rejsen for at se den.";
-    holder.appendChild(p);
-    return null;
+  const af = rute.skiftAf || rute.skiftId;
+  const på = rute.skiftPå || rute.skiftId;
+  const bagud = new Date(lås.etPlanlagt - 15*60000);
+
+  let et, to_;
+  if(lås.hjemad){
+    et  = await hentBen(rute.lokalId, af,      rute.produkter, 2, 0, bagud);
+    to_ = await hentBen(på,           HJEM.id, S_TOG,          3, 0, bagud);
+    if(lås.videreLinje){
+      try{ to_ = to_.concat(await hentOmvej(på, 3, bagud)); }catch(e){}
+    }
+  }else{
+    et  = await hentBen(HJEM.id, på,           S_TOG,          2, 0, bagud);
+    to_ = await hentBen(af,      rute.lokalId, rute.produkter, 3, 0, bagud);
   }
 
-  const række = alle.filter(erLåstRække)[0] || null;
+  const a = et.filter(x => String(x.linje) === lås.etLinje
+                        && +x.planlagt === lås.etPlanlagt)[0] || null;
+  const b = to_.filter(x => String(x.linje) === lås.toLinje
+                        && +x.planlagt === lås.toPlanlagt
+                        && (x.videre ? x.videre.linje : "") === lås.videreLinje)[0] || null;
+  return { rute: rute, a: a, b: b, to_: to_ };
+}
+
+function tegnLås(nu){
+  const holder = $("#låst");
+  holder.textContent = "";
+  if(!lås) return;
 
   const boks = el("div","låsboks");
   const top = el("div","låstop");
-  const mærkat = el("span","låsmærkat"); mærkat.textContent = "Du følger";
-  top.appendChild(mærkat);
+  const mærkat = el("span","låsmærkat");
+  mærkat.textContent = lås.hjemad ? "Du følger — hjem" : "Du følger — ud";
   const slip = el("button","slipknap"); slip.textContent = "Slip";
   slip.addEventListener("click", slipLås);
-  top.appendChild(slip);
+  top.appendChild(mærkat); top.appendChild(slip);
   boks.appendChild(top);
 
-  if(!række){
+  if(lås.hjemad !== hjemad){
     const p = el("p","låstom");
-    p.textContent = "Kan ikke finde afgangen lige nu. Den kan være aflyst, "
-      + "eller ligge for langt tilbage. Tryk Slip for at fjerne den.";
-    boks.appendChild(p);
-    holder.appendChild(boks);
-    return null;
+    p.textContent = "Rejsen går den anden vej. Tryk Vend rejsen for at følge den.";
+    boks.appendChild(p); holder.appendChild(boks); return;
+  }
+  if(!låsData || !låsData.a || !låsData.b){
+    const p = el("p","låstom");
+    p.textContent = "Kan ikke finde rejsen lige nu. Den kan være aflyst. Tryk Slip for at fjerne den.";
+    boks.appendChild(p); holder.appendChild(boks); return;
   }
 
-  /* selve rejsen, tegnet som en almindelig række */
-  const tabel = el("table","låstabel");
-  const krop = el("tbody");
-  krop.appendChild(tegnRække(række, nu, true));
-  tabel.appendChild(krop);
-  boks.appendChild(tabel);
+  const a = låsData.a, b = låsData.b, gangtid = låsData.rute.gangtid;
+  const vent = minutter(a.ankomst, b.afgang);
+  const stramt = vent < gangtid;
+  const togKørt = b.afgang < nu;
 
-  /* holder skiftet? og hvad er alternativet, hvis det ikke gør */
-  if(låsData){
-    const a = række.et, gangtid = låsData.rute.gangtid;
-    const b = række.to;
-    const vent = minutter(a.ankomst, b.afgang);
-    const kørt = b.afgang < nu;
-    const stramt = vent < gangtid;
-
-    const linje = el("p","låsdom");
-    if(kørt){
-      linje.textContent = "Toget er kørt.";
-      linje.classList.add("mistet");
-    }else if(stramt){
-      linje.textContent = "Skiftet er strammere end dine "+gangtid+" minutter — "
-        + vent + " min fra du står af.";
-      linje.classList.add("stramt");
-    }else{
-      linje.textContent = "Skiftet holder: " + vent + " min fra du står af.";
-      linje.classList.add("holder");
+  /* ── trin: et ben med sted, tider og tilstand ── */
+  function trin(ben, fraNavn, tilNavn, tilstand, klasse){
+    const t = el("div","trin");
+    const m = el("div","trinmærke");
+    m.appendChild(mærke(ben.linje, ben.art));
+    if(ben.videre){
+      const p = el("span","minipil"); p.textContent="›"; m.appendChild(p);
+      m.appendChild(mærke(ben.videre.linje, ben.videre.art));
     }
-    boks.appendChild(linje);
+    t.appendChild(m);
 
-    if(kørt || stramt){
-      const grænse = new Date(a.ankomst.getTime() + gangtid*60000);
-      let næste = null;
-      for(let i=0;i<låsData.to_.length;i++){
-        const x = låsData.to_[i];
-        if(x.aflyst) continue;
-        if(x.afgang < nu) continue;
-        if(x.afgang < grænse) continue;
-        if(!næste || x.ankomst < næste.ankomst) næste = x;
-      }
-      const alt = el("p","låsalt");
-      if(næste){
-        alt.textContent = "Næste mulighed: " + næste.linje
-          + (næste.videre ? " og " + næste.videre.linje + " via " + næste.videre.sted : "")
-          + " kl. " + urTekst(næste.afgang)
-          + " — i " + HJEM.navn + " " + urTekst(næste.ankomst);
-      }else{
-        alt.textContent = "Ingen anden mulighed fundet lige nu.";
-      }
-      boks.appendChild(alt);
+    const midt = el("div","trinmidt");
+    const rute = el("div","trinrute");
+    rute.textContent = fraNavn + " › " + tilNavn
+      + (ben.videre ? " (via " + ben.videre.sted + ")" : "");
+    const tider = el("div","trintider");
+    tider.textContent = urTekst(ben.afgang) + " – " + urTekst(ben.ankomst);
+    if(ben.forsinkelse >= 1){
+      const f = el("em"); f.textContent = " +" + ben.forsinkelse;
+      tider.appendChild(f);
     }
+    midt.appendChild(rute); midt.appendChild(tider);
+    t.appendChild(midt);
+
+    const s = el("div","trinstatus " + (klasse||""));
+    s.textContent = tilstand;
+    t.appendChild(s);
+    return t;
+  }
+
+  const lokalNavn = lås.hjemad ? låsData.rute.lokalNavn : HJEM.navn;
+  const målNavn   = lås.hjemad ? HJEM.navn : låsData.rute.lokalNavn;
+
+  let s1, k1;
+  if(nu < a.afgang){ s1 = "om " + minutter(nu, a.afgang) + " min"; k1 = "venter"; }
+  else if(nu < a.ankomst){ s1 = "undervejs"; k1 = "kører"; }
+  else { s1 = "ankommet"; k1 = "færdig"; }
+  boks.appendChild(trin(a, lokalNavn, låsData.rute.skiftNavn, s1, k1));
+
+  /* ── skiftet ── */
+  const sk = el("div","trinskift");
+  const skt = el("span");
+  skt.textContent = "Skift på " + låsData.rute.skiftNavn + " · " + vent + " min";
+  sk.appendChild(skt);
+  const dom = el("span","skiftdom");
+  if(togKørt && nu > a.ankomst && stramt){ dom.textContent = "mistet"; dom.classList.add("mistet"); }
+  else if(togKørt){ dom.textContent = "overstået"; dom.classList.add("færdig"); }
+  else if(stramt){ dom.textContent = "stramt — du skal skynde dig"; dom.classList.add("stramt"); }
+  else { dom.textContent = "holder"; dom.classList.add("holder"); }
+  sk.appendChild(dom);
+  boks.appendChild(sk);
+
+  let s2, k2;
+  if(nu < b.afgang){ s2 = "afgår " + urTekst(b.afgang); k2 = "venter"; }
+  else if(nu < b.ankomst){ s2 = "undervejs"; k2 = "kører"; }
+  else { s2 = "fremme"; k2 = "færdig"; }
+  boks.appendChild(trin(b, låsData.rute.skiftNavn, målNavn, s2, k2));
+
+  /* ── nederst: hvornår du er fremme ── */
+  const fod = el("div","låsfod");
+  const fm = el("span","fodmærkat"); fm.textContent = "Fremme i " + målNavn;
+  const ft = el("b"); ft.textContent = urTekst(b.ankomst);
+  fod.appendChild(fm); fod.appendChild(ft);
+  const rest = el("span","fodrest");
+  rest.textContent = nu < b.ankomst ? "om " + minutter(nu, b.ankomst) + " min" : "";
+  fod.appendChild(rest);
+  boks.appendChild(fod);
+
+  /* ── kan du ikke nå det, så hvad så ── */
+  if(stramt && !togKørt || (togKørt && nu < a.ankomst)){
+    const grænse = new Date(a.ankomst.getTime() + gangtid*60000);
+    let næste = null;
+    låsData.to_.forEach(x => {
+      if(x.aflyst || x.afgang < grænse || +x.planlagt === lås.toPlanlagt) return;
+      if(!næste || x.ankomst < næste.ankomst) næste = x;
+    });
+    const alt = el("p","låsalt");
+    alt.textContent = næste
+      ? "Misser du den: " + næste.linje
+        + (næste.videre ? " og " + næste.videre.linje : "")
+        + " kl. " + urTekst(næste.afgang) + " — fremme " + urTekst(næste.ankomst)
+      : "Misser du den, er der ingen anden mulighed lige nu.";
+    boks.appendChild(alt);
   }
 
   holder.appendChild(boks);
-  return række;
 }
 
 function tegnBånd(kasse){
@@ -987,7 +1097,6 @@ async function opdater(){
   try{
     const alle = [];
     const svigt = [], tomme = [];
-    låsData = null;
     omvejSpor = hjemad ? "omvej ikke kørt" : "omvej kun hjemad";
     const førsteSider = visFlere ? 2 : 1;
     const andetSider  = 1 + (visFlere ? EKSTRA_SIDER_MERE : EKSTRA_SIDER);
@@ -999,34 +1108,25 @@ async function opdater(){
       const på = rute.skiftPå || rute.skiftId;
       const varsel = hjemad ? rute.varsel : VARSEL_HJEMMEFRA;
 
-      /* Er der en lås på denne rute, søger vi fra et kvarter FØR den
-         låste afgang — ellers forsvinder den, så snart den er kørt,
-         og så kan vi ikke følge den mens du sidder i den.          */
-      const bagud = (lås && lås.hjemad === hjemad && lås.rute === rute.skiftNavn)
-        ? new Date(lås.etPlanlagt - 15*60000) : null;
-
       try{
         let et, to_;
         if(hjemad){
           /* Flere rejser skal række længere på BEGGE ben — ellers har
              de sidste afgange intet tog at koble til og falder ud.   */
-          et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider, 0, bagud);
-          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider, 0, bagud);
+          et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider);
           /* H over Ballerup lægges til som ekstra muligheder — samme
              ankomst som det direkte C, men du sidder ned undervejs. */
           try{
-            const omvej = await hentOmvej(på, andetSider, bagud);
+            const omvej = await hentOmvej(på, andetSider);
             to_ = to_.concat(omvej);
           }catch(e){
             /* omvejen er en bonus; fejler den, kører resten */
             omvejSpor = "omvej fejlede: " + String(e.message||e);
           }
         }else{
-          et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider, 0, bagud);
-          to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider, 0, bagud);
-        }
-        if(lås && lås.hjemad === hjemad && lås.rute === rute.skiftNavn){
-          låsData = { et: et, to_: to_, rute: rute };
+          et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider);
+          to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider);
         }
         kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
       }catch(e){
@@ -1041,17 +1141,22 @@ async function opdater(){
       }
     }));
 
-    /* slip låsen når du er hjemme */
-    if(lås && nu.getTime() > lås.ankomst + LÅS_MARGEN*60000){
-      lås = null; gemLås(); start();
+    /* låsen hentes for sig, så den ikke påvirker listen */
+    låsData = null;
+    if(lås){
+      try{ låsData = await hentLåsData(); }catch(e){ låsData = null; }
+      if(låsData && låsData.b){
+        lås.ankomst = +låsData.b.ankomst;   // følger med når den skubbes
+        gemLås();
+      }
+      /* slip når du er fremme */
+      if(nu.getTime() > lås.ankomst + LÅS_MARGEN*60000){
+        lås = null; låsData = null; gemLås(); start();
+      }
     }
-    const låstRække = tegnLås(alle, nu);
-    if(låstRække){
-      lås.ankomst = +låstRække.ankomst;   // følg med når den skubbes
-      gemLås();
-    }
+    tegnLås(nu);
 
-    const kasser = grupper(alle.filter(r => !erLåstRække(r)))
+    const kasser = grupper(alle)
       .slice(0, visFlere ? GRUPPER_LANGT : GRUPPER_KORT);
 
     ryd();
