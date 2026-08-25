@@ -1066,17 +1066,25 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
 #nemengang-back{z-index:59}    /* over indkøbsarket, under nemvalg (60) — som kan åbnes herfra */
 #nemtid-back{z-index:59}       /* samme niveau: åbnes fra indkøbsarket, åbner intet selv */
-/* Leveringslinjen: ÉN knap i stedet for seksten dage der ruller. */
+/* Leveringslinjen: ÉN knap i stedet for seksten dage der ruller.
+
+   BYGGET OM i 2.82.0. Første forsøg var et gitter med tre kolonner, hvor
+   to elementer selv skulle finde deres plads — og de landede forkert, så
+   prisen stod under ordet "Leveres" og tiden blev skubbet helt ud til
+   højre. Nu er det en almindelig række: tekst til venstre, pil til højre,
+   og prisen som en dæmpet linje UNDER teksten. Ingen gætværk om placering. */
 .nemlevvalg{padding:2px 4px 10px}
-.nemlevvalg button{display:grid;width:100%;text-align:left;cursor:pointer;
-  grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;
-  gap:1px 9px;align-items:center;background:none;color:var(--ink);
+.nemlevvalg button{display:flex;align-items:center;gap:10px;width:100%;
+  text-align:left;cursor:pointer;background:none;color:var(--ink);
   border:1px solid var(--line);border-radius:12px;padding:9px 13px;
   min-height:var(--tap)}
-.nemlevvalg .ord{grid-row:1 / span 2;font-size:13px;color:var(--muted)}
-.nemlevvalg .v{font-size:14.5px;font-weight:600}
-.nemlevvalg .u{grid-column:2;font-size:11.5px;color:var(--muted)}
-.nemlevvalg .pil{grid-row:1 / span 2;font-size:20px;color:var(--muted)}
+.nemlevvalg .txt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+.nemlevvalg .ord{font-size:11.5px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.04em}
+.nemlevvalg .v{font-size:15px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.nemlevvalg .u{font-size:11.5px;color:var(--muted)}
+.nemlevvalg .pil{font-size:20px;color:var(--muted);flex:none}
 .nemtiddage{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;
   margin-bottom:2px;scrollbar-width:none}
 .nemtiddage::-webkit-scrollbar{display:none}
@@ -2205,7 +2213,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.81.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.82.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5166,12 +5174,34 @@ function levSpand(fra, til){
   return a || b || "";
 }
 
+/* Er Nemligs forventede vindue værd at vise?
+
+   FEJL FUNDET I DRIFT 25. august: dagskortet stod med "Forventes
+   00:53–23:59 · bestilt 09:00–10:00". Nemlig fylder feltet ud LÆNGE før
+   bilen kører, og indtil da er det et pladsholder-vindue der dækker næsten
+   hele døgnet. Det siger intet, og det ser ud som om noget er gået galt.
+
+   Reglen: vinduet skal være SMALLERE end det bestilte for at være en
+   oplysning. Er det bredere eller lige så bredt, står den bestilte tid
+   alene. Kender vi ikke den bestilte tid, kræves højst fire timer — mere
+   end det er ikke et leveringsvindue, det er en dag.                  */
+function levBrugbart(budFra, budTil, slotFra, slotTil){
+  const t = x => { const d = new Date(x); return isNaN(d.getTime()) ? null : d.getTime(); };
+  const b0 = t(budFra), b1 = t(budTil);
+  if(b0 == null || b1 == null || b1 <= b0) return false;
+  const bredde = b1 - b0;
+  const s0 = t(slotFra), s1 = t(slotTil);
+  if(s0 != null && s1 != null && s1 > s0) return bredde < (s1 - s0);
+  return bredde <= 4 * 3600000;
+}
+
 function renderLevering(ds){
   const L = leveringPaa(ds);
   if(!L) return "";
 
   const bestilt = levSpand(L.slotFra, L.slotTil) || (L.slotTekst || "");
-  const bud     = levSpand(L.budFra, L.budTil);
+  const bud     = levBrugbart(L.budFra, L.budTil, L.slotFra, L.slotTil)
+    ? levSpand(L.budFra, L.budTil) : "";
 
   /* Er bilen kørt? Serveren afgør det ud fra Nemligs State. Kender den ikke
      standen, falder vi tilbage på klokken: er den bestilte tid begyndt,
@@ -7638,14 +7668,15 @@ function nemLeveringsAfsnit(){
       ? navn(v.dato) + " kl. " + v.start + "-" + v.slut
       : "Vælg leveringstid";
     const under = v
-      ? (v.pris > 0 ? v.pris + " kr" : "gratis")
-        + (nemTider.reserveret ? " · reserveret" : "")
+      ? [v.pris > 0 ? v.pris + " kr" : "gratis",
+         nemTider.reserveret ? "reserveret" : null].filter(Boolean).join(" · ")
       : "Lagerstatus regnes efter den valgte tid";
-    return '<div class="nemlevvalg"><button type="button" id="nemlev-aabn"'
-      + ' data-nemlevaabn="1">'
-      + '<span class="ord">Leveres</span>'
-      + '<span class="v">' + esc(tekst) + '</span>'
-      + '<span class="u">' + esc(under) + '</span>'
+    return '<div class="nemlevvalg"><button type="button" data-nemlevaabn="1">'
+      + '<span class="txt">'
+      +   '<span class="ord">Leveres</span>'
+      +   '<span class="v">' + esc(tekst) + '</span>'
+      +   '<span class="u">' + esc(under) + '</span>'
+      + '</span>'
       + '<span class="pil">›</span></button></div>';
   }
 
@@ -8343,6 +8374,20 @@ function nemTidTegn(){
     }
   }
   krop.innerHTML = h;
+
+  /* Hele arket tegnes forfra ved hvert tryk, og så nulstilles den vandrette
+     rulning i dagsrækken — vælger man en dag langt henne, hopper rækken
+     tilbage til start og man kan ikke se hvad der er markeret. Han fandt
+     det i drift 25/8. Derfor rulles den valgte dag ind i billedet igen.
+
+     Uden animation: det er en genskabelse af hvor man var, ikke en
+     bevægelse man skal lægge mærke til. */
+  const aktiv = krop.querySelector(".nemtiddage button.aktiv");
+  if(aktiv && aktiv.parentElement){
+    const baand = aktiv.parentElement;
+    baand.scrollLeft = Math.max(0,
+      aktiv.offsetLeft - (baand.clientWidth - aktiv.offsetWidth) / 2);
+  }
 }
 
 document.getElementById("nemtid-krop").addEventListener("click", ev => {
