@@ -962,7 +962,24 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 
 .nemdelt{border:1px solid var(--line);border-radius:12px;padding:12px;
   margin-bottom:12px}
-.nemdelt h3{font-size:15px;margin:0 0 8px}
+/* Hvad man HAR svaret på, og hvad der mangler. Send-knappen nederst har
+   hele tiden sagt "Mangler 3 svar", men den siger ikke HVILKE tre, og man
+   skal ned i bunden for at se den.
+
+   GRØN på det afklarede, dæmpet GUL på resten — bevidst ikke rødt. Når
+   arket åbner, er intet besvaret endnu, og fem røde blokke ligner fem
+   fejl frem for fem spørgsmål. Valgt sammen med ham 25. august.
+
+   --mad og --ferie findes begge i lys OG mørk tilstand. Gul betyder ferie
+   i dagsvisningen, men det her er et ark om Nemlig — de mødes aldrig. */
+.nemdelt.svaret{border-color:var(--mad);box-shadow:inset 3px 0 0 var(--mad)}
+.nemdelt.mangler{border-color:var(--ferie);box-shadow:inset 3px 0 0 var(--ferie)}
+.nemdelt h3{font-size:15px;margin:0 0 8px;display:flex;align-items:center;
+  gap:8px;justify-content:space-between}
+.nemdelt .stand{font-size:11.5px;font-weight:600;white-space:nowrap;
+  padding:3px 9px;border-radius:999px;flex:none}
+.nemdelt.svaret .stand{background:var(--mad-bg);color:var(--mad)}
+.nemdelt.mangler .stand{background:var(--ferie-svag);color:var(--ink)}
 .nemdelt .kilde{display:flex;justify-content:space-between;gap:10px;
   font-size:13px;color:var(--muted);padding:3px 0}
 .nemdelt .kilde b{font-weight:600;color:var(--ink)}
@@ -2137,7 +2154,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.77.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.78.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7983,8 +8000,13 @@ function nemDeltTegn(){
         + '</div>'
       : '<div class="ialt">Valgt i alt: ' + g.sum + ' stk</div>';
 
-    return '<div class="nemdelt">'
-      + '<h3>' + esc(storNavn(g.navn)) + ' valgt ' + g.poster.length + ' steder</h3>'
+    /* Tilstanden skrives på selve blokken, så man kan se nedad ad listen
+       hvad der er tilbage — frem for kun at læse et tal på knappen i
+       bunden. Se CSS'en ved .nemdelt.svaret for hvorfor det ikke er rødt. */
+    const svaret = !!g.valg;
+    return '<div class="nemdelt ' + (svaret ? "svaret" : "mangler") + '">'
+      + '<h3><span>' + esc(storNavn(g.navn)) + ' valgt ' + g.poster.length + ' steder</span>'
+      +   '<span class="stand">' + (svaret ? "✓ afklaret" : "mangler svar") + '</span></h3>'
       + linjer + ialt
       + '<div class="valg">'
       +   '<button type="button" data-deltbehold="' + i + '"'
