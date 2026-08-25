@@ -1095,6 +1095,12 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   border-color:var(--mad)}
 .nemtidrk .mrk{font-size:11px;font-weight:600;color:var(--mad);
   background:var(--mad-bg);border-radius:999px;padding:2px 8px;flex:none}
+/* Kryds i arkets overskrift. Tidsarket er langt — treoghalvtreds tidsrum —
+   så lukkeknappen i bunden er reelt uden for rækkevidde, og et tryk ved
+   siden af arket er ikke synligt nok. Hans ord 25. august. */
+.sheet h2 .arkkryds{float:right;margin:-4px -4px 0 8px;width:34px;height:34px;
+  line-height:1;font-size:24px;color:var(--muted);background:none;
+  border:none;cursor:pointer;padding:0}
 .nemtidgruppe{font-size:12px;font-weight:700;color:var(--muted);
   text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
 .nemtidgruppe:first-child{margin-top:2px}
@@ -1968,7 +1974,8 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
      et leveringsvindue, som når man selv vælger tid på deres side. -->
 <div class="backdrop" id="nemtid-back">
   <div class="sheet" role="dialog" aria-modal="true">
-    <h2>Vælg leveringstid</h2>
+    <h2>Vælg leveringstid<button type="button" class="arkkryds"
+      id="nemtid-kryds" aria-label="Luk">×</button></h2>
     <div class="meta" id="nemtid-meta"></div>
     <div id="nemtid-krop"></div>
     <div class="actions">
@@ -2213,7 +2220,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.82.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.83.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2707,11 +2714,34 @@ const tilRaekke = e => ({
 /* =======================================================================
    Fejlbesked — ingen tavse fejl
    ======================================================================= */
+let beskedUr = null;
+
 function vis(besked){
   document.getElementById("banner-text").textContent = besked;
   document.getElementById("banner").hidden = false;
+  /* En besked der er sat med vis() er som regel en FEJL og skal blive
+     stående, til man har set den. Derfor ryddes et evt. ur fra en tidligere
+     bekræftelse — ellers kunne den nå at skjule fejlen. */
+  if(beskedUr){ clearTimeout(beskedUr); beskedUr = null; }
 }
-function skjulBesked(){ document.getElementById("banner").hidden = true; }
+
+/* Kortvarig BEKRÆFTELSE. Forsvinder af sig selv efter fem sekunder.
+
+   Hans ord 25. august: en besked om at tiden er reserveret skal ikke have
+   en Skjul-knap at trykke på. Banneret bruges også til rigtige fejl, som
+   SKAL blive stående — derfor en selvstændig indgang frem for at ændre
+   vis() for alle. */
+function bekraeft(besked){
+  document.getElementById("banner-text").textContent = besked;
+  document.getElementById("banner").hidden = false;
+  if(beskedUr) clearTimeout(beskedUr);
+  beskedUr = setTimeout(() => { skjulBesked(); beskedUr = null; }, 5000);
+}
+
+function skjulBesked(){
+  document.getElementById("banner").hidden = true;
+  if(beskedUr){ clearTimeout(beskedUr); beskedUr = null; }
+}
 document.getElementById("banner-close").onclick = skjulBesked;
 
 /* =======================================================================
@@ -6047,6 +6077,9 @@ function nemStandardLevering(){
    cherrytomater stå som på lager i arket og være udsolgt i kurven.
    Målt og fastslået 25. august. Nu spørges Nemlig i stedet.            */
 let nemTider = null;
+/* Er hentningen undervejs? Styrer om arket viser "henter tider…" eller
+   falder tilbage til de tre faste dage. Se nemLeveringsAfsnit. */
+let nemTiderHenter = false;
 
 /* Det tidsrum lagertjekket skal regne efter.
 
@@ -6072,6 +6105,7 @@ function nemTidsrum(){
 }
 
 async function nemHentTider(){
+  nemTiderHenter = true;
   try{
     const { data, error } = await sb.functions.invoke("nemlig-tider", { body: {} });
     if(error) throw error;
@@ -6089,6 +6123,12 @@ async function nemHentTider(){
     }
     if(nemArk){ nemTegn(); await nemHentPriser(); nemTegn(); }
   }catch(e){ /* arket virker uden — så er vi bare tilbage ved det gamle */ }
+  finally{
+    /* Flaget ryddes UANSET udfald, og der tegnes om — ellers ville
+       "henter tider…" blive stående for evigt hvis kaldet gik galt. */
+    nemTiderHenter = false;
+    if(nemArk && !nemTider) nemTegn();
+  }
 }
 
 function nemLeveringsDag(){
@@ -7680,6 +7720,20 @@ function nemLeveringsAfsnit(){
       + '<span class="pil">›</span></button></div>';
   }
 
+  /* HENTER STADIG: vis en neutral linje frem for fald-tilbage-visningen.
+
+     Uden det her nåede man at se de tre gamle dagsknapper blinke forbi i
+     det sekund, der gik før Nemlig svarede — han fandt det i drift 25/8.
+     Fald-tilbage skal først træde til hvis kaldet FAKTISK mislykkes, ikke
+     mens det er undervejs. */
+  if(nemTiderHenter && !nemTider){
+    return '<div class="nemlevvalg"><button type="button" disabled>'
+      + '<span class="txt">'
+      +   '<span class="ord">Leveres</span>'
+      +   '<span class="v">Henter tider…</span>'
+      + '</span></button></div>';
+  }
+
   /* Fald-tilbage: den gamle visning, hvis tiderne ikke kunne hentes. */
   const fast = nemStandardLevering();
   const dage = [];
@@ -8278,7 +8332,15 @@ async function nemTidHent(reserver){
       /* Vi tror ikke på et 200 — vi ser efter om tidsrummet FAKTISK sidder
          i den friske liste. Det har Nemlig snydt os med før. */
       if(data.reservationLykkedes){
-        vis("Leveringstiden er reserveret hos Nemlig.");
+        /* Valget er truffet, og så er der ikke mere at lave i arket.
+           Lukkeknappen ligger under treoghalvtreds tidsrum, så uden det
+           her skulle man scrolle hele vejen ned for at komme ud.
+           Hans ord 25. august. */
+        hide("nemtid-back");
+        nemTidDag = null;
+        bekraeft("Leveringstiden er sat til "
+          + (data.valgt ? data.valgt.start + "-" + data.valgt.slut : "den valgte tid")
+          + ".");
       } else {
         vis("Nemlig tog ikke imod tiden. Prøv en anden, eller vælg den på nemlig.com.");
       }
@@ -8413,6 +8475,9 @@ function krop_slaaFra(fra){
     .forEach(b => { b.disabled = fra; });
 }
 document.getElementById("nemtid-luk").onclick = () => {
+  hide("nemtid-back"); nemTidDag = null;
+};
+document.getElementById("nemtid-kryds").onclick = () => {
   hide("nemtid-back"); nemTidDag = null;
 };
 
