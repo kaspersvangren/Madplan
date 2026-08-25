@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "3.5";
+const VERSION = "3.6";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -629,6 +629,20 @@ function grupper(liste){
   rene.forEach(r => {
     const n = r.ankomst.getTime();
     (kasser[n] = kasser[n] || []).push(r);
+  });
+
+  /* Inden for en blok: behold kun den SENESTE afgang for hver
+     kombination af linjer. Tre letbaner op til samme tog er ren
+     ventetid på perronen — den tidligste findes i forvejen som sin
+     egen blok længere oppe, hvor den lander tidligere.            */
+  Object.keys(kasser).forEach(n => {
+    const bedste = {};
+    kasser[n].forEach(r => {
+      const form = r.et.linje + "|" + r.to.linje + "|"
+                 + (r.to.videre ? r.to.videre.linje : "");
+      if(!bedste[form] || r.afgang > bedste[form].afgang) bedste[form] = r;
+    });
+    kasser[n] = Object.keys(bedste).map(k => bedste[k]);
   });
   return Object.keys(kasser)
     .map(k => kasser[k].sort((a,b) => {
