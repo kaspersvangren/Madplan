@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "3.2";
+const VERSION = "3.3";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -29,6 +29,7 @@ const HERLEV_ST       = "A=1@O=Herlev St.@X=12443678@Y=55718917@U=86@L=8600706@"
 const GLADSAXE_RH_BUS = "A=1@O=Buddinge, Gladsaxe Rådhus (Buddinge Torv)@X=12495527@Y=55742289@U=86@L=1724@";
 const HERLEV_LETBANE  = "A=1@O=Herlev St. (Letbane)@X=12440432@Y=55720131@U=86@L=8603414@";
 const HUSUM_ST        = "A=1@O=Husum St.@X=12464029@Y=55709407@U=86@L=8600705@";
+const BALLERUP_ST     = "A=1@O=Ballerup St.@X=12358343@Y=55729875@U=86@L=8600708@";
 const ØLSTYKKE_ST     = "A=1@O=Ølstykke St.@X=12159708@Y=55795640@U=86@L=8600712@";
 
 const BUS = 32, LETBANE = 2048, S_TOG = 16;
@@ -78,6 +79,7 @@ const DVALE_MINUTTER   = 30;
 const GRUPPER_KORT     = 5;   // hvor mange ankomsttider vises normalt
 const GRUPPER_LANGT    = 12;
 const PER_SØGNING      = 6;
+const SKIFT_BALLERUP   = 3;   // din skiftetid på Ballerup St., i minutter
 const EKSTRA_SIDER     = 1;   // ekstra sider normalt
 const EKSTRA_SIDER_MERE = 3;  // når du trykker "Flere rejser"
 </script>
@@ -532,6 +534,34 @@ function tolkBen(trip){
   };
 }
 
+/* Rejseplanen foreslår aldrig H over Ballerup, fordi den aldrig er
+   HURTIGERE — kun lige så hurtig. Så vi spørger ikke om et forslag.
+   Vi henter Herlev→Ballerup og Ballerup→Ølstykke hver for sig og
+   syr dem sammen selv. Det er samme kneb som med bus og tog.       */
+async function hentOmvej(fraId, sider){
+  const et  = await hentBen(fraId,        BALLERUP_ST, S_TOG, sider);
+  const to_ = await hentBen(BALLERUP_ST,  HJEM.id,     S_TOG, sider);
+  const ud = [];
+  et.forEach(a => {
+    if(a.aflyst || !a.linje) return;
+    if(String(a.linje).toUpperCase() !== "H") return;   // kun H-vejen
+    const grænse = new Date(a.ankomst.getTime() + SKIFT_BALLERUP*60000);
+    let b = null;
+    for(let i=0;i<to_.length;i++){
+      if(!to_[i].aflyst && to_[i].afgang >= grænse){ b = to_[i]; break; }
+    }
+    if(!b) return;
+    ud.push({
+      linje: a.linje, art: a.art,
+      planlagt: a.planlagt, afgang: a.afgang, ankomst: b.ankomst,
+      forsinkelse: a.forsinkelse, aflyst: false,
+      videre: { linje: b.linje, art: b.art, sted: "Ballerup",
+                vent: minutter(a.ankomst, b.afgang) }
+    });
+  });
+  return ud;
+}
+
 /* ── sammenkobling ─────────────────────────────────────── */
 function kobl(rute, et, to_, nu, varsel){
   const ud=[];
@@ -586,7 +616,11 @@ function grupper(liste){
     (kasser[n] = kasser[n] || []).push(r);
   });
   return Object.keys(kasser)
-    .map(k => kasser[k].sort((a,b) => a.afgang - b.afgang))
+    .map(k => kasser[k].sort((a,b) => {
+      /* H over Ballerup øverst — det er som regel den med plads */
+      const ah = a.to.videre ? 0 : 1, bh = b.to.videre ? 0 : 1;
+      return (ah - bh) || (a.afgang - b.afgang);
+    }))
     .sort((a,b) => a[0].ankomst - b[0].ankomst);
 }
 
@@ -792,7 +826,13 @@ async function opdater(){
           /* Flere rejser skal række længere på BEGGE ben — ellers har
              de sidste afgange intet tog at koble til og falder ud.   */
           et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider);
-          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider, 1);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider);
+          /* H over Ballerup lægges til som ekstra muligheder — samme
+             ankomst som det direkte C, men du sidder ned undervejs. */
+          try{
+            const omvej = await hentOmvej(på, andetSider);
+            to_ = to_.concat(omvej);
+          }catch(e){ /* omvejen er en bonus; fejler den, kører resten */ }
         }else{
           et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider);
           to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider);
