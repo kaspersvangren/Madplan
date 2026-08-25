@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "4.1";
+const VERSION = "4.2";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -617,8 +617,13 @@ async function hentOmvej(fraId, sider, bagud){
       linje: a.linje, art: a.art,
       planlagt: a.planlagt, afgang: a.afgang, ankomst: b.ankomst,
       forsinkelse: a.forsinkelse, aflyst: false,
+      /* C'ets egne tider gemmes, så panelet kan vise det som sit eget
+         trin med sin egen forsinkelse — ikke kun som et ekstra mærke. */
       videre: { linje: b.linje, art: b.art, sted: "Ballerup",
-                vent: minutter(a.ankomst, b.afgang) }
+                vent: minutter(a.ankomst, b.afgang),
+                planlagt: b.planlagt, afgang: b.afgang, ankomst: b.ankomst,
+                forsinkelse: b.forsinkelse,
+                fraAnkomst: a.ankomst }
     });
   });
   omvejSpor = "Herlev→Ballerup: " + (oversigt || "intet")
@@ -942,16 +947,11 @@ function tegnLås(nu){
     const t = el("div","trin");
     const m = el("div","trinmærke");
     m.appendChild(mærke(ben.linje, ben.art));
-    if(ben.videre){
-      const p = el("span","minipil"); p.textContent="›"; m.appendChild(p);
-      m.appendChild(mærke(ben.videre.linje, ben.videre.art));
-    }
     t.appendChild(m);
 
     const midt = el("div","trinmidt");
     const rute = el("div","trinrute");
-    rute.textContent = fraNavn + " › " + tilNavn
-      + (ben.videre ? " (via " + ben.videre.sted + ")" : "");
+    rute.textContent = fraNavn + " › " + tilNavn;
     const tider = el("div","trintider");
     tider.textContent = urTekst(ben.afgang) + " – " + urTekst(ben.ankomst);
     if(ben.forsinkelse >= 1){
@@ -989,11 +989,42 @@ function tegnLås(nu){
   sk.appendChild(dom);
   boks.appendChild(sk);
 
-  let s2, k2;
-  if(nu < b.afgang){ s2 = "afgår " + urTekst(b.afgang); k2 = "venter"; }
-  else if(nu < b.ankomst){ s2 = "undervejs"; k2 = "kører"; }
-  else { s2 = "fremme"; k2 = "færdig"; }
-  boks.appendChild(trin(b, låsData.rute.skiftNavn, målNavn, s2, k2));
+  /* tilstanden for ét ben, ud fra hvor langt du er nået */
+  function status(fra, til){
+    if(nu < fra) return ["afgår " + urTekst(fra), "venter"];
+    if(nu < til) return ["undervejs", "kører"];
+    return ["fremme", "færdig"];
+  }
+
+  if(b.videre){
+    /* H til Ballerup og videre med C — hvert tog sit eget trin, så
+       hver forsinkelse kan ses for sig.                            */
+    const v = b.videre;
+    const førsteBen = { linje: b.linje, art: b.art, afgang: b.afgang,
+                        ankomst: v.fraAnkomst, forsinkelse: b.forsinkelse };
+    const s2 = status(b.afgang, v.fraAnkomst);
+    boks.appendChild(trin(førsteBen, låsData.rute.skiftNavn, v.sted, s2[0], s2[1]));
+
+    const bvent = minutter(v.fraAnkomst, v.afgang);
+    const sk2 = el("div","trinskift");
+    const t2 = el("span");
+    t2.textContent = "Skift på " + v.sted + " · " + bvent + " min";
+    sk2.appendChild(t2);
+    const d2 = el("span","skiftdom");
+    if(v.afgang < nu){ d2.textContent = "overstået"; d2.classList.add("færdig"); }
+    else if(bvent < 1){ d2.textContent = "meget stramt"; d2.classList.add("stramt"); }
+    else { d2.textContent = "holder"; d2.classList.add("holder"); }
+    sk2.appendChild(d2);
+    boks.appendChild(sk2);
+
+    const andetBen = { linje: v.linje, art: v.art, afgang: v.afgang,
+                       ankomst: v.ankomst, forsinkelse: v.forsinkelse };
+    const s3 = status(v.afgang, v.ankomst);
+    boks.appendChild(trin(andetBen, v.sted, målNavn, s3[0], s3[1]));
+  }else{
+    const s2 = status(b.afgang, b.ankomst);
+    boks.appendChild(trin(b, låsData.rute.skiftNavn, målNavn, s2[0], s2[1]));
+  }
 
   /* ── nederst: hvornår du er fremme ── */
   const fod = el("div","låsfod");
