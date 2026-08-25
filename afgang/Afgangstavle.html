@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "3.3";
+const VERSION = "3.4";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -259,7 +259,7 @@ tr.sen .afg b{color:var(--forsinket);}
 body.henter .kort{opacity:.45;transition:opacity .12s;}
 body.henter .knapper button{cursor:progress;}
 .kort{transition:opacity .18s;}
-.fod{margin-top:20px;font-size:12px;color:var(--dæmpet);}
+.fod{margin-top:20px;font-size:12px;color:var(--dæmpet);white-space:pre-line;}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
 </head>
@@ -538,19 +538,26 @@ function tolkBen(trip){
    HURTIGERE — kun lige så hurtig. Så vi spørger ikke om et forslag.
    Vi henter Herlev→Ballerup og Ballerup→Ølstykke hver for sig og
    syr dem sammen selv. Det er samme kneb som med bus og tog.       */
+let omvejSpor = "";   // hvad omvejen fandt, vises nederst
+
 async function hentOmvej(fraId, sider){
   const et  = await hentBen(fraId,        BALLERUP_ST, S_TOG, sider);
   const to_ = await hentBen(BALLERUP_ST,  HJEM.id,     S_TOG, sider);
+  const linjer = {};
+  et.forEach(a => { const l = a.linje || "?"; linjer[l] = (linjer[l]||0)+1; });
+  const oversigt = Object.keys(linjer).map(l => l+"×"+linjer[l]).join(" ");
   const ud = [];
+  let manglerTog = 0, antalH = 0;
   et.forEach(a => {
     if(a.aflyst || !a.linje) return;
     if(String(a.linje).toUpperCase() !== "H") return;   // kun H-vejen
+    antalH++;
     const grænse = new Date(a.ankomst.getTime() + SKIFT_BALLERUP*60000);
     let b = null;
     for(let i=0;i<to_.length;i++){
       if(!to_[i].aflyst && to_[i].afgang >= grænse){ b = to_[i]; break; }
     }
-    if(!b) return;
+    if(!b){ manglerTog++; return; }
     ud.push({
       linje: a.linje, art: a.art,
       planlagt: a.planlagt, afgang: a.afgang, ankomst: b.ankomst,
@@ -559,6 +566,11 @@ async function hentOmvej(fraId, sider){
                 vent: minutter(a.ankomst, b.afgang) }
     });
   });
+  omvejSpor = "Herlev→Ballerup: " + (oversigt || "intet")
+            + " · Ballerup→Ølstykke: " + to_.length
+            + " · H fundet: " + antalH
+            + (manglerTog ? " · uden tog videre: " + manglerTog : "")
+            + " · kæder: " + ud.length;
   return ud;
 }
 
@@ -811,6 +823,7 @@ async function opdater(){
   try{
     const alle = [];
     const svigt = [], tomme = [];
+    omvejSpor = hjemad ? "omvej ikke kørt" : "omvej kun hjemad";
     const førsteSider = visFlere ? 2 : 1;
     const andetSider  = 1 + (visFlere ? EKSTRA_SIDER_MERE : EKSTRA_SIDER);
     await Promise.all(brug.map(async rute => {
@@ -832,7 +845,10 @@ async function opdater(){
           try{
             const omvej = await hentOmvej(på, andetSider);
             to_ = to_.concat(omvej);
-          }catch(e){ /* omvejen er en bonus; fejler den, kører resten */ }
+          }catch(e){
+            /* omvejen er en bonus; fejler den, kører resten */
+            omvejSpor = "omvej fejlede: " + String(e.message||e);
+          }
         }else{
           et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider);
           to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider);
@@ -872,7 +888,8 @@ async function opdater(){
       });
     }
     $("#fod").textContent = "Opdateret "+urTekst(nu)+" · v"+VERSION+" · Data fra Rejseplanen."
-      + (visFlere ? " · viser flere" : "");
+      + (visFlere ? " · viser flere" : "")
+      + (omvejSpor ? "\n" + omvejSpor : "");
     sætPuls(svigt.length ? "gal" : "");
     if(tomme.length){
       const p = el("p","rolig");
