@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "3.6";
+const VERSION = "4.0";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -75,6 +75,7 @@ const VEJRSTEDER = {
 };
 
 const OPDATER_SEKUNDER = 60;
+const LÅS_SEKUNDER     = 30;  // mens du følger en rejse
 const DVALE_MINUTTER   = 30;
 const GRUPPER_KORT     = 5;   // hvor mange ankomsttider vises normalt
 const GRUPPER_LANGT    = 12;
@@ -227,6 +228,8 @@ tr.sen .afg b{color:var(--forsinket);}
      der klemte mærkerne ind over stednavnet */
   td.afg,td.linje,td.sted,td.skift{
     display:block;width:auto;border:none;padding:0;min-width:0;}
+  .låstabel,.låstabel tbody{display:block;}
+  .låstabel td{padding:0;}
   tr.bånd{display:block;padding:0;}
   tr.bånd td{display:block;width:auto;padding:7px 14px;}
 
@@ -285,6 +288,7 @@ body.henter .knapper button{cursor:progress;}
   <p class="forklar" id="forklar"></p>
 
   <div id="drift"></div>
+  <div id="låst"></div>
   <div id="beskeder"></div>
 
   <div class="kort">
@@ -459,25 +463,29 @@ async function kald(url){
   if(data.errorCode) throw new Error(data.errorText||data.errorCode);
   return data;
 }
-function bygBen(fra,til,produkter,sammenhæng,skift){
+function bygBen(fra,til,produkter,sammenhæng,skift,tid){
   let u = FUNKTION + "?sti=trip"
     + "&rtMode=REALTIME"
     + "&originId=" + encodeURIComponent(fra)
     + "&destId="   + encodeURIComponent(til)
     + "&products=" + produkter + "&maxChange=" + (skift||0) + "&numF=" + PER_SØGNING;
+  if(tid){
+    u += "&date=" + tid.getFullYear() + "-" + to(tid.getMonth()+1) + "-" + to(tid.getDate())
+       + "&time=" + to(tid.getHours()) + ":" + to(tid.getMinutes());
+  }
   if(sammenhæng) u += "&context=" + encodeURIComponent(sammenhæng);
   return u;
 }
-async function hentBen(fra,til,produkter,sider,skift){
-  const n = fra+"|"+til+"|"+produkter+"|"+sider+"|"+(skift||0);
+async function hentBen(fra,til,produkter,sider,skift,tid){
+  const n = fra+"|"+til+"|"+produkter+"|"+sider+"|"+(skift||0)+"|"+(tid?+tid:0);
   if(kurv[n]) return kurv[n];
   kurv[n] = (async () => {
-    const f = await kald(bygBen(fra,til,produkter,null,skift));
+    const f = await kald(bygBen(fra,til,produkter,null,skift,tid));
     let ture = Array.isArray(f.Trip)?f.Trip.slice():(f.Trip?[f.Trip]:[]);
     let s = f.scrF;
     for(let i=1;i<sider && s;i++){
       try{
-        const x = await kald(bygBen(fra,til,produkter,s,skift));
+        const x = await kald(bygBen(fra,til,produkter,s,skift,tid));
         ture = ture.concat(Array.isArray(x.Trip)?x.Trip:(x.Trip?[x.Trip]:[]));
         s = x.scrF;
       }catch(e){ break; }
@@ -540,9 +548,9 @@ function tolkBen(trip){
    syr dem sammen selv. Det er samme kneb som med bus og tog.       */
 let omvejSpor = "";   // hvad omvejen fandt, vises nederst
 
-async function hentOmvej(fraId, sider){
-  const et  = await hentBen(fraId,        BALLERUP_ST, S_TOG, sider);
-  const to_ = await hentBen(BALLERUP_ST,  HJEM.id,     S_TOG, sider);
+async function hentOmvej(fraId, sider, bagud){
+  const et  = await hentBen(fraId,        BALLERUP_ST, S_TOG, sider, 0, bagud);
+  const to_ = await hentBen(BALLERUP_ST,  HJEM.id,     S_TOG, sider, 0, bagud);
   const linjer = {};
   et.forEach(a => { const l = a.linje || "?"; linjer[l] = (linjer[l]||0)+1; });
   const oversigt = Object.keys(linjer).map(l => l+"×"+linjer[l]).join(" ");
@@ -574,12 +582,58 @@ async function hentOmvej(fraId, sider){
   return ud;
 }
 
+/* ── låsen ────────────────────────────────────────────────
+   Når du har valgt en rejse og trykket på den, gemmes den her og
+   følges undervejs. Den overlever at vinduet lukkes, fordi den
+   ligger i browserens eget lager.                                */
+const LÅS_NØGLE = "afgangstavle-lås";
+const LÅS_MARGEN = 3;      // minutter efter forventet ankomst, så slippes den
+let lås = null, låsData = null;
+
+function læsLås(){
+  try{
+    const r = window.localStorage.getItem(LÅS_NØGLE);
+    lås = r ? JSON.parse(r) : null;
+  }catch(e){ lås = null; }
+}
+function gemLås(){
+  try{
+    if(lås) window.localStorage.setItem(LÅS_NØGLE, JSON.stringify(lås));
+    else window.localStorage.removeItem(LÅS_NØGLE);
+  }catch(e){ /* uden lager virker låsen bare ikke på tværs af vinduer */ }
+}
+function sætLås(r){
+  lås = {
+    hjemad: hjemad,
+    rute: r.rute.skiftNavn,
+    etLinje: r.et.linje,
+    etPlanlagt: +r.et.planlagt,
+    toLinje: r.to.linje,
+    toPlanlagt: +r.to.planlagt,
+    videreLinje: r.to.videre ? r.to.videre.linje : "",
+    ankomst: +r.ankomst
+  };
+  gemLås(); start(); opdater();
+}
+function slipLås(){ lås = null; gemLås(); start(); opdater(); }
+
+function erLåstAfgang(a){
+  return !!lås && lås.hjemad === hjemad
+      && String(a.linje) === lås.etLinje && +a.planlagt === lås.etPlanlagt;
+}
+function erLåstRække(r){
+  return !!lås && lås.hjemad === hjemad
+      && +r.et.planlagt === lås.etPlanlagt
+      && String(r.to.linje) === lås.toLinje
+      && (r.to.videre ? r.to.videre.linje : "") === lås.videreLinje;
+}
+
 /* ── sammenkobling ─────────────────────────────────────── */
 function kobl(rute, et, to_, nu, varsel){
   const ud=[];
   et.forEach(a => {
     if(a.aflyst) return;
-    if(a.afgang < nu) return;                          // den er kørt
+    if(a.afgang < nu && !erLåstAfgang(a)) return;      // kørt, og ikke låst
     if(rute.linjer && !rute.linjer.some(l =>
         String(a.linje).toUpperCase() === l.toUpperCase())) return;
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
@@ -702,8 +756,13 @@ function tegnDrift(beskeder){
 /* ── tegning ───────────────────────────────────────────── */
 function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m; }
 
-function tegnRække(r, nu){
+function tegnRække(r, nu, ulåselig){
   const tr = el("tr");
+  if(!ulåselig){
+    tr.classList.add("valgbar");
+    tr.title = "Tryk for at følge denne rejse";
+    tr.addEventListener("click", () => sætLås(r));
+  }
   if(r.forsinkelse >= 1) tr.classList.add("sen");
   if(r.knap) tr.classList.add("knap");
 
@@ -766,6 +825,94 @@ function tegnVejrNu(){
     holder.appendChild(d);
   }
   holder.title = v.navn + ", " + vejrOrd(v.nu.kode);
+}
+
+function tegnLås(alle, nu){
+  const holder = $("#låst");
+  holder.textContent = "";
+  if(!lås) return null;
+
+  if(lås.hjemad !== hjemad){
+    const p = el("div","låsboks anden");
+    p.textContent = "Du følger en rejse den anden vej. Tryk Vend rejsen for at se den.";
+    holder.appendChild(p);
+    return null;
+  }
+
+  const række = alle.filter(erLåstRække)[0] || null;
+
+  const boks = el("div","låsboks");
+  const top = el("div","låstop");
+  const mærkat = el("span","låsmærkat"); mærkat.textContent = "Du følger";
+  top.appendChild(mærkat);
+  const slip = el("button","slipknap"); slip.textContent = "Slip";
+  slip.addEventListener("click", slipLås);
+  top.appendChild(slip);
+  boks.appendChild(top);
+
+  if(!række){
+    const p = el("p","låstom");
+    p.textContent = "Kan ikke finde afgangen lige nu. Den kan være aflyst, "
+      + "eller ligge for langt tilbage. Tryk Slip for at fjerne den.";
+    boks.appendChild(p);
+    holder.appendChild(boks);
+    return null;
+  }
+
+  /* selve rejsen, tegnet som en almindelig række */
+  const tabel = el("table","låstabel");
+  const krop = el("tbody");
+  krop.appendChild(tegnRække(række, nu, true));
+  tabel.appendChild(krop);
+  boks.appendChild(tabel);
+
+  /* holder skiftet? og hvad er alternativet, hvis det ikke gør */
+  if(låsData){
+    const a = række.et, gangtid = låsData.rute.gangtid;
+    const b = række.to;
+    const vent = minutter(a.ankomst, b.afgang);
+    const kørt = b.afgang < nu;
+    const stramt = vent < gangtid;
+
+    const linje = el("p","låsdom");
+    if(kørt){
+      linje.textContent = "Toget er kørt.";
+      linje.classList.add("mistet");
+    }else if(stramt){
+      linje.textContent = "Skiftet er strammere end dine "+gangtid+" minutter — "
+        + vent + " min fra du står af.";
+      linje.classList.add("stramt");
+    }else{
+      linje.textContent = "Skiftet holder: " + vent + " min fra du står af.";
+      linje.classList.add("holder");
+    }
+    boks.appendChild(linje);
+
+    if(kørt || stramt){
+      const grænse = new Date(a.ankomst.getTime() + gangtid*60000);
+      let næste = null;
+      for(let i=0;i<låsData.to_.length;i++){
+        const x = låsData.to_[i];
+        if(x.aflyst) continue;
+        if(x.afgang < nu) continue;
+        if(x.afgang < grænse) continue;
+        if(!næste || x.ankomst < næste.ankomst) næste = x;
+      }
+      const alt = el("p","låsalt");
+      if(næste){
+        alt.textContent = "Næste mulighed: " + næste.linje
+          + (næste.videre ? " og " + næste.videre.linje + " via " + næste.videre.sted : "")
+          + " kl. " + urTekst(næste.afgang)
+          + " — i " + HJEM.navn + " " + urTekst(næste.ankomst);
+      }else{
+        alt.textContent = "Ingen anden mulighed fundet lige nu.";
+      }
+      boks.appendChild(alt);
+    }
+  }
+
+  holder.appendChild(boks);
+  return række;
 }
 
 function tegnBånd(kasse){
@@ -840,6 +987,7 @@ async function opdater(){
   try{
     const alle = [];
     const svigt = [], tomme = [];
+    låsData = null;
     omvejSpor = hjemad ? "omvej ikke kørt" : "omvej kun hjemad";
     const førsteSider = visFlere ? 2 : 1;
     const andetSider  = 1 + (visFlere ? EKSTRA_SIDER_MERE : EKSTRA_SIDER);
@@ -850,25 +998,35 @@ async function opdater(){
       const af = rute.skiftAf || rute.skiftId;
       const på = rute.skiftPå || rute.skiftId;
       const varsel = hjemad ? rute.varsel : VARSEL_HJEMMEFRA;
+
+      /* Er der en lås på denne rute, søger vi fra et kvarter FØR den
+         låste afgang — ellers forsvinder den, så snart den er kørt,
+         og så kan vi ikke følge den mens du sidder i den.          */
+      const bagud = (lås && lås.hjemad === hjemad && lås.rute === rute.skiftNavn)
+        ? new Date(lås.etPlanlagt - 15*60000) : null;
+
       try{
         let et, to_;
         if(hjemad){
           /* Flere rejser skal række længere på BEGGE ben — ellers har
              de sidste afgange intet tog at koble til og falder ud.   */
-          et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider);
-          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider);
+          et  = await hentBen(rute.lokalId, af,          rute.produkter, førsteSider, 0, bagud);
+          to_ = await hentBen(på,           HJEM.id,     S_TOG,          andetSider, 0, bagud);
           /* H over Ballerup lægges til som ekstra muligheder — samme
              ankomst som det direkte C, men du sidder ned undervejs. */
           try{
-            const omvej = await hentOmvej(på, andetSider);
+            const omvej = await hentOmvej(på, andetSider, bagud);
             to_ = to_.concat(omvej);
           }catch(e){
             /* omvejen er en bonus; fejler den, kører resten */
             omvejSpor = "omvej fejlede: " + String(e.message||e);
           }
         }else{
-          et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider);
-          to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider);
+          et  = await hentBen(HJEM.id,      på,          S_TOG,          førsteSider, 0, bagud);
+          to_ = await hentBen(af,           rute.lokalId, rute.produkter, andetSider, 0, bagud);
+        }
+        if(lås && lås.hjemad === hjemad && lås.rute === rute.skiftNavn){
+          låsData = { et: et, to_: to_, rute: rute };
         }
         kobl(rute, et, to_, nu, varsel).forEach(r => alle.push(r));
       }catch(e){
@@ -883,7 +1041,17 @@ async function opdater(){
       }
     }));
 
-    const kasser = grupper(alle)
+    /* slip låsen når du er hjemme */
+    if(lås && nu.getTime() > lås.ankomst + LÅS_MARGEN*60000){
+      lås = null; gemLås(); start();
+    }
+    const låstRække = tegnLås(alle, nu);
+    if(låstRække){
+      lås.ankomst = +låstRække.ankomst;   // følg med når den skubbes
+      gemLås();
+    }
+
+    const kasser = grupper(alle.filter(r => !erLåstRække(r)))
       .slice(0, visFlere ? GRUPPER_LANGT : GRUPPER_KORT);
 
     ryd();
@@ -940,7 +1108,8 @@ function tikUr(){
 }
 function start(){
   clearInterval(timer);
-  timer=setInterval(()=>{ if(!document.hidden) opdater(); }, OPDATER_SEKUNDER*1000);
+  const sek = lås ? LÅS_SEKUNDER : OPDATER_SEKUNDER;
+  timer=setInterval(()=>{ if(!document.hidden) opdater(); }, sek*1000);
 }
 function vågn(){ sidsteAktivitet=Date.now(); if(sover){ sover=false; start(); } }
 
@@ -958,7 +1127,7 @@ $("#knapFlere").addEventListener("click", e=>{
 });
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && !sover){ vågn(); opdater(); } });
 
-sætOverskrift(); tikUr(); setInterval(tikUr,1000); opdater(); start();
+læsLås(); sætOverskrift(); tikUr(); setInterval(tikUr,1000); opdater(); start();
 })();
 </script>
 </body>
