@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "3.4";
+const VERSION = "3.5";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -618,7 +618,10 @@ function kobl(rute, et, to_, nu, varsel){
 function grupper(liste){
   const set = {}, rene = [];
   liste.forEach(r => {
-    const n = r.et.linje+"|"+r.afgang.getTime()+"|"+r.ankomst.getTime();
+    /* togdelen SKAL med i mærket — ellers ser et direkte C og en
+       H over Ballerup ens ud, og den ene kasseres som dublet. */
+    const n = r.et.linje+"|"+r.afgang.getTime()+"|"+r.ankomst.getTime()
+            + "|"+r.to.linje+"|"+(r.to.videre ? r.to.videre.linje : "");
     if(set[n]) return;
     set[n] = true; rene.push(r);
   });
