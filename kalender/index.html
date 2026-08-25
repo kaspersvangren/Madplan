@@ -957,6 +957,18 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   text-overflow:ellipsis;overflow:hidden}
 .nemlev button.aktiv{background:var(--mad-bg);color:var(--mad);
   border-color:var(--mad)}
+/* Seksten dage kan ikke stå på én linje som de tre gamle knapper. De
+   ruller i stedet vandret, med prisen under dagen — leveringsprisen
+   svinger fra 0 til 49 kr på samme dag, og det er værd at kunne se uden
+   at gå ind på Nemlig. */
+.nemlev.nemlevbred{overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none}
+.nemlev.nemlevbred::-webkit-scrollbar{display:none}
+.nemlev.nemlevbred button{flex:none;padding:5px 11px;line-height:1.25;
+  display:flex;flex-direction:column;align-items:center;gap:1px}
+.nemlev.nemlevbred button[disabled]{opacity:.45;cursor:default}
+.nemlev.nemlevbred .p{font-size:10.5px;font-weight:600;opacity:.75}
+.nemlev.nemlevbred .p.fri{color:var(--mad);opacity:1}
 .nemlevnote{font-size:11.5px;color:var(--muted);opacity:.8;
   padding:0 4px 10px;line-height:1.35}
 
@@ -1065,6 +1077,21 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nemdelt-back{z-index:58}      /* over selve indkøbsarket, under de andre */
 #nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
 #nemengang-back{z-index:59}    /* over indkøbsarket, under nemvalg (60) — som kan åbnes herfra */
+#nemtid-back{z-index:59}       /* samme niveau: åbnes fra indkøbsarket, åbner intet selv */
+.nemtidgruppe{font-size:12px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+.nemtidgruppe:first-child{margin-top:2px}
+.nemtidrk{display:flex;align-items:center;gap:10px;width:100%;
+  background:none;border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;margin-bottom:7px;cursor:pointer;text-align:left;
+  color:var(--ink);font-size:14px;min-height:var(--tap)}
+.nemtidrk .t{font-weight:600;flex:none;min-width:82px}
+.nemtidrk .pris{margin-left:auto;font-weight:600;font-size:13px;
+  color:var(--muted)}
+.nemtidrk .pris.fri{color:var(--mad)}
+.nemtidrk.valgt{border-color:var(--mad);background:var(--mad-bg);
+  color:var(--mad)}
+.nemtidrk[disabled]{opacity:.5;cursor:default}
 #nemkort-back{z-index:70}
 /* Muligheder for den samme ingrediens. Billede, navn, pakke og pris i
    én række, så to salathoveder kan sammenlignes uden at læse. */
@@ -1918,6 +1945,21 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Nemlig: vælg og reservér en leveringstid. Det er den ENESTE handling
+     appen foretager hos Nemlig ud over kurven, og den sker kun når han
+     trykker på en bestemt tid. Den bestiller ikke — den lægger beslag på
+     et leveringsvindue, som når man selv vælger tid på deres side. -->
+<div class="backdrop" id="nemtid-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Vælg leveringstid</h2>
+    <div class="meta" id="nemtid-meta"></div>
+    <div id="nemtid-krop"></div>
+    <div class="actions">
+      <button class="btn primary" id="nemtid-luk">Luk</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: køb noget én gang. Varen gemmes IKKE i kartoteket — den lever
      kun i denne uges liste og er væk igen næste fredag. -->
 <div class="backdrop" id="nemengang-back">
@@ -2154,7 +2196,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.78.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.80.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5955,8 +5997,60 @@ function nemStandardLevering(){
   return iso(d);
 }
 
-function nemLevering(){
+/* Nemligs egne ledige leveringstider, hentet med nemlig-tider når arket
+   åbnes. Er den null, falder alt tilbage til den gamle opførsel.
+
+   HVORFOR DEN FINDES: appen byggede før selv den tidsrums-streng som
+   Nemligs søgning bruger til at afgøre lagerstatus — og den var forkert i
+   to led. Timen stod i lokaltid i stedet for UTC, og halen var afskrevet
+   fra ét tidsrum vi havde set én gang. Et tidsrum der ikke findes bliver
+   ignoreret, og så svarer Nemlig generisk "på lager". Derfor kunne
+   cherrytomater stå som på lager i arket og være udsolgt i kurven.
+   Målt og fastslået 25. august. Nu spørges Nemlig i stedet.            */
+let nemTider = null;
+
+/* Det tidsrum lagertjekket skal regne efter.
+
+   RANGORDEN: har han allerede reserveret et tidsrum hos Nemlig, vinder
+   det — det er jo den levering varerne rent faktisk skal med. Ellers
+   tages det billigste ledige tidsrum på den dag han har valgt i arket.
+   Kender vi ingen tider endnu, sendes dagen som før, og edge-funktionen
+   bygger sit gamle gæt. Så virker arket stadig mens tiderne hentes.   */
+function nemTidsrum(){
+  if(!nemTider) return null;
+  if(nemTider.reserveret && nemTider.valgt) return nemTider.valgt.utc;
+  const dag = nemUgeAlt().levering || nemStandardLevering();
+  const d = (nemTider.dage || []).find(x => x.dato === dag);
+  if(d && d.billigste) return d.billigste.utc;
+  const f = (nemTider.dage || [])[0];
+  return f && f.billigste ? f.billigste.utc : null;
+}
+
+async function nemHentTider(){
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-tider", { body: {} });
+    if(error) throw error;
+    if(!data || !Array.isArray(data.dage) || !data.dage.length) return;
+    nemTider = data;
+    /* Har han reserveret et tidsrum hos Nemlig, skal arket vise DEN dag —
+       ellers ville arket påstå én leveringsdag mens ordren har en anden. */
+    if(data.reserveret && data.valgt && data.valgt.dato){
+      nemLeveringSaet(data.valgt.dato);
+    } else if(!(nemTider.dage || []).some(d => d.dato === nemLeveringsDag())){
+      /* Den dag arket peger på er slet ikke ledig. Tag den første der er,
+         frem for at vise udsolgt-status for en dag der ikke kan vælges. */
+      nemLeveringSaet(nemTider.dage[0].dato);
+    }
+    if(nemArk){ nemTegn(); await nemHentPriser(); nemTegn(); }
+  }catch(e){ /* arket virker uden — så er vi bare tilbage ved det gamle */ }
+}
+
+function nemLeveringsDag(){
   return nemUgeAlt().levering || nemStandardLevering();
+}
+
+function nemLevering(){
+  return nemTidsrum() || nemLeveringsDag();
 }
 
 function nemLeveringSaet(isoDato){
@@ -7506,14 +7600,8 @@ function nemKurvAfsnit(){
    en helt anden dag, er det nemmere at rette i ugen end at bygge en
    kalender ind i et ark. */
 function nemLeveringsAfsnit(){
-  const valgt = nemLevering();
-  const fast = nemStandardLevering();
-  const dage = [];
-  for(const forskyd of [-1, 0, 1]){
-    const d = new Date(fast);
-    d.setDate(d.getDate() + forskyd);
-    dage.push(iso(d));
-  }
+  const valgt = nemLeveringsDag();
+
   /* Kort form: "to. 3/9". Fuldt månedsnavn gjorde knapperne for brede til
      tre ved siden af hinanden på en telefon. */
   const navn = i => {
@@ -7521,14 +7609,46 @@ function nemLeveringsAfsnit(){
     return d.toLocaleDateString("da-DK", { weekday: "short" }).replace(".", "")
       + " " + d.getDate() + "/" + (d.getMonth() + 1);
   };
+
+  /* MED RIGTIGE TIDER (fra 2.79.0): Nemligs egne ledige dage, op til seksten
+     frem, med prisen på dagens billigste tidsrum. Før stod der altid tre
+     faste dage omkring den torsdag appen selv regnede sig frem til — og
+     flyttede han sin levering, kunne appen slet ikke følge med. */
+  if(nemTider && (nemTider.dage || []).length){
+    const res = nemTider.reserveret && nemTider.valgt ? nemTider.valgt : null;
+    const pris = d => d.harGratis ? "gratis"
+      : (d.minPris > 0 ? d.minPris + " kr" : "gratis");
+    return '<div class="nemlev nemlevbred"><span class="ord">Leveres</span>'
+      + nemTider.dage.map(d =>
+          '<button type="button" data-nemlev="' + d.dato + '"'
+          + (d.dato === valgt ? ' class="aktiv"' : "")
+          + '><span class="d">' + esc(navn(d.dato)) + '</span>'
+          + '<span class="p' + (d.harGratis ? " fri" : "") + '">'
+          + esc(pris(d)) + '</span></button>').join("")
+      + '</div>'
+      + '<div class="nemlevnote">'
+      + (res
+          ? 'Reserveret: ' + esc(navn(res.dato)) + ' kl. ' + res.start + '-' + res.slut
+            + (res.pris > 0 ? ' \u00b7 ' + res.pris + ' kr' : ' \u00b7 gratis')
+            + '. Tryk på en dag for at flytte den.'
+          : 'Prisen er leveringsprisen på dagens billigste tid. '
+            + 'Tryk på en dag for at vælge og reservere et klokkeslæt.')
+      + '</div>';
+  }
+
+  /* Fald-tilbage: den gamle visning, hvis tiderne ikke kunne hentes. */
+  const fast = nemStandardLevering();
+  const dage = [];
+  for(const forskyd of [-1, 0, 1]){
+    const d = new Date(fast);
+    d.setDate(d.getDate() + forskyd);
+    dage.push(iso(d));
+  }
   return '<div class="nemlev"><span class="ord">Leveres</span>'
     + dage.map(d =>
         '<button type="button" data-nemlev="' + d + '"'
         + (d === valgt ? ' class="aktiv"' : "") + '>' + esc(navn(d)) + '</button>').join("")
     + '</div>'
-    /* Kort nok til én linje på en telefon. Den lange udgave forklarede
-       også at leveringstiden vælges hos Nemlig — rigtigt, men det er ikke
-       noget man har brug for at læse hver gang. */
     + '<div class="nemlevnote">Styrer kun hvad der vises som udsolgt.</div>';
 }
 
@@ -7884,6 +8004,11 @@ async function nemAabn(){
      skal forbi hver gang. */
   nemFoldet.add("gratis");
   nemHentGratis();     // uden await: arket skal ikke vente på den
+  /* Tiderne hentes uden await af samme grund. Kommer de, tegnes arket om
+     og priserne hentes forfra med det RIGTIGE tidsrum — først da er
+     udsolgt-visningen til at stole på. Kommer de ikke, virker arket
+     præcis som før. */
+  nemHentTider();
   show("nem-back");
   nemTegn();
   await Promise.all([nemHentPriser(), nemHentKurv()]);
@@ -8072,6 +8197,121 @@ async function nemSend(){
     send.disabled = false;
   }
 }
+
+/* ==================================================================
+   Vælg leveringstid — og reservér den hos Nemlig
+
+   DET ER APPENS FØRSTE HANDLING HOS NEMLIG UD OVER KURVEN. Den sker
+   aldrig af sig selv, kun når han trykker på en bestemt tid. Den
+   bestiller ikke; den lægger beslag på et leveringsvindue, præcis som
+   når man selv vælger tid på deres side.
+   ================================================================== */
+let nemTidDag = null;      // hvilken dag arket viser
+let nemTidHenter = false;
+
+async function nemTidAaben(dato){
+  nemTidDag = dato;
+  document.getElementById("nemtid-meta").textContent = "Henter tiderne…";
+  document.getElementById("nemtid-krop").innerHTML = "";
+  show("nemtid-back");
+  await nemTidHent();
+}
+
+/* Tidsrummene hentes med alle:true — den almindelige hentning tager kun
+   det billigste pr. dag, fordi arket ikke skal slæbe rundt på 53 tider
+   gange 16 dage. */
+async function nemTidHent(reserver){
+  if(nemTidHenter) return;
+  nemTidHenter = true;
+  try{
+    const krop = { alle: true };
+    if(reserver) krop.reserver = reserver;
+    const { data, error } = await sb.functions.invoke("nemlig-tider", { body: krop });
+    if(error) throw error;
+    if(!data || !Array.isArray(data.dage)) throw new Error("Uventet svar");
+
+    if(reserver){
+      /* Vi tror ikke på et 200 — vi ser efter om tidsrummet FAKTISK sidder
+         i den friske liste. Det har Nemlig snydt os med før. */
+      if(data.reservationLykkedes){
+        vis("Leveringstiden er reserveret hos Nemlig.");
+      } else {
+        vis("Nemlig tog ikke imod tiden. Prøv en anden, eller vælg den på nemlig.com.");
+      }
+    }
+
+    nemTider = data;
+    if(data.reserveret && data.valgt && data.valgt.dato){
+      nemLeveringSaet(data.valgt.dato);
+      nemTidDag = data.valgt.dato;
+    }
+    nemTidTegn();
+    if(nemArk){ nemTegn(); await nemHentPriser(); nemTegn(); }
+  }catch(err){
+    document.getElementById("nemtid-meta").textContent =
+      "Tiderne kunne ikke hentes: " + (err.message || String(err));
+  }finally{ nemTidHenter = false; }
+}
+
+function nemTidTegn(){
+  const meta = document.getElementById("nemtid-meta");
+  const krop = document.getElementById("nemtid-krop");
+  if(!nemTider || !nemTidDag){ krop.innerHTML = ""; return; }
+
+  const dag = (nemTider.dage || []).find(d => d.dato === nemTidDag);
+  const d = new Date(nemTidDag);
+  const dagNavn = d.toLocaleDateString("da-DK",
+    { weekday: "long", day: "numeric", month: "long" });
+
+  if(!dag || !Array.isArray(dag.tidsrum) || !dag.tidsrum.length){
+    meta.textContent = "Ingen ledige tider " + dagNavn + ".";
+    krop.innerHTML = "";
+    return;
+  }
+
+  meta.textContent = nemTider.reserveret && nemTider.valgt
+    ? "Du har reserveret " + nemTider.valgt.start + "-" + nemTider.valgt.slut
+      + ". Tryk på en anden tid for at flytte den."
+    : "Tryk på en tid for at reservere den hos Nemlig. Det bestiller ikke.";
+
+  /* Gratis og billige tider først som deres egen gruppe — det er dem man
+     leder efter, og de ligger spredt ud over døgnet. */
+  const valgtId = nemTider.valgt ? nemTider.valgt.id : null;
+  const raek = t => {
+    const kr = t.pris > 0 ? t.pris + " kr" : "gratis";
+    return '<button type="button" class="nemtidrk'
+      + (t.id === valgtId ? " valgt" : "") + '" data-nemtid="' + t.id + '">'
+      + '<span class="t">' + t.start + "-" + t.slut + '</span>'
+      + '<span class="pris' + (t.pris > 0 ? "" : " fri") + '">' + kr + '</span>'
+      + '</button>';
+  };
+
+  const gratis = dag.tidsrum.filter(t => t.pris === 0);
+  const resten = dag.tidsrum.filter(t => t.pris > 0);
+  let h = "";
+  if(gratis.length) h += '<div class="nemtidgruppe">Gratis levering</div>'
+    + gratis.map(raek).join("");
+  if(resten.length) h += '<div class="nemtidgruppe">'
+    + (gratis.length ? "Øvrige tider" : "Tider " + esc(dagNavn)) + '</div>'
+    + resten.map(raek).join("");
+  krop.innerHTML = h;
+}
+
+document.getElementById("nemtid-krop").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-nemtid]");
+  if(!b) return;
+  krop_slaaFra(true);
+  nemTidHent(Number(b.dataset.nemtid)).then(() => krop_slaaFra(false));
+});
+/* Mens reservationen er undervejs, må der ikke kunne trykkes igen — to
+   reservationer i træk ville kappes om det samme vindue. */
+function krop_slaaFra(fra){
+  document.querySelectorAll("#nemtid-krop .nemtidrk")
+    .forEach(b => { b.disabled = fra; });
+}
+document.getElementById("nemtid-luk").onclick = () => {
+  hide("nemtid-back"); nemTidDag = null;
+};
 
 /* ==================================================================
    Køb én gang — engangsvarer
@@ -8787,6 +9027,16 @@ function nemStandOpdater(){
 document.getElementById("nem-krop").addEventListener("click", async ev => {
   const d = ev.target.closest("[data-nemlev]");
   if(!d || !nemArk) return;
+  /* Har vi Nemligs egne tider, er et tryk på en dag også vejen ind til at
+     vælge KLOKKESLÆT og reservere det. Uden tider gør knappen præcis som
+     før: den skifter kun hvad der regnes udsolgt efter. */
+  if(nemTider && (nemTider.dage || []).some(x => x.dato === d.dataset.nemlev)){
+    nemLeveringSaet(d.dataset.nemlev);
+    nemByg(); nemTegn();
+    nemTidAaben(d.dataset.nemlev);
+    nemHentPriser().then(() => nemTegn());
+    return;
+  }
   nemLeveringSaet(d.dataset.nemlev);
   nemByg();
   nemTegn();
