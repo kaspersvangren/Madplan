@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "4.3";
+const VERSION = "4.4";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -306,6 +306,17 @@ body.henter .knapper button{cursor:progress;}
 
 .låsalt{margin:0;padding:9px 16px;font-size:13px;color:var(--dæmpet);
   background:#f6f8fa;border-top:1px solid #eef1f4;}
+
+/* noget i den låste rejse er aflyst */
+.låsboks.forstyrret{border-color:var(--aflyst);}
+.låsboks.forstyrret .låstop{background:var(--aflyst);}
+.trin.trinaflyst{opacity:.55;}
+.trin.trinaflyst .trinrute,.trin.trinaflyst .trintider{text-decoration:line-through;}
+.trinstatus.aflystnu{color:var(--aflyst);font-weight:600;text-decoration:none;}
+.erstattet{padding:5px 16px;font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--aflyst);background:#fdf3f3;border-top:1px solid #f6e2e2;}
+.fodrest.skredet{color:var(--aflyst);font-weight:600;}
 .låstom{margin:0;padding:14px 16px;font-size:13.5px;color:var(--dæmpet);}
 tr.erlåst{display:none;}
 /* aflyst afgang — vises, men kan ikke bruges */
@@ -691,7 +702,11 @@ function sætLås(r){
     toLinje: r.to.linje,
     toPlanlagt: +r.to.planlagt,
     videreLinje: r.to.videre ? r.to.videre.linje : "",
-    ankomst: +r.ankomst
+    ankomst: +r.ankomst,
+    /* Det du oprindeligt sigtede efter. Bruges til at sige, hvor meget
+       en erstatning koster i forhold til det du låste.              */
+    målAnkomst: +r.ankomst,
+    målAfgang: +r.et.planlagt
   };
   gemLås(); start(); opdater();
 }
@@ -968,7 +983,28 @@ async function hentLåsData(){
   const b = to_.filter(x => String(x.linje) === lås.toLinje
                         && +x.planlagt === lås.toPlanlagt
                         && (x.videre ? x.videre.linje : "") === lås.videreLinje)[0] || null;
-  return { rute: rute, a: a, b: b, to_: to_ };
+
+  /* Er dit ben aflyst, findes erstatningen her — den næste afgang du
+     kan bruge. Den oprindelige bliver stående som overstreget, så du
+     kan se HVAD der skete, ikke bare at tallene ændrede sig.       */
+  let aErstat = null, bErstat = null;
+
+  if(a && a.aflyst){
+    et.forEach(x => {
+      if(x.aflyst || x.afgang < a.afgang) return;
+      if(!aErstat || x.afgang < aErstat.afgang) aErstat = x;
+    });
+  }
+  const brugtA = aErstat || a;
+  if(brugtA && (!b || b.aflyst || (a && a.aflyst))){
+    const grænse = new Date(brugtA.ankomst.getTime() + rute.gangtid*60000);
+    to_.forEach(x => {
+      if(x.aflyst || x.afgang < grænse) return;
+      if(!bErstat || x.ankomst < bErstat.ankomst) bErstat = x;
+    });
+    if(bErstat && b && !b.aflyst && !(a && a.aflyst)) bErstat = null;
+  }
+  return { rute: rute, a: a, b: b, aErstat: aErstat, bErstat: bErstat, to_: to_ };
 }
 
 function tegnLås(nu){
@@ -990,20 +1026,32 @@ function tegnLås(nu){
     p.textContent = "Rejsen går den anden vej. Tryk Vend rejsen for at følge den.";
     boks.appendChild(p); holder.appendChild(boks); return;
   }
-  if(!låsData || !låsData.a || !låsData.b){
+  if(!låsData || !låsData.a){
     const p = el("p","låstom");
-    p.textContent = "Kan ikke finde rejsen lige nu. Den kan være aflyst. Tryk Slip for at fjerne den.";
+    p.textContent = "Kan ikke finde rejsen lige nu. Tryk Slip for at fjerne den.";
     boks.appendChild(p); holder.appendChild(boks); return;
   }
 
-  const a = låsData.a, b = låsData.b, gangtid = låsData.rute.gangtid;
+  const gangtid = låsData.rute.gangtid;
+  const aAflyst = låsData.a.aflyst;
+  const bAflyst = !låsData.b || låsData.b.aflyst;
+  const a = låsData.aErstat || låsData.a;
+  const b = låsData.bErstat || låsData.b;
+
+  if(aAflyst || bAflyst) boks.classList.add("forstyrret");
+
+  if(!b){
+    const p = el("p","låstom");
+    p.textContent = "Der er ingen forbindelse videre lige nu. Tryk Slip for at fjerne rejsen.";
+    boks.appendChild(p); holder.appendChild(boks); return;
+  }
   const vent = minutter(a.ankomst, b.afgang);
   const stramt = vent < gangtid;
   const togKørt = b.afgang < nu;
 
   /* ── trin: et ben med sted, tider og tilstand ── */
-  function trin(ben, fraNavn, tilNavn, tilstand, klasse){
-    const t = el("div","trin");
+  function trin(ben, fraNavn, tilNavn, tilstand, klasse, aflyst){
+    const t = el("div","trin" + (aflyst ? " trinaflyst" : ""));
     const m = el("div","trinmærke");
     m.appendChild(mærke(ben.linje, ben.art));
     t.appendChild(m);
@@ -1028,6 +1076,19 @@ function tegnLås(nu){
 
   const lokalNavn = lås.hjemad ? låsData.rute.lokalNavn : HJEM.navn;
   const målNavn   = lås.hjemad ? HJEM.navn : låsData.rute.lokalNavn;
+
+  function erstatning(tekst){
+    const e = el("div","erstattet");
+    e.textContent = tekst;
+    return e;
+  }
+
+  if(aAflyst){
+    boks.appendChild(trin(låsData.a, lokalNavn, låsData.rute.skiftNavn,
+      "aflyst", "aflystnu", true));
+    boks.appendChild(erstatning(låsData.aErstat
+      ? "Erstattet af" : "Ingen erstatning fundet"));
+  }
 
   let s1, k1;
   if(nu < a.afgang){ s1 = "om " + minutter(nu, a.afgang) + " min"; k1 = "venter"; }
@@ -1081,6 +1142,12 @@ function tegnLås(nu){
     const s3 = status(v.afgang, v.ankomst);
     boks.appendChild(trin(andetBen, v.sted, målNavn, s3[0], s3[1]));
   }else{
+    if(bAflyst && låsData.b){
+      boks.appendChild(trin(låsData.b, låsData.rute.skiftNavn, målNavn,
+        "aflyst", "aflystnu", true));
+      boks.appendChild(erstatning(låsData.bErstat
+        ? "Erstattet af" : "Ingen erstatning fundet"));
+    }
     const s2 = status(b.afgang, b.ankomst);
     boks.appendChild(trin(b, låsData.rute.skiftNavn, målNavn, s2[0], s2[1]));
   }
@@ -1091,7 +1158,13 @@ function tegnLås(nu){
   const ft = el("b"); ft.textContent = urTekst(b.ankomst);
   fod.appendChild(fm); fod.appendChild(ft);
   const rest = el("span","fodrest");
-  rest.textContent = nu < b.ankomst ? "om " + minutter(nu, b.ankomst) + " min" : "";
+  const skred = lås.målAnkomst ? minutter(new Date(lås.målAnkomst), b.ankomst) : 0;
+  if(skred >= 1){
+    rest.textContent = skred + " min senere end planlagt";
+    rest.classList.add("skredet");
+  }else{
+    rest.textContent = nu < b.ankomst ? "om " + minutter(nu, b.ankomst) + " min" : "";
+  }
   fod.appendChild(rest);
   boks.appendChild(fod);
 
@@ -1235,9 +1308,12 @@ async function opdater(){
     låsData = null;
     if(lås){
       try{ låsData = await hentLåsData(); }catch(e){ låsData = null; }
-      if(låsData && låsData.b){
-        lås.ankomst = +låsData.b.ankomst;   // følger med når den skubbes
-        gemLås();
+      if(låsData){
+        const gældende = låsData.bErstat || låsData.b;
+        if(gældende){
+          lås.ankomst = +gældende.ankomst;   // følger med når den skubbes
+          gemLås();
+        }
       }
       /* slip når du er fremme */
       if(nu.getTime() > lås.ankomst + LÅS_MARGEN*60000){
