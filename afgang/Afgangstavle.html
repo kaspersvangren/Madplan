@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "4.2";
+const VERSION = "4.3";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -308,6 +308,14 @@ body.henter .knapper button{cursor:progress;}
   background:#f6f8fa;border-top:1px solid #eef1f4;}
 .låstom{margin:0;padding:14px 16px;font-size:13.5px;color:var(--dæmpet);}
 tr.erlåst{display:none;}
+/* aflyst afgang — vises, men kan ikke bruges */
+tbody tr.aflyst td{opacity:.5;}
+tbody tr.aflyst .afg b,tbody tr.aflyst .sted,tbody tr.aflyst .skift{
+  text-decoration:line-through;}
+.aflystmærkat{color:var(--aflyst);font-weight:600;
+  text-decoration:none;display:inline-block;}
+/* den tidligere afgang der giver luft ved et stramt skifte */
+.afg em.luft{font-style:normal;color:var(--god);font-weight:600;margin-left:5px;}
 tr.valgbar{cursor:pointer;}
 tr.valgbar:hover td{background:#f4f7fa;}
 
@@ -552,6 +560,24 @@ function artAf(p){
 const produktAf = b => Array.isArray(b.Product)?(b.Product[0]||{}):(b.Product||{});
 const tidAf = (p,rt) => rt ? tilDato(p.rtDate||p.date,p.rtTime||p.time) : tilDato(p.date,p.time);
 
+/* Aflysninger står IKKE i ét felt. Rejseplanen sætter dem tre steder:
+   på selve benet, på Origin (cancelledDeparture) og på Destination
+   (cancelledArrival) — og desuden som en note med nøglen
+   text.realtime.journey.cancelled. Vi kigger alle steder, for
+   overser man dem, viser tavlen aflyste tog som brugbare.          */
+function erAflyst(objekt){
+  if(!objekt) return false;
+  if(objekt.cancelled === true || objekt.cancelled === "true") return true;
+  if(objekt.cancelledDeparture === true || objekt.cancelledArrival === true) return true;
+  const n = objekt.Notes && objekt.Notes.Note;
+  const noter = Array.isArray(n) ? n : (n ? [n] : []);
+  return noter.some(x => x && (x.cancelled === true || x.cancelled === "true"
+    || String(x.key||"").indexOf("cancelled") > -1));
+}
+function benAflyst(b){
+  return erAflyst(b) || erAflyst(b.Origin) || erAflyst(b.Destination);
+}
+
 function tolkBen(trip){
   const alle=(trip.LegList&&trip.LegList.Leg)||[];
   const ben=(Array.isArray(alle)?alle:[alle]).filter(b => b.type!=="WALK" && b.Product);
@@ -568,8 +594,10 @@ function tolkBen(trip){
   if(!afgang||!ankomst) return null;
   /* to ben betyder et skift undervejs — typisk H til Ballerup og
      videre med C. Det er ofte mere plads, selv om tiden er den samme. */
+  const aflyst = erAflyst(trip) || ben.some(benAflyst);
+
   let videre = null;
-  if(ben.length === 2){
+  if(ben.length === 2 && !aflyst){
     const p2 = produktAf(ben[1]);
     const ank1 = tidAf(ben[0].Destination,true) || tidAf(ben[0].Destination,false);
     const afg2 = tidAf(ben[1].Origin,true)      || tidAf(ben[1].Origin,false);
@@ -584,7 +612,7 @@ function tolkBen(trip){
     linje: p.line || (b.name||"").replace(/^(Bus|S-tog|Letbane)\s+/i,"").trim(),
     art: artAf(p), planlagt: planlagt, afgang: afgang, ankomst: ankomst,
     forsinkelse: minutter(planlagt,afgang),
-    aflyst: b.cancelled === true || sidsteBen.cancelled === true,
+    aflyst: aflyst,
     videre: videre
   };
 }
@@ -684,10 +712,13 @@ function erLåstRække(r){
 function kobl(rute, et, to_, nu, varsel){
   const ud=[];
   et.forEach(a => {
-    if(a.aflyst) return;
     if(a.afgang < nu) return;                          // den er kørt
     if(rute.linjer && !rute.linjer.some(l =>
         String(a.linje).toUpperCase() === l.toUpperCase())) return;
+
+    /* En aflyst afgang kobles stadig — på de planlagte tider — så den
+       kan vises overstreget dér hvor den ville have hørt hjemme. Så
+       forstår du hullet i stedet for bare at se det.                */
     const grænse = new Date(a.ankomst.getTime() + rute.gangtid*60000);
     const mulige = to_.filter(x => !x.aflyst && x.afgang >= grænse);
     if(!mulige.length) return;
@@ -708,6 +739,7 @@ function kobl(rute, et, to_, nu, varsel){
       const vent = minutter(a.ankomst, b.afgang);
       ud.push({
         et:a, to:b, rute:rute, vent:vent,
+        aflyst: a.aflyst,
         rummelig: vent >= rute.gangtid + 3,
         knap: minutter(nu, a.afgang) < varsel,         // næppe til at nå hjemmefra
         afgang:a.afgang, planlagt:a.planlagt, forsinkelse:a.forsinkelse,
@@ -737,22 +769,38 @@ function grupper(liste){
     (kasser[n] = kasser[n] || []).push(r);
   });
 
-  /* Inden for en blok: behold kun den SENESTE afgang for hver
-     kombination af linjer. Tre letbaner op til samme tog er ren
-     ventetid på perronen — den tidligste findes i forvejen som sin
-     egen blok længere oppe, hvor den lander tidligere.            */
+  /* Inden for en blok: behold den SENESTE afgang for hver kombination
+     af linjer — tre letbaner op til samme tog er ren ventetid.
+     MEN: er den seneste stram, beholdes også den seneste RUMMELIGE.
+     Ved fire minutters skifte vælter den mindste forsinkelse dig, og
+     så vil du gerne se den afgang der giver luft.
+     Aflyste afgange beholdes altid — de forklarer hullet.          */
   Object.keys(kasser).forEach(n => {
-    const bedste = {};
+    const senest = {}, senestRummelig = {}, aflyste = [];
     kasser[n].forEach(r => {
+      if(r.aflyst){ aflyste.push(r); return; }
       const form = r.et.linje + "|" + r.to.linje + "|"
                  + (r.to.videre ? r.to.videre.linje : "");
-      if(!bedste[form] || r.afgang > bedste[form].afgang) bedste[form] = r;
+      if(!senest[form] || r.afgang > senest[form].afgang) senest[form] = r;
+      if(r.rummelig && (!senestRummelig[form]
+          || r.afgang > senestRummelig[form].afgang)) senestRummelig[form] = r;
     });
-    kasser[n] = Object.keys(bedste).map(k => bedste[k]);
+    const ud = [];
+    Object.keys(senest).forEach(form => {
+      ud.push(senest[form]);
+      const trygt = senestRummelig[form];
+      if(!senest[form].rummelig && trygt && trygt !== senest[form]){
+        trygt.medLuft = true;      // vises som det sikre alternativ
+        ud.push(trygt);
+      }
+    });
+    kasser[n] = ud.concat(aflyste);
   });
   return Object.keys(kasser)
     .map(k => kasser[k].sort((a,b) => {
-      /* H over Ballerup øverst — det er som regel den med plads */
+      /* aflyste nederst, H over Ballerup øverst blandt de brugbare */
+      const aa = a.aflyst ? 1 : 0, ba = b.aflyst ? 1 : 0;
+      if(aa !== ba) return aa - ba;
       const ah = a.to.videre ? 0 : 1, bh = b.to.videre ? 0 : 1;
       return (ah - bh) || (a.afgang - b.afgang);
     }))
@@ -811,7 +859,9 @@ function mærke(t,a){ const m=el("span","mærke "+a); m.textContent=t; return m;
 function tegnRække(r, nu, ulåselig){
   const tr = el("tr");
   if(erLåstRække(r)) tr.classList.add("erlåst");
-  if(!ulåselig){
+  if(r.aflyst) tr.classList.add("aflyst");
+  if(r.medLuft) tr.classList.add("medluft");
+  if(!ulåselig && !r.aflyst){
     tr.classList.add("valgbar");
     tr.title = "Tryk for at følge denne rejse";
     tr.addEventListener("click", () => sætLås(r));
@@ -822,11 +872,20 @@ function tegnRække(r, nu, ulåselig){
   const t1 = el("td","afg");
   const b1 = el("b"); b1.textContent = urTekst(r.afgang);
   const s1 = el("span");
-  const m = minutter(nu, r.afgang);
-  s1.textContent = m <= 0 ? "nu" : "om "+m+" min";
-  if(r.forsinkelse >= 1){
-    const e = el("em"); e.textContent = "+"+r.forsinkelse;
-    s1.appendChild(e);
+  if(r.aflyst){
+    s1.textContent = "aflyst";
+    s1.classList.add("aflystmærkat");
+  }else{
+    const m = minutter(nu, r.afgang);
+    s1.textContent = m <= 0 ? "nu" : "om "+m+" min";
+    if(r.forsinkelse >= 1){
+      const e = el("em"); e.textContent = "+"+r.forsinkelse;
+      s1.appendChild(e);
+    }
+    if(r.medLuft){
+      const l = el("em","luft"); l.textContent = "god tid";
+      s1.appendChild(l);
+    }
   }
   t1.appendChild(b1); t1.appendChild(s1);
   tr.appendChild(t1);
