@@ -333,6 +333,13 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .ingrad select{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit}
 .ingrad .fjern{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--muted);border-radius:9px}
 .ingrad .fjern:hover{background:var(--chip);color:var(--holiday)}
+/* Stjernen markerer hovedingrediensen — den vare retten vælges på, og
+   dermed den eneste hvis tilbud siger noget om retten som helhed.     */
+.ingrad .hoved{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--muted);border-radius:9px}
+.ingrad .hoved:hover{background:var(--chip)}
+.ingrad .hoved[aria-pressed="true"]{color:var(--mad)}
+.ingrad .hoved[aria-pressed="true"] svg{fill:var(--mad)}
+.inghint{font-size:13px;color:var(--muted);margin:2px 0 0}
 .tilfoej{margin-top:10px;font-size:14px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:7px;padding:8px 0}
 .tilfoej:hover{color:var(--ink)}
 .snart{padding:60px 20px;text-align:center;color:var(--muted)}
@@ -1565,6 +1572,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 
     <div class="gruppe">Ingredienser til indkøbslisten</div>
     <div id="r-ing"></div>
+    <div class="inghint">Stjernen markerer hovedingrediensen — den I vælger retten på. Der må gerne være flere.</div>
     <button class="tilfoej" id="r-ing-tilfoej">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       Tilføj ingrediens
@@ -2220,7 +2228,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.83.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.84.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3342,6 +3350,10 @@ function tegnIngRaekker(){
     '<div class="ingrad" data-n="'+n+'">'
     + '<div class="linje">'
     +   '<input type="text" class="i-navn" list="ing-forslag" placeholder="Ingrediens" value="'+esc(i.navn)+'">'
+    +   '<button class="hoved" type="button" aria-pressed="'+(i.hoved ? "true" : "false")+'" '
+    +     'aria-label="Hovedingrediens" title="Hovedingrediens">'
+    +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg>'
+    +   '</button>'
     +   '<button class="fjern" aria-label="Fjern"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
     + '</div>'
     + '<div class="linje">'
@@ -3360,11 +3372,22 @@ function laesIngRaekker(){
       navn: rad.querySelector(".i-navn").value.trim(),
       maengde: t === "" || isNaN(parseFloat(t)) ? null : parseFloat(t),
       enhed: rad.querySelector(".i-enhed").value || null,
-      kategori: rad.querySelector(".i-kategori").value
+      kategori: rad.querySelector(".i-kategori").value,
+      hoved: rad.querySelector(".hoved").getAttribute("aria-pressed") === "true"
     };
   });
 }
 document.getElementById("r-ing").addEventListener("click", ev => {
+  const h = ev.target.closest(".hoved");
+  if(h){
+    /* Læs rækkerne FØRST, ellers taber de andre stjerner deres tilstand
+       når listen tegnes forfra.                                        */
+    const n = Number(h.closest(".ingrad").dataset.n);
+    laesIngRaekker();
+    kladdeIng[n].hoved = !kladdeIng[n].hoved;
+    tegnIngRaekker();
+    return;
+  }
   const f = ev.target.closest(".fjern"); if(!f) return;
   laesIngRaekker();
   kladdeIng.splice(Number(f.closest(".ingrad").dataset.n), 1);
@@ -3372,7 +3395,7 @@ document.getElementById("r-ing").addEventListener("click", ev => {
 });
 document.getElementById("r-ing-tilfoej").onclick = () => {
   laesIngRaekker();
-  kladdeIng.push({navn:"", maengde:null, enhed:null, kategori:"koeb"});
+  kladdeIng.push({navn:"", maengde:null, enhed:null, kategori:"koeb", hoved:false});
   tegnIngRaekker();
   const rader = document.querySelectorAll("#r-ing .i-navn");
   if(rader.length) rader[rader.length-1].focus();
@@ -3392,8 +3415,8 @@ function aabnRetRed(id){
   document.getElementById("r-fremgang").value  = r ? (r.fremgangsmaade||"") : "";
   kladdeFrost = r ? (r.frost_lager || 0) : 0;
   tegnKladdeFrost();
-  kladdeIng = r ? ingredienserFor(id).map(i => ({navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori}))
-                : [{navn:"", maengde:null, enhed:null, kategori:"koeb"}];
+  kladdeIng = r ? ingredienserFor(id).map(i => ({navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori, hoved:!!i.hoved}))
+                : [{navn:"", maengde:null, enhed:null, kategori:"koeb", hoved:false}];
   tegnIngRaekker();
   kladdeBillede = { sti: r ? (r.billede_sti || "") : "", pos: r ? (r.billede_pos == null ? 50 : r.billede_pos) : 50,
                     nySti: "", gammelSti: r ? (r.billede_sti || "") : "" };
@@ -3562,7 +3585,7 @@ document.getElementById("retred-gem").onclick = async () => {
 
   if(rene.length){
     const { data: nye, error: f3 } = await sb.from("ingredienser").insert(
-      rene.map((i, n) => ({ret_id:retId, navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori, sortering:n}))
+      rene.map((i, n) => ({ret_id:retId, navn:i.navn, maengde:i.maengde, enhed:i.enhed, kategori:i.kategori, hoved:!!i.hoved, sortering:n}))
     ).select();
     if(f3){ faerdig(f3.message); return; }
     ingredienser.push(...nye);
