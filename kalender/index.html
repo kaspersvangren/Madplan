@@ -1081,6 +1081,14 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .tilret-linje{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.45}
 .tilret-intet{color:var(--muted);font-size:14px;padding:10px 2px;line-height:1.5}
 .tilret-top{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.45}
+/* Stjernen paa retkortet er en RIGTIG flex-kolonne, ikke noget der ligger
+   oven paa. Saa kan den hverken daekke navnet eller "sidst lavet", og
+   kortets hoejde passer sig selv.                                       */
+.retkort .tilbudstjerne{flex:none;align-self:center}
+.retkort .tilbudstjerne path{fill:#F6C453;stroke:#8A5A0B;stroke-width:1}
+.retkort .tilbudstjerne text{fill:#4A2E02;font-size:11px;font-weight:600}
+.retkort .tilbudstjerne text.kr{font-size:12px}
+html[data-theme="dark"] .retkort .tilbudstjerne path{fill:#D9A63C;stroke:#3A2606}
 /* Leveringslinjen: ÉN knap i stedet for seksten dage der ruller.
 
    BYGGET OM i 2.82.0. Første forsøg var et gitter med tre kolonner, hvor
@@ -2253,7 +2261,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.86.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.87.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -2918,6 +2926,7 @@ function saetFane(f){
   document.getElementById("today-btn").hidden  = !medHoved;
   document.getElementById("today-btn").textContent = kalender ? "I dag" : "Denne uge";
   ekstraTekst = "";
+  if(f === "kogebog" || f === "madplan") tilbudRetSikr(() => render());
   document.getElementById("soegerad").hidden   = f !== "kogebog";
   document.getElementById("todorad").hidden    = f !== "todo";
 
@@ -2964,6 +2973,8 @@ const filtre = { vegetar:"fri", nem:"fri", agnes_kan_lide:"fri" };   // fri | kr
 const FILTERNAVNE = { vegetar:"Veg.", nem:"Nem", agnes_kan_lide:"Agnes" };
 let visTilbehoer = false;
 let visKunFrost = false;
+let visKunTilbud = false;
+let vaelgKunTilbud = false;
 
 function ingredienserFor(retId){
   return ingredienser.filter(i => i.ret_id === retId)
@@ -3094,13 +3105,15 @@ function tegnFiltre(){
       + (tegn[filtre[n]] ? '<span class="tegn">'+tegn[filtre[n]]+'</span>' : '')
       + FILTERNAVNE[n] + '</button>').join("")
     + '<button class="fchip" data-tilbehoer="1" data-stand="'+(visTilbehoer?"krav":"fri")+'" title="Vis tilbehør i stedet for retter">Tilbehør</button>'
-    + '<button class="fchip ikon" data-frost="1" data-stand="'+(visKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>';
+    + '<button class="fchip ikon" data-frost="1" data-stand="'+(visKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>'
+    + '<button class="fchip ikon" data-tilbud="1" data-stand="'+(visKunTilbud?"krav":"fri")+'" title="Kun retter med tilbud på hovedingrediensen" aria-label="Kun retter med tilbud">★</button>';
   void naeste;
 }
 document.getElementById("filtre").addEventListener("click", ev => {
   const f = ev.target.closest("[data-filter]");
   const t = ev.target.closest("[data-tilbehoer]");
   const fr = ev.target.closest("[data-frost]");
+  const tb = ev.target.closest("[data-tilbud]");
   if(f){
     const naeste = { fri:"krav", krav:"uden", uden:"fri" };
     filtre[f.dataset.filter] = naeste[filtre[f.dataset.filter]];
@@ -3108,6 +3121,8 @@ document.getElementById("filtre").addEventListener("click", ev => {
     visTilbehoer = !visTilbehoer;
   } else if(fr){
     visKunFrost = !visKunFrost;
+  } else if(tb){
+    visKunTilbud = !visKunTilbud;
   } else return;
   tegnFiltre();
   render();
@@ -3127,6 +3142,7 @@ function filtreredeRetter(){
   return retter.filter(r => {
     if(!!r.er_tilbehoer !== visTilbehoer) return false;
     if(visKunFrost && frostLager(r.id) === 0) return false;
+    if(visKunTilbud && !tilbudRetKort.has(r.id)) return false;
     for(const n of Object.keys(FILTERNAVNE)){
       if(filtre[n] === "krav" && !r[n]) return false;
       if(filtre[n] === "uden" &&  r[n]) return false;
@@ -3137,7 +3153,15 @@ function filtreredeRetter(){
       if(!iNavn && !iIng) return false;
     }
     return true;
-  }).sort((a,b) => a.navn.localeCompare(b.navn, "da"));
+  }).sort((a,b) => {
+    /* Med tilbudsfilteret slaaet til er beloebet det man vaelger efter,
+       saa den staerkeste handel skal staa oeverst. Ellers alfabetisk. */
+    if(visKunTilbud){
+      const d = (tilbudRetKort.get(b.id) || 0) - (tilbudRetKort.get(a.id) || 0);
+      if(d) return d;
+    }
+    return a.navn.localeCompare(b.navn, "da");
+  });
 }
 
 function renderKogebog(){
@@ -3160,6 +3184,7 @@ function renderKogebog(){
          +   '<span class="under">'+marker+'<span>'+ing.length+' ingredienser</span></span>'
          + '</span>'
          + '<span class="naar">'+sidstTekst+'</span>'
+         + tilbudStjerne(r.id)
          + '</button>';
   }).join("") + '</div>';
 }
@@ -4002,6 +4027,9 @@ function aabnVaelger(tilstand){
   tegnVaelgFiltre();
   tegnVaelgListe();
   show("vaelg-back");
+  /* Uden await: listen staar med det samme, og stjernerne kommer naar
+     priserne lander et par sekunder senere. */
+  tilbudRetSikr(() => { if(vaelgTilstand) tegnVaelgListe(); });
 }
 
 function tegnVaelgFiltre(){
@@ -4012,12 +4040,15 @@ function tegnVaelgFiltre(){
       '<button class="fchip" data-vfilter="'+n+'" data-stand="'+vaelgFiltre[n]+'" title="'+HELE[n]+'">'
       + (tegn[vaelgFiltre[n]] ? '<span class="tegn">'+tegn[vaelgFiltre[n]]+'</span>' : '')
       + FILTERNAVNE[n] + '</button>').join("")
-    + '<button class="fchip ikon" data-vfrost="1" data-stand="'+(vaelgKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>';
+    + '<button class="fchip ikon" data-vfrost="1" data-stand="'+(vaelgKunFrost?"krav":"fri")+'" title="Kun retter der står i fryseren" aria-label="Kun retter der står i fryseren">❄</button>'
+    + '<button class="fchip ikon" data-vtilbud="1" data-stand="'+(vaelgKunTilbud?"krav":"fri")+'" title="Kun retter med tilbud på hovedingrediensen" aria-label="Kun retter med tilbud">★</button>';
 }
 document.getElementById("vaelg-filtre").addEventListener("click", ev => {
   const f  = ev.target.closest("[data-vfilter]");
   const fr = ev.target.closest("[data-vfrost]");
+  const tb = ev.target.closest("[data-vtilbud]");
   if(fr){ vaelgKunFrost = !vaelgKunFrost; }
+  else if(tb){ vaelgKunTilbud = !vaelgKunTilbud; }
   else if(f){
     const naeste = { fri:"krav", krav:"uden", uden:"fri" };
     vaelgFiltre[f.dataset.vfilter] = naeste[vaelgFiltre[f.dataset.vfilter]];
@@ -4037,6 +4068,7 @@ function tegnVaelgListe(){
     if(!!r.er_tilbehoer !== tilbehoer) return false;
     if(!tilbehoer){
       if(vaelgKunFrost && frostLager(r.id) === 0) return false;
+      if(vaelgKunTilbud && !tilbudRetKort.has(r.id)) return false;
       for(const n of Object.keys(FILTERNAVNE)){
         if(vaelgFiltre[n] === "krav" && !r[n]) return false;
         if(vaelgFiltre[n] === "uden" &&  r[n]) return false;
@@ -4044,7 +4076,13 @@ function tegnVaelgListe(){
     }
     if(vaelgSoeg && !r.navn.toLowerCase().includes(vaelgSoeg)) return false;
     return true;
-  }).sort((a,b) => a.navn.localeCompare(b.navn,"da"));
+  }).sort((a,b) => {
+    if(vaelgKunTilbud){
+      const d = (tilbudRetKort.get(b.id) || 0) - (tilbudRetKort.get(a.id) || 0);
+      if(d) return d;
+    }
+    return a.navn.localeCompare(b.navn,"da");
+  });
 
   const el = document.getElementById("vaelg-liste");
 
@@ -4067,7 +4105,8 @@ function tegnVaelgListe(){
     return '<button class="retkort'+(valgt?" valgt":"")+'" data-vaelg="'+r.id+'"><span style="flex:1;min-width:0">'
          +   '<span class="navn">'+(valgt?"✓ ":"")+esc(r.navn)+'</span>'
          +   (marker ? '<span class="under">'+marker+'</span>' : '')
-         + '</span><span class="naar">'+(tilbehoer?"":naar)+'</span></button>';
+         + '</span><span class="naar">'+(tilbehoer?"":naar)+'</span>'
+         + (tilbehoer ? "" : tilbudStjerne(r.id)) + '</button>';
   }).join("");
 }
 
@@ -9948,7 +9987,7 @@ function tilbudRetKilder(){
     const n = String(i.navn || "").toLowerCase().trim();
     if(!n) return;
     if(!ud.has(n)) ud.set(n, { navn: i.navn, brug: [] });
-    ud.get(n).brug.push({ ret: r.navn, maengde: i.maengde, enhed: i.enhed });
+    ud.get(n).brug.push({ retId: r.id, ret: r.navn, maengde: i.maengde, enhed: i.enhed });
   });
   return ud;
 }
@@ -10046,13 +10085,50 @@ function tilbudRetSamle(){
     k.brug.forEach(b => {
       const kr = tilbudRetKroner(fund, b);
       if(kr == null || kr < TILRET_KR) return;
-      if(!ud.has(b.ret)) ud.set(b.ret, { ret: b.ret, ialt: 0, dele: [] });
-      const r = ud.get(b.ret);
+      if(!ud.has(b.retId)) ud.set(b.retId, { retId: b.retId, ret: b.ret, ialt: 0, dele: [] });
+      const r = ud.get(b.retId);
       r.ialt += kr;
       r.dele.push({ vare: k.navn, kr, fund });
     });
   });
   return [...ud.values()].sort((a, b) => b.ialt - a.ialt);
+}
+
+/* Opslaget kortene bruger: ret-id -> kroner. Bygges om naar priserne
+   lander, saa selve tegningen bare er et Map-opslag. */
+let tilbudRetKort = new Map();
+let tilbudRetHentetFor = null;
+
+function tilbudRetKortOpdater(){
+  tilbudRetKort = new Map();
+  try{ tilbudRetSamle().forEach(r => tilbudRetKort.set(r.retId, r.ialt)); }
+  catch(e){ /* mangler der data, staar kortene bare uden maerke */ }
+}
+
+/* Henter EN gang pr. leveringsdag. Skifter dagen, hentes der forfra —
+   priserne haenger paa den dag varerne leveres, ikke paa i dag.
+   Fejler tavst: et manglende maerke maa aldrig spaerre planlaegningen. */
+function tilbudRetSikr(naarKlar){
+  const dag = nemLeveringsDag();
+  if(tilbudRetHenter || tilbudRetHentetFor === dag) return;
+  tilbudRetHenter = true;
+  tilbudRetHent()
+    .then(() => { tilbudRetHentetFor = dag; tilbudRetKortOpdater(); })
+    .catch(() => {})
+    .finally(() => { tilbudRetHenter = false; if(naarKlar) naarKlar(); });
+}
+
+/* Beloebet rundes NED. Staar der 118, skal man ikke kunne opdage at det
+   var 117,60 — et maerke maa aldrig love mere end der er. */
+function tilbudStjerne(retId){
+  const kr = tilbudRetKort.get(retId);
+  if(kr == null) return "";
+  return '<svg class="tilbudstjerne" width="58" height="58" viewBox="0 0 62 62" role="img"'
+    + ' aria-label="Tilbud, spar ' + Math.floor(kr) + ' kroner">'
+    + '<path d="M31 2l5.2 6.6 8.1-2.6 1.4 8.4 8.4 1.4-2.6 8.1L58 31l-6.5 5.1 2.6 8.1-8.4 1.4-1.4 8.4-8.1-2.6L31 58l-5.2-6.6-8.1 2.6-1.4-8.4-8.4-1.4 2.6-8.1L4 31l6.5-5.1-2.6-8.1 8.4-1.4 1.4-8.4 8.1 2.6z"/>'
+    + '<text x="31" y="27" text-anchor="middle">spar</text>'
+    + '<text x="31" y="41" text-anchor="middle" class="kr">' + Math.floor(kr) + ',-</text>'
+    + '</svg>';
 }
 
 async function tilbudRetHent(){
@@ -10076,6 +10152,7 @@ function tilbudRetTegn(){
     krop.innerHTML = '<div class="tilret-intet">Henter priser…</div>';
     return;
   }
+  tilbudRetKortOpdater();
   const raekker = tilbudRetSamle();
   top.textContent = "Leveres " + nemDato(nemLeveringsDag())
     + " · mindst " + TILRET_PCT + " % og " + TILRET_KR + " kr."
