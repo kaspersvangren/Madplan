@@ -2261,7 +2261,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.87.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.88.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7191,11 +7191,19 @@ async function nemHentPriser(){
   const ider = [];
   nemAlleLinjer().forEach(l => {
     if(l.kort && l.kort.produkt_id) ider.push(String(l.kort.produkt_id));
-    /* Alternativerne slås op med det samme, ikke først når man åbner
+    /* Alle muligheder slås op med det samme, ikke først når man åbner
        bytte-arket. Ellers ville priserne stå tomme netop i det øjeblik
        man skal sammenligne dem — og det er hele pointen med listen.
-       Det koster ingen ekstra kald: nemlig-tjek tager hold à 20. */
-    nemAlternativer(nemFind(l.navn) || l.kort).forEach(a => ider.push(a.produkt_id));
+       Det koster ingen ekstra kald: nemlig-tjek tager hold à 20.
+
+       nemMULIGHEDER, ikke nemAlternativer: listen skal indeholde
+       STANDARDVAREN OGSÅ. Er linjen byttet for ugen, peger l.kort på
+       varianten, og så var standardens varenummer ikke med i opslaget
+       nogen steder. Prislisten ERSTATTES ved hvert kald, så standardens
+       pris forsvandt i samme øjeblik man byttede — og kom aldrig igen,
+       fordi den heller ikke var med næste gang. Grundlaget tages fra
+       nemFind(), altså den GEMTE vare, præcis som nemBytAaben gør. */
+    nemMuligheder(nemFind(l.navn) || l.kort).forEach(m => ider.push(m.produkt_id));
   });
   const unikke = [...new Set(ider)];
   if(!unikke.length){ nemArk.henter = false; return; }
@@ -7209,13 +7217,18 @@ async function nemHentPriser(){
        dette svar, så uden det her forsvandt de i det øjeblik priserne kom
        hjem: varekortet faldt tilbage på navn og varenummer alene, uden
        pris, mærke og beskrivelse. */
+    /* Arket kan vaere lukket imens: nem-luk saetter nemArk = null. Uden
+       den her kastede tildelingen, catch'en kastede EN GANG TIL paa
+       samme null, og resten af nemAabn blev aldrig koert. Det ramte
+       netop naar man gik ud og ind med det samme. */
+    if(!nemArk) return;
     nemArk.priser     = data.fundet || {};
     nemArk.findesIkke = data.findesIkke || [];
     nemGratisPriserIgen();
   }catch(err){
-    nemArk.fejl = "Kunne ikke hente priser: " + (err.message || err);
+    if(nemArk) nemArk.fejl = "Kunne ikke hente priser: " + (err.message || err);
   }
-  nemArk.henter = false;
+  if(nemArk) nemArk.henter = false;
 }
 
 /* ---------- Det Nemlig forærer væk ----------
