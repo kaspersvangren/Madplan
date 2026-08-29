@@ -1073,6 +1073,14 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 #nemvariant-back{z-index:62}   /* over nemvalg (60), under de øvrige */
 #nemengang-back{z-index:59}    /* over indkøbsarket, under nemvalg (60) — som kan åbnes herfra */
 #nemtid-back{z-index:59}       /* samme niveau: åbnes fra indkøbsarket, åbner intet selv */
+/* Tilbudsretter: eget ark fra menuen. Rører intet af det bestående —
+   hverken indkøbsarket, planlægningen eller varekartoteket.            */
+.tilret-ret{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.tilret-ret h3{margin:0 0 2px;font-size:16px}
+.tilret-spar{color:var(--mad);font-weight:600}
+.tilret-linje{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.45}
+.tilret-intet{color:var(--muted);font-size:14px;padding:10px 2px;line-height:1.5}
+.tilret-top{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.45}
 /* Leveringslinjen: ÉN knap i stedet for seksten dage der ruller.
 
    BYGGET OM i 2.82.0. Første forsøg var et gitter med tre kolonner, hvor
@@ -1811,6 +1819,10 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       Nemlig-varer
       <span class="stand" id="nemlig-stand">—</span>
     </button>
+    <button class="menu-row" id="menu-tilbudret">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4L12 22l-9-9V4a1 1 0 0 1 1-1h9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
+      Tilbud på retter
+    </button>
     <!-- Købshistorikken er sit EGET site, ikke et ark i appen: den er til
          at sidde og grave i, ikke til at bruge midt i et indkøb. Derfor et
          almindeligt link — så kan det åbnes i en ny fane, kopieres og
@@ -2045,6 +2057,19 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Tilbud på retter -->
+<div class="backdrop" id="tilbudret-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Tilbud på retter</h2>
+    <div class="meta" id="tilbudret-meta">Retter hvor hovedingrediensen er nede i pris.</div>
+    <div class="tilret-top" id="tilbudret-top"></div>
+    <div id="tilbudret-krop"></div>
+    <div class="actions">
+      <button class="btn" id="tilbudret-luk">Luk</button>
+    </div>
+  </div>
+</div>
+
 <!-- Skraldedatoer -->
 <div class="backdrop" id="skrald-back">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sk-h2">
@@ -2228,7 +2253,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.85.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.86.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -9892,6 +9917,204 @@ document.addEventListener("focusin", ev => {
   if(ev.target.matches("input, textarea, select")) setTimeout(tastaturSync, 300);
 });
 document.addEventListener("focusout", () => setTimeout(tastaturSync, 300));
+
+/* ================= Tilbud på retter =================
+   Første udgave, bevidst holdt UDEN FOR planlægningen: et eget ark fra
+   menuen, som ikke rører layout eller opførsel nogen andre steder. Formålet
+   er at se om signalet er noget værd, før det syes ind i retvælgeren.
+
+   Reglen er hans: mindst TILRET_PCT procent OG mindst TILRET_KR kroner,
+   målt på hvad varen NORMALT koster mod ugens billigste — ikke på det
+   Nemlig skilter med. Det er forskellen der fanger hans øko-eksempel:
+   500 g øko-kød ned fra 80 til 55 sparer 25 på papiret, men er stadig
+   dyrere end den almindelige til 50, og så er der intet at hente.
+
+   Mængderabat ("2 for 44") tælles IKKE med. Den udløses kun hvis man
+   køber det krævede antal, og det er en anden slags beslutning.        */
+const TILRET_PCT = 10;
+const TILRET_KR  = 25;
+
+let tilbudRetPriser = {};
+let tilbudRetHenter = false;
+
+/* Hovedingredienserne, og hvilke retter de bærer. Tilbehør holdes ude:
+   en ret vælges ikke på sine kartofler. */
+function tilbudRetKilder(){
+  const ud = new Map();
+  ingredienser.forEach(i => {
+    if(!i.hoved) return;
+    const r = retter.find(x => x.id === i.ret_id);
+    if(!r || r.er_tilbehoer) return;
+    const n = String(i.navn || "").toLowerCase().trim();
+    if(!n) return;
+    if(!ud.has(n)) ud.set(n, { navn: i.navn, brug: [] });
+    ud.get(n).brug.push({ ret: r.navn, maengde: i.maengde, enhed: i.enhed });
+  });
+  return ud;
+}
+
+/* Alle produkter under en vare — standarden og dens varianter. Tilbuddet
+   kan ligge på en variant: ugens største fund var Okseculotte, ikke
+   standardvaren. */
+function tilbudRetProdukter(vareNavn){
+  const v = nemFind(vareNavn);
+  if(!v || !v.produkt_id) return [];
+  const std = {
+    produkt_id: String(v.produkt_id),
+    produkt_navn: v.produkt_navn || v.navn,
+    pakke_maengde: v.pakke_maengde ?? null,
+    pakke_enhed: v.pakke_enhed || "",
+    styk: v.styk ?? null
+  };
+  return [std, ...nemAlternativer(v)];
+}
+
+/* Prisen pr. GRUNDENHED (g eller ml), så pakker af forskellig størrelse
+   kan sammenlignes. Kan varen ikke måles, regnes der pr. pakke i stedet,
+   og så sammenlignes kun pakker med pakker. */
+function tilbudRetEnhed(p, kr){
+  if(kr == null) return null;
+  const grund = nemTilGrund(p.pakke_maengde, p.pakke_enhed);
+  if(grund && grund > 0) return { basis: nemFamilie(p.pakke_enhed), pris: kr / grund };
+  return { basis: "pakke", pris: kr };
+}
+
+/* Normalprisen er nu-prisen plus det der spares. Er der ingen kampagne,
+   ER nu-prisen normalprisen. */
+function tilbudRetNormal(pris){
+  const k = pris && pris.kampagne;
+  if(!k || k.slags === "mange" || k.slags === "gratis") return pris ? pris.pris : null;
+  if(k.foer != null) return k.foer;
+  if(k.spar != null && pris.pris != null) return pris.pris + k.spar;
+  return pris.pris;
+}
+
+/* Regnestykket for ÉN vare. Returnerer null når der intet er at sige. */
+function tilbudRetVare(vareNavn){
+  const produkter = tilbudRetProdukter(vareNavn);
+  if(!produkter.length) return null;
+
+  let bedstNu = null, bedstNormal = null;
+  produkter.forEach(p => {
+    const pris = tilbudRetPriser[String(p.produkt_id)];
+    if(!pris || pris.pris == null) return;
+    if(pris.paaLager === false) return;           // udsolgt er ikke et tilbud
+    const nu = tilbudRetEnhed(p, pris.pris);
+    const no = tilbudRetEnhed(p, tilbudRetNormal(pris));
+    if(nu && (!bedstNu || nu.pris < bedstNu.pris))
+      bedstNu = { ...nu, p, kampagne: pris.kampagne || null };
+    if(no && (!bedstNormal || no.pris < bedstNormal.pris)) bedstNormal = no;
+  });
+  if(!bedstNu || !bedstNormal) return null;
+  /* Pakker og kilopriser må ikke blandes: 40 kr sparet pr. kilo betyder
+     noget helt andet end 40 kr sparet pr. pakke. */
+  if(bedstNu.basis !== bedstNormal.basis) return null;
+
+  const sparPrEnhed = bedstNormal.pris - bedstNu.pris;
+  if(!(sparPrEnhed > 0)) return null;
+  const pct = (sparPrEnhed / bedstNormal.pris) * 100;
+  if(pct < TILRET_PCT) return null;
+
+  return { sparPrEnhed, pct, basis: bedstNu.basis, vinder: bedstNu.p,
+           kampagne: bedstNu.kampagne };
+}
+
+/* Hvad sparer man så på DENNE ret? Behovet lægges om til samme grundlag
+   som besparelsen er regnet i. Har opskriften ingen mængde, regnes der
+   med én pakke — samme antagelse som indkøbslisten allerede gør. */
+function tilbudRetKroner(fund, brug){
+  const p = fund.vinder;
+  if(fund.basis === "pakke"){
+    const a = (brug.maengde == null) ? 1
+      : nemAntal(brug.maengde, brug.enhed, p.pakke_maengde, p.pakke_enhed, p).antal;
+    return fund.sparPrEnhed * a;
+  }
+  const pakke = nemTilGrund(p.pakke_maengde, p.pakke_enhed);
+  if(brug.maengde == null) return pakke ? fund.sparPrEnhed * pakke : null;
+  const behov = nemTilGrund(brug.maengde, brug.enhed);
+  if(behov) return fund.sparPrEnhed * behov;
+  /* Enheden kan ikke regnes om — så gå gennem antal pakker i stedet. */
+  const a = nemAntal(brug.maengde, brug.enhed, p.pakke_maengde, p.pakke_enhed, p);
+  return (pakke && !a.gaet) ? fund.sparPrEnhed * pakke * a.antal : null;
+}
+
+function tilbudRetSamle(){
+  const ud = new Map();
+  tilbudRetKilder().forEach((k, noegle) => {
+    const fund = tilbudRetVare(k.navn);
+    if(!fund) return;
+    k.brug.forEach(b => {
+      const kr = tilbudRetKroner(fund, b);
+      if(kr == null || kr < TILRET_KR) return;
+      if(!ud.has(b.ret)) ud.set(b.ret, { ret: b.ret, ialt: 0, dele: [] });
+      const r = ud.get(b.ret);
+      r.ialt += kr;
+      r.dele.push({ vare: k.navn, kr, fund });
+    });
+  });
+  return [...ud.values()].sort((a, b) => b.ialt - a.ialt);
+}
+
+async function tilbudRetHent(){
+  const kilder = tilbudRetKilder();
+  const ider = [];
+  kilder.forEach(k => tilbudRetProdukter(k.navn).forEach(p => ider.push(String(p.produkt_id))));
+  const unikke = [...new Set(ider)];
+  if(!unikke.length) return;
+  const { data, error } = await sb.functions.invoke("nemlig-tjek",
+    { body: { ider: unikke, levering: nemLevering() } });
+  if(error) throw error;
+  tilbudRetPriser = (data && data.fundet) || {};
+}
+
+function tilbudRetTegn(){
+  const krop = document.getElementById("tilbudret-krop");
+  const top  = document.getElementById("tilbudret-top");
+  if(!krop) return;
+  if(tilbudRetHenter){
+    top.textContent = "";
+    krop.innerHTML = '<div class="tilret-intet">Henter priser…</div>';
+    return;
+  }
+  const raekker = tilbudRetSamle();
+  top.textContent = "Leveres " + nemDato(nemLeveringsDag())
+    + " · mindst " + TILRET_PCT + " % og " + TILRET_KR + " kr."
+    + " Mængderabat tælles ikke med.";
+  if(!raekker.length){
+    krop.innerHTML = '<div class="tilret-intet">Ingen af jeres retter er nede i pris i denne uge.'
+      + ' Prøv igen når leveringsdagen skifter — priserne hænger på den dag,'
+      + ' varerne leveres.</div>';
+    return;
+  }
+  krop.innerHTML = raekker.map(r =>
+      '<div class="tilret-ret">'
+    +   '<h3>' + esc(r.ret) + '</h3>'
+    +   '<div class="tilret-spar">spar ' + nemKr(r.ialt) + ' kr</div>'
+    +   r.dele.map(d =>
+          '<div class="tilret-linje">' + esc(d.vare) + ' · '
+          + esc(d.fund.vinder.produkt_navn || "") + ' · '
+          + Math.round(d.fund.pct) + ' % · ' + nemKr(d.kr) + ' kr'
+          + '</div>').join("")
+    + '</div>').join("");
+}
+
+document.getElementById("menu-tilbudret").onclick = async () => {
+  hide("menu-back");
+  tilbudRetHenter = true;
+  tilbudRetTegn();
+  show("tilbudret-back");
+  try{
+    await tilbudRetHent();
+  }catch(err){
+    tilbudRetHenter = false;
+    document.getElementById("tilbudret-krop").innerHTML =
+      '<div class="tilret-intet">Kunne ikke hente priser: ' + esc(err.message || String(err)) + '</div>';
+    return;
+  }
+  tilbudRetHenter = false;
+  tilbudRetTegn();
+};
+document.getElementById("tilbudret-luk").onclick = () => hide("tilbudret-back");
 
 const show = id => {
   const back = document.getElementById(id);
