@@ -2228,7 +2228,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.84.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.85.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5863,8 +5863,23 @@ function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
   if(behov == null) return { antal:1, gaet:true };
   const e1 = (enhed || "").toLowerCase().trim();
 
-  const traef = nemStykliste(kort).find(x => x.enhed === e1);
+  const stykliste = nemStykliste(kort);
+  const traef = stykliste.find(x => x.enhed === e1);
   if(traef) return { antal: Math.max(1, Math.ceil(behov / traef.antal)), gaet:false };
+
+  /* Samme ord fandtes ikke, men samme FAMILIE kan gøre det: står der
+     800 g på produktet, og opskriften siger 1 kg, er det det samme
+     regnestykke. Uden det her faldt osso buco tilbage på 1 og et gæt,
+     selvom begge tal var rigtige. Det præcise ord prøves altid FØRST,
+     så en eksplicit linje aldrig kan blive overtrumfet.               */
+  const fBehov = nemFamilie(e1);
+  if(fBehov){
+    for(const x of stykliste){
+      if(nemFamilie(x.enhed) !== fBehov) continue;
+      const a = nemTilGrund(behov, e1), b = nemTilGrund(x.antal, x.enhed);
+      if(a && b) return { antal: Math.max(1, Math.ceil(a / b)), gaet:false };
+    }
+  }
 
   if(!pakkeMaengde) return { antal:1, gaet:true };
   const f1 = nemFamilie(enhed), f2 = nemFamilie(pakkeEnhed);
@@ -8720,10 +8735,25 @@ function nemStykTegn(){
     hint.textContent = "Valgfrit. Udfyld kun hvis opskrifterne måler i noget "
       + "andet end pakkestørrelsen — fx “2 dåser” eller “3 pakker”.";
   } else {
+    const standardEnhed = (document.getElementById("nemvalg-enhed").value || "").toLowerCase();
     const daekket = new Set(raekker.map(r => r.enhed));
-    const mangler = brugte.filter(e => !daekket.has(e) && e !== (document.getElementById("nemvalg-enhed").value || "").toLowerCase());
+    const mangler = brugte.filter(e => !daekket.has(e) && e !== standardEnhed);
+
+    /* Varianterne har hver deres omregning, og de blev IKKE talt med før.
+       Beskeden kunne derfor sige "Alle er dækket", mens fire varianter
+       stadig manglede — og man ledte forgæves efter hvad der var galt.  */
+    const varianter = (nemValg && Array.isArray(nemValg.alt) ? nemValg.alt : []);
+    const halte = varianter.filter(a => {
+      const egne = new Set((Array.isArray(a.styk) ? a.styk : []).map(x => String(x.enhed || "").toLowerCase()));
+      const egenEnhed = String(a.pakke_enhed || "").toLowerCase();
+      return brugte.some(e => !egne.has(e) && e !== egenEnhed
+                              && !(nemFamilie(e) && nemFamilie(e) === nemFamilie(egenEnhed)));
+    }).length;
+
     hint.textContent = "Opskrifterne måler denne i " + brugte.join(" og ") + "."
-      + (mangler.length ? " Mangler stadig: " + mangler.join(", ") + "." : " Alle er dækket.");
+      + (mangler.length ? " Mangler stadig: " + mangler.join(", ") + "." : " Standardvaren er dækket.")
+      + (halte ? " " + halte + (halte === 1 ? " variant mangler" : " varianter mangler")
+                 + " stadig sin egen omregning." : "");
   }
 }
 
