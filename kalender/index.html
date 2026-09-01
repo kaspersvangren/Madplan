@@ -12,6 +12,18 @@
      Nu sætter saetTema() farven direkte, og en eksplicit theme-color
      slår både manifestet og mediebetingelserne. -->
 <meta name="theme-color" id="temafarve" content="#F2F1ED">
+<!-- Farven skal vaere rigtig FOER foerste tegning. Den installerede app
+     ser ud til kun at laese theme-color ved opstart (Chrome aendrede
+     haandteringen af statuslinjen i sommeren 2026), og saa hjaelper det
+     ikke at rette den senere i scriptet. Derfor et lille synkront script
+     her, foer noget som helst er tegnet. Samme localStorage-noegle som
+     resten af appen bruger. -->
+<script>
+try{
+  if(localStorage.getItem("kalender-tema") === "dark")
+    document.getElementById("temafarve").setAttribute("content", "#121412");
+}catch(e){}
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hverdag">
@@ -2266,7 +2278,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.89.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.89.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
