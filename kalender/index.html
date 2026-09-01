@@ -1198,6 +1198,20 @@ html[data-theme="dark"] .retkort .tilbudstjerne path{fill:#D9A63C;stroke:#3A2606
 .nemogsaa.udgaar .rest{flex:none}
 .nemogsaa.udgaar::before{content:"";flex:none;width:6px;height:6px;
   border-radius:999px;background:var(--holiday)}
+/* VIP-mærket. Gaverne fra nemlig.com/mit-nemlig/nemlig-vip står i samme
+   afsnit som de almindelige gratis varer, og uden et mærke kan de to slags
+   ikke skelnes. Ferie-guld er valgt fordi den findes i begge temaer og
+   hverken er tilbudsgrøn eller advarselsrød. */
+.nemvip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;
+  color:var(--ferie);border:1px solid var(--ferie);border-radius:999px;
+  padding:0 5px;margin-left:6px;vertical-align:1px;
+  background:color-mix(in srgb, var(--ferie) 12%, transparent)}
+/* En gave der ikke kan komme med den valgte leveringsdag. Den SKJULES IKKE:
+   det er netop den slags man løser ved at flytte dagen, og det kan man kun
+   hvis man kan se at der er noget at flytte efter. */
+.nemrad.vipspaerret{opacity:.62}
+.nemrad.vipspaerret .vipgrund{display:block;font-size:12px;color:var(--holiday);
+  margin-top:2px;font-weight:600}
 /* Linjesummen står tættere på og lidt kraftigere end stykprisen — det er
    den man leder efter, når der er skruet op. */
 .nemrad .under.sum{color:var(--ink);font-variant-numeric:tabular-nums;margin-top:1px}
@@ -2278,7 +2292,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.89.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.90.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6248,6 +6262,9 @@ async function nemHentTider(){
          frem for at vise udsolgt-status for en dag der ikke kan vælges. */
       nemLeveringSaet(nemTider.dage[0].dato);
     }
+    /* Gaverne hentes forfra med det rigtige tidsrum: det er netop
+       tidsrummet der afgør om en gave kan komme med. */
+    if(nemArk) nemHentVip();
     if(nemArk){ nemTegn(); await nemHentPriser(); nemTegn(); }
   }catch(e){ /* arket virker uden — så er vi bare tilbage ved det gamle */ }
   finally{
@@ -7283,7 +7300,13 @@ async function nemHentGratis(){
       (nemArk.gratis || []).filter(l => l.medtaget)
         .map(l => String(l.kort.produkt_id)));
 
-    nemArk.gratis = fund.map(v => {
+    /* VIP-gaverne bor i SAMME liste, men hentes med et andet kald. Uden
+       det her ville den ene hentning slette den andens linjer, alt efter
+       hvem der kom hjem sidst. Én liste, fordi afsnittets indeks er
+       nøglen til linjen i alle klikbehandlerne. */
+    const vipFoer = (nemArk.gratis || []).filter(l => l.erVip);
+
+    nemArk.gratis = vipFoer.concat(fund.map(v => {
       nemArk.priser[String(v.id)] = v;        // så priser og tilbud virker
       const valgt = valgtFoer.has(String(v.id));
       /* Beskrivelsen er varens mængde og mærke, fx "10 g / Pure Garden".
@@ -7316,7 +7339,106 @@ async function nemHentGratis(){
            nemHentPriser erstatter den. */
         vare: v
       };
+    }));
+    nemTegn();
+  }catch(err){
+    /* Tavst med vilje — se forklaringen ovenfor. */
+  }
+}
+
+/* ---------- VIP-gaverne ----------
+   Hans egne gaver fra nemlig.com/mit-nemlig/nemlig-vip. De står i SAMME
+   afsnit som de almindelige gratis varer, men med et VIP-mærke, så de to
+   slags kan skelnes.
+
+   HVORFOR DE OVERHOVEDET KAN HENTES (1. september 2026): siden fyldes af
+   et ganske almindeligt kald, som virker uden login. Vi troede i tre uger
+   at gaverne kun stod i nyhedsbrevet — det var forkert, og mailen skal
+   ikke røres.
+
+   FRISTEN KLARER NEMLIG SELV: leveringsdagen sendes med, og svaret siger
+   så om gaven kan komme med den dag. Kan den ikke, står linjen dæmpet med
+   Nemligs egen forklaring i stedet for at blive skjult — det var netop en
+   gave uden for fristen der 25. august blev lagt i kurven og smidt ud
+   igen, uden at nogen kunne se hvorfor.
+
+   Fejler kaldet, sker der ingenting: afsnittet ser ud som før. Adressen
+   bygger på tre led vi har afskrevet fra hans browser, og de kan ændre
+   sig uden varsel. */
+async function nemHentVip(){
+  if(!nemArk) return;
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-vip",
+      { body: { levering: nemLevering() } });
+    if(error) throw error;
+    const gaver = (data && Array.isArray(data.gaver)) ? data.gaver : [];
+    if(!nemArk) return;                       // arket kan være lukket imens
+
+    const valgtFoer = new Set(
+      (nemArk.gratis || []).filter(l => l.erVip && l.medtaget)
+        .map(l => String(l.kort.produkt_id)));
+
+    const linjer = gaver.map(g => {
+      /* Varen bygges i samme form som søgningens, så resten af arket kan
+         regne på den uden at vide hvor den kommer fra. */
+      const vare = {
+        id: String(g.id),
+        navn: g.navn,
+        maerke: g.maerke,
+        beskrivelse: g.beskrivelse,
+        /* Kun hvis der står noget der BEVISER at den er gratis. Gruppen
+           hedder ganske vist VIP-gaver, men et forkert nul er værre end
+           en pris der står rigtigt. */
+        pris: g.gratis ? 0 : g.normalpris,
+        normalpris: g.normalpris,
+        kampagne: g.kampagne || null,
+        billede: g.billede,
+        sti: g.sti,
+        paaLager: g.paaLager !== false && g.kanLeveres !== false,
+        hovedgruppe: null
+      };
+      nemArk.priser[vare.id] = vare;
+
+      /* De to slags "kan ikke" skal give hver sin besked. Udsolgt kan han
+         intet stille op med; "ikke i det valgte leveringsinterval" løser
+         sig ved at flytte dagen. */
+      const spaerret = g.kanLeveres === false || g.paaLager === false;
+      const valgt = !spaerret && valgtFoer.has(vare.id);
+      const maal = String(g.beskrivelse || "").replace(/\s*\/\s*/g, " · ");
+
+      return {
+        navn: g.navn,
+        behov: null, enhed: "", kilder: maal, gaet: false, spring: false,
+        uafklaret: false,
+        kort: {
+          produkt_id: vare.id,
+          produkt_navn: g.navn,
+          pakke_maengde: null,
+          pakke_enhed: "",
+          billede: g.billede,
+          hovedgruppe: null,
+          styk: null
+        },
+        ekstra: [],
+        standardAntal: 1,
+        maxAntal: (g.kampagne && g.kampagne.maxAntal) || 1,
+        medtaget: !!valgt,
+        antal: valgt ? 1 : 0,
+        erGratis: !!g.gratis,
+        erVip: true,
+        vipSpaerret: spaerret,
+        /* Nemligs egen ordlyd. Er der ingen, siges det kort selv. */
+        vipGrund: spaerret
+          ? (g.grund || (g.paaLager === false ? "udsolgt"
+                                              : "kan ikke leveres den valgte dag"))
+          : null,
+        vare
+      };
     });
+
+    /* VIP først: det er hans egne, og de er mere værd end dem alle kan
+       tage. De almindelige gaver bliver stående urørt. */
+    nemArk.gratis = linjer.concat((nemArk.gratis || []).filter(l => !l.erVip));
     nemTegn();
   }catch(err){
     /* Tavst med vilje — se forklaringen ovenfor. */
@@ -7362,6 +7484,11 @@ async function nemEftermonter(){
 
 /* En linje er klar, hvis den er kortlagt, findes, og er på lager. */
 function nemTilstand(l){
+  /* En VIP-gave der ikke kan leveres den valgte dag er sin EGEN tilstand.
+     Uden den ville den lande i "udsolgt" og dermed spærre knappen — og en
+     gave man ikke har bedt om, må aldrig stå i vejen for hele ordren.
+     Den kan ikke vælges, og nemBlokerer lader den passere. */
+  if(l.vipSpaerret) return "vipspaerret";
   if(!l.kort || !l.kort.produkt_id) return "ukendt";
   const id = String(l.kort.produkt_id);
   if(nemArk.findesIkke.includes(id)) return "udgaaet";
@@ -7374,6 +7501,14 @@ function nemTilstand(l){
      ingen overlay: det er de samme to knapper som alle andre linjer. */
   if(l.uafklaret) return "uafklaret";
   return "klar";
+}
+
+/* Spærrer linjen knappen? ÉT sted, så afsnittets tæller og den døde
+   send-knap altid er enige. Sprunget over tæller ikke med (den er
+   håndteret), og en VIP-gave der ikke kan leveres tæller heller ikke — den
+   er en oplysning, ikke en opgave. */
+function nemBlokerer(l){
+  return !l.spring && !l.vipSpaerret && nemTilstand(l) !== "klar";
 }
 
 /* En udsolgt VARIANT spærrer ikke linjen — man har jo allerede sagt ja til
@@ -7422,6 +7557,27 @@ function nemTegn(){
       return '<div class="nemrad"><span class="v"><span class="navn" style="opacity:.55">'
         + esc(storNavn(l.navn)) + '</span><span class="under">springes over</span></span>'
         + '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">fortryd</button></div>';
+    }
+
+    /* En VIP-gave der ikke kan komme med. Egen gren FØR de tre blokerende
+       tilstande nedenfor, fordi den ser anderledes ud og skal andet:
+       ingen knapper. "Udskift" giver ingen mening på en gave — der er
+       ingen anden vare der kan træde i stedet — og "spring over" er der
+       ikke behov for, når linjen alligevel ikke spærrer noget.
+       Forklaringen er NEMLIGS EGEN tekst, ikke min omskrivning: står der
+       "ikke tilgængeligt i det valgte leveringsinterval", er det netop
+       dét, der kan løses ved at vælge en anden dag. */
+    if(tilstand === "vipspaerret"){
+      const bil = (p && p.billede) || (l.kort && l.kort.billede) || null;
+      return '<div class="nemrad vipspaerret">'
+        + '<input type="checkbox" disabled aria-label="Kan ikke vælges">'
+        + (bil ? '<img class="nembil" src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">'
+               : '<span class="nembil tom"></span>')
+        + '<span class="v"><span class="navn">' + esc(storNavn(l.navn)) + '</span>'
+        +   '<span class="nemvip">VIP</span>'
+        +   '<span class="vipgrund">' + esc(l.vipGrund || "kan ikke leveres den valgte dag") + '</span>'
+        +   (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
+        + '</span></div>';
     }
 
     /* UDSOLGT, UDGÅET og IKKE KORTLAGT tegnes nu som en HELT ALMINDELIG
@@ -7527,6 +7683,9 @@ function nemTegn(){
                + '</button>' : "")
       + '<span class="v"><span class="navn" data-nemred="' + gruppe + ':' + i + '">'
       + esc(storNavn(l.navn)) + '</span>'
+      /* De to slags gratis varer står i samme afsnit, og VIP-gaverne er
+         hans egne — dem alle kan tage, er der ingen der har fortjent. */
+      + (l.erVip ? '<span class="nemvip">VIP</span>' : "")
       + (l.uafklaret
           ? '<span class="under kraevertekst">'
             + esc(l.kilder ? "skal bruges til " + l.kilder : "fast vare")
@@ -7627,8 +7786,7 @@ function nemTegn(){
      komme videre. Tallet vises på afsnittet, også når det er foldet, så
      man kan se HVOR der er noget. Sprunget over tæller ikke med; den er
      jo håndteret. */
-  const kraeverHandling = liste =>
-    liste.filter(l => !l.spring && nemTilstand(l) !== "klar").length;
+  const kraeverHandling = liste => liste.filter(nemBlokerer).length;
 
   const maerke = n => n
     /* Trekanten er droppet — den var for meget alarm, og den røde
@@ -7728,7 +7886,7 @@ function nemTegn(){
   krop.innerHTML = h;
 
   // Knappen er død, så længe der er uløste advarsler.
-  const uloest = nemAlleLinjer().filter(l => nemTilstand(l) !== "klar" && !l.spring).length;
+  const uloest = nemAlleLinjer().filter(nemBlokerer).length;
   const send = document.getElementById("nem-send");
   const klar = nemSendeliste();
   send.disabled = nemArk.henter || uloest > 0 || !klar.length;
@@ -8242,6 +8400,7 @@ async function nemAabn(){
      skal forbi hver gang. */
   nemFoldet.add("gratis");
   nemHentGratis();     // uden await: arket skal ikke vente på den
+  nemHentVip();        // samme grund — gaverne må ikke forsinke arket
   /* Tiderne hentes uden await af samme grund. Kommer de, tegnes arket om
      og priserne hentes forfra med det RIGTIGE tidsrum — først da er
      udsolgt-visningen til at stole på. Kommer de ikke, virker arket
@@ -9360,6 +9519,7 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
   nemByg();
   nemTegn();
   nemHentGratis();
+  nemHentVip();        // gaverne afhænger af dagen — hentes forfra
   await nemHentPriser();
   nemTegn();
 });
