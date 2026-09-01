@@ -20,7 +20,7 @@
    Filen kan derfor godt ligge et offentligt sted.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "5.0 beta";
+const VERSION = "5.0.1 beta";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -65,6 +65,9 @@ const DRIFT_LINJER = ["166","Letbane","linje L","linje C","linje H"];
 const DRIFT_STEDER = ["Buddinge Torv","Buddinge St","Gladsaxe Rådhus","Gladsaxe Ringvej",
                       "Herlev St","Husum St","Ølstykke","Ballerup","Måløv","Skovlunde","Islev"];
 const DRIFT_BANE   = ["Frederikssundbanen","Frederikssundsbanen","Hovedstadens Letbane"];
+/* Linjer han ikke længere bruger. Nævner overskriften en af dem,
+   springes meddelelsen over — 300S er nedlagt og rager ham ikke.  */
+const DRIFT_IKKE = ["300S","200S","250S","350S","166N"];
 const DRIFT_MAKS_DAGE = 30;   // længerevarende vejarbejde vises ikke
 
 /* Vejr hentes fra Open-Meteo. Ingen nøgle, ingen kvote, og det går
@@ -310,6 +313,18 @@ tbody tr.aflyst .afg b,tbody tr.aflyst .sted,tbody tr.aflyst .skift{text-decorat
   td.sted,td.skift{font-size:13px;}
   td.skift::before,td:nth-child(5)::before{content:"› ";color:var(--hårfin);}
   td.tom{grid-column:1 / -1;}
+
+  /* Stregen der binder to veje sammen tegnes på RÆKKEN her — cellen
+     fylder kun den øverste gitterlinje og har ingen højde at spænde
+     over. Og den gentagne række skal ikke have en tom tidslinje.   */
+  tbody tr.førstAfFlere td:first-child::before,
+  tbody tr.gentaget td:first-child::before{display:none;}
+  tbody tr.førstAfFlere,tbody tr.gentaget{
+    border-left:2px solid var(--hårfin);padding-left:12px;}
+  tbody tr.førstAfFlere{padding-bottom:4px;}
+  tbody tr.gentaget{
+    grid-template-areas:"l1 sted skift l2";padding-top:4px;border-top:none;}
+  tbody tr.gentaget td.afg{display:none;}
   tr.bånd{display:block;padding:0;}
   tr.bånd td{display:block;width:auto;padding:7px 14px;}
   .trin{grid-template-columns:auto 1fr;row-gap:4px;}
@@ -558,6 +573,8 @@ async function hentDriftNu(){
 function vedkommer(m){
   const tekst = [m.head, m.lead, m.text].filter(Boolean).join(" ");
   if(!tekst) return false;
+  const overskrift = String(m.head||"");
+  if(DRIFT_IKKE.some(l => overskrift.indexOf(l) > -1)) return false;
   const start = tilDato(m.sDate, m.sTime || "00:00:00");
   const slut  = tilDato(m.eDate, m.eTime || "23:59:00");
   if(start && slut && (slut - start) > DRIFT_MAKS_DAGE*86400000) return false;
