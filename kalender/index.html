@@ -5,8 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vores Hverdag</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#F2F1ED" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121412" media="(prefers-color-scheme: dark)">
+<!-- ÉT tag uden mediebetingelse. De to gamle spurgte telefonen
+     (prefers-color-scheme), men i den installerede app er det manifestets
+     theme_color der gælder, og den kender kun én farve. Resultatet var en
+     statuslinje der hverken fulgte telefonen eller appens måneknap.
+     Nu sætter saetTema() farven direkte, og en eksplicit theme-color
+     slår både manifestet og mediebetingelserne. -->
+<meta name="theme-color" id="temafarve" content="#F2F1ED">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hverdag">
@@ -2261,7 +2266,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.88.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.89.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5783,8 +5788,16 @@ document.addEventListener("click", ev => {
 });
 
 /* ---------- Lyst og mørkt ---------- */
+/* Farverne er de samme som --bg i de to temaer. Staar de to steder,
+   fordi meta-tagget skal have en ren vaerdi, ikke en CSS-variabel. */
+const TEMAFARVE = { light: "#F2F1ED", dark: "#121412" };
+function saetTemafarve(t){
+  const m = document.getElementById("temafarve");
+  if(m) m.setAttribute("content", TEMAFARVE[t] || TEMAFARVE.light);
+}
 function saetTema(t){
   document.documentElement.setAttribute("data-theme", t);
+  saetTemafarve(t);
   try{ localStorage.setItem("kalender-tema", t); }catch(e){}
   render();
 }
@@ -11746,7 +11759,13 @@ async function start(){
   document.getElementById("version").textContent = "v" + VERSION;
   try{ if(localStorage.getItem("kalender-vaagen") === "1") saetVaagen(true); }catch(e){}
   tegnVaagenStand();
-  try{ const t = localStorage.getItem("kalender-tema"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+  try{
+    const t = localStorage.getItem("kalender-tema");
+    if(t) document.documentElement.setAttribute("data-theme", t);
+    /* Ogsaa her, ellers staar statuslinjen lys indtil man foerste gang
+       trykker paa maanen. */
+    saetTemafarve(document.documentElement.getAttribute("data-theme") || "light");
+  }catch(e){}
   try{ visFoedselsdage = localStorage.getItem("kalender-fdag") !== "0"; }catch(e){}
   document.getElementById("fdag-stand").textContent = visFoedselsdage ? "til" : "fra";
   document.getElementById("menu-zoom").hidden = !kanZoome();
@@ -11821,6 +11840,33 @@ async function hentBeskRaekke(){
   return null;
 }
 
+/* Er den offentlige VAPID-noegle skiftet, siden enheden tilmeldte sig?
+
+   Tjekket laa FOER kun inde i beskTilmeld(), og den kaldes kun naar der
+   IKKE allerede findes en raekke. En allerede tilmeldt telefon beholdt
+   derfor sit gamle abonnement, og afsendelsen faldt med 403 fra Google -
+   uden at noget sagde fra. Ramt 1. september 2026 ved noegleskiftet.
+
+   Her kigger vi efter det HVER gang beskedskaermen aabnes. Er noeglen en
+   anden, meldes abonnementet fra og raekken slettes, saa knappen igen
+   hedder "Slaa til" og en ny tilmelding laver et gyldigt abonnement.
+   Returnerer true hvis der blev ryddet op.                              */
+async function beskNoegleSkiftet(){
+  try{
+    if(!pushMulig() || !VAPID_PUBLIC) return false;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(!sub) return false;
+    const gl = sub.options && sub.options.applicationServerKey;
+    if(!gl) return false;
+    if(new Uint8Array(gl).join(",") === b64tilBytes(VAPID_PUBLIC).join(",")) return false;
+    await sub.unsubscribe();
+    if(beskRaekke) await sb.from("push_enheder").delete().eq("id", beskRaekke.id);
+    beskRaekke = null; beskKladde = null;
+    return true;
+  }catch(e){ return false; }
+}
+
 /* Navnet på personen, men "Familie" hedder "Alle" her — ellers ville man
    tro det var det samme som markeringen på aftalen. */
 const beskPersonNavn = id => id === "familie" ? "Alle" :
@@ -11893,6 +11939,9 @@ async function aabnBeskeder(){
   }
 
   const fejl = await hentBeskRaekke();
+  /* Ryd et abonnement der hoerer til en gammel noegle, FOER skaermen
+     tegnes - ellers ser den ud som om alt er i orden. */
+  const ryddet = await beskNoegleSkiftet();
   if(fejl){
     meta.textContent = "Kunne ikke hente enhedens indstillinger: "
       + fejl.message + " — er notifikationer.sql kørt?";
@@ -11902,7 +11951,12 @@ async function aabnBeskeder(){
 
   if(!beskRaekke){
     beskKladde = null;
-    meta.textContent = "Beskeder er slået fra her. Slår du dem til, "
+    /* Sig HVORFOR, hvis vi lige har ryddet op. Ellers ser det ud som om
+       beskederne blev slået fra af sig selv. */
+    meta.textContent = ryddet
+      ? "Sikkerhedsnøglen er skiftet, så det gamle abonnement kunne ikke "
+        + "længere bruges. Slå beskeder til igen, så virker de."
+      : "Beskeder er slået fra her. Slår du dem til, "
       + "spørger telefonen om lov. Siger du nej, kan appen ikke spørge "
       + "igen — så skal det rettes i telefonens indstillinger for siden.";
     gem.hidden = false; gem.textContent = "Slå beskeder til";
