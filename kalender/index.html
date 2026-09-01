@@ -2292,7 +2292,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.90.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.91.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5227,6 +5227,66 @@ function levGem(){
   }catch(e){}
 }
 
+/* =======================================================================
+   Købshistorikken holder sig selv ved lige
+
+   Statistikken er ikke pynt: nemStandardAntal foreslår antal ud fra
+   medianen af de seneste 12 måneders køb. Hentes nye ordrer ikke ind,
+   regner arket videre på et grundlag der bliver ældre for hver uge.
+
+   Indtil nu skulle nemlig-historik åbnes som link i hånden. Nu kaldes den
+   når appen ser at ordren ER LEVERET — det tidspunkt findes allerede,
+   fordi leveringsfeltet holder øje med den alligevel.
+
+   HVORFOR forfra=1: nemlig-historik springer ordrer over den allerede
+   har. Bliver en ordre hentet ind MENS den er i gang, ville den ellers
+   for evigt stå uden de udsolgte varer og erstatninger der kom til
+   undervejs. antal=3 holder det billigt — tre ordrer, ikke hele bunken.
+   ======================================================================= */
+const STAT_NOEGLE  = "nemlig-import";
+const STAT_BAGKANT = 7 * 24 * 60 * 60 * 1000;   // en uge
+let statTravl = false;
+
+function statLaes(){
+  try{
+    const o = JSON.parse(localStorage.getItem(STAT_NOEGLE) || "null");
+    return (o && typeof o === "object") ? o : {};
+  }catch(e){ return {}; }
+}
+function statGem(o){
+  try{ localStorage.setItem(STAT_NOEGLE, JSON.stringify(o)); }catch(e){}
+}
+
+/* ordre = ordrenummeret når det er en levering der udløser den.
+   Uden ordrenummer er det bagkanten: kør hvis der er gået for længe. */
+async function statImport(ordre){
+  if(statTravl) return;
+  const s = statLaes();
+  if(ordre){
+    if(s.ordre === String(ordre)) return;        // den ordre er hentet
+  }else{
+    if(s.tid && Date.now() - s.tid < STAT_BAGKANT) return;
+  }
+  statTravl = true;
+  try{
+    const r = await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+    if(!r.ok) throw new Error("svar " + r.status);
+    /* Funktionen svarer ALTID 200 med en tekstside — også når Nemlig
+       afviser, eller når loginnet er udløbet. Derfor læses teksten, i
+       stedet for at tro på statuskoden. */
+    const tekst = await r.text();
+    if(/afviste|Intet Nemlig-login|fejlede/i.test(tekst)) throw new Error(tekst.slice(0, 90));
+    /* Kun ved held. Går det galt, står ordrenummeret ikke gemt, og så
+       prøver den igen næste gang appen åbnes. */
+    statGem({ ordre: ordre ? String(ordre) : (s.ordre || null), tid: Date.now() });
+  }catch(err){
+    /* Tavst: statistikken er et par dage bagud, præcis som før. Et rødt
+       felt om Nemlig midt i familiens kalender gavner ingen. */
+    console.warn("Købshistorikken kunne ikke opdateres:", err);
+  }
+  statTravl = false;
+}
+
 /* Kaldes hver gang serveren har svaret. Holder huskesedlen ved lige. */
 function levNoter(L){
   const idag = iso(new Date());
@@ -5239,7 +5299,12 @@ function levNoter(L){
     levHusk.sidst = L;
     /* Siger Nemlig selv "leveret", starter uret nu — men kun første gang,
        så nedtællingen ikke bliver ved med at starte forfra. */
-    if(L.leveret && !levHusk.slut) levHusk.slut = Date.now() + LEV_EFTER;
+    if(L.leveret && !levHusk.slut){
+      levHusk.slut = Date.now() + LEV_EFTER;
+      /* Varerne er sat af. Nu er ordren færdig hos Nemlig, og det er her
+         købshistorikken skal hentes ind — én gang for den ordre. */
+      statImport(levHusk.ordre);
+    }
     levGem();
     return;
   }
@@ -5248,7 +5313,10 @@ function levNoter(L){
      Nemlig rydder feltet når varerne er sat af. Vi viser "Leveret" videre
      i to timer, i stedet for at lade feltet forsvinde i samme sekund. */
   if(levHusk && levHusk.dato === idag && levHusk.sidst){
-    if(!levHusk.slut) levHusk.slut = Date.now() + LEV_EFTER;
+    if(!levHusk.slut){
+      levHusk.slut = Date.now() + LEV_EFTER;
+      statImport(levHusk.ordre);   // samme grund som ovenfor
+    }
     levGem();
   }
 }
@@ -11918,6 +11986,9 @@ async function start(){
   hentVejr();
   setInterval(() => { if(Date.now() - vejrHentet > 3300000) hentVejr(); }, 600000);
   hentLevering();
+  /* Bagkanten. Åbnede han ikke appen den dag varerne kom, bliver
+     historikken hentet her i stedet — højst én gang om ugen. */
+  statImport(null);
   /* Ét ur der spørger tit. Hvor tit der rent faktisk hentes, afhænger af
      om der er en ordre i gang — buddet flytter sig kun, mens bilen kører. */
   setInterval(() => {
