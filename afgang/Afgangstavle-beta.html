@@ -177,7 +177,11 @@ tbody.kasse{animation:tonop .22s ease-out;}
 .afg b{font-size:18px;font-weight:600;display:block;line-height:1.15;}
 .afg span{font-size:11.5px;color:var(--dæmpet);}
 .afg em{font-style:normal;color:var(--forsinket);font-weight:600;}
-.afg em.luft{color:var(--god);}
+/* samme afgang, anden vej videre — bundet til rækken ovenfor */
+tbody tr.gentaget td{border-top:none;padding-top:2px;}
+tbody.kasse tr:not(.bånd) + tr.gentaget td{border-top:none;}
+.samme{display:block;width:2px;height:22px;margin-left:9px;
+  background:var(--hårfin);border-radius:1px;}
 .tæller{font-variant-numeric:tabular-nums;}
 
 .linje{width:1%;white-space:nowrap;}
@@ -690,7 +694,15 @@ function tegnListe(){
   stat.kasser.forEach(kasse => {
     const krop = el("tbody","kasse");
     krop.appendChild(tegnBånd(kasse));
-    kasse.forEach(r => krop.appendChild(tegnRække(r)));
+      let forrige = null;
+    kasse.forEach(r => {
+      /* samme afgang med to veje videre skrives kun én gang — den
+         tomme kolonne læses som "samme som ovenfor", præcis som i en
+         køreplan.                                                   */
+      const gentaget = forrige !== null && +r.afgang === forrige && !r.aflyst;
+      krop.appendChild(tegnRække(r, gentaget));
+      forrige = r.aflyst ? null : +r.afgang;
+    });
     tabel.appendChild(krop);
   });
 }
@@ -720,7 +732,7 @@ function tegnBånd(kasse){
   return tr;
 }
 
-function tegnRække(r){
+function tegnRække(r, gentaget){
   const tr = el("tr");
   if(r.aflyst) tr.classList.add("aflyst");
   if(r.medLuft) tr.classList.add("medluft");
@@ -731,6 +743,11 @@ function tegnRække(r){
   }
 
   const t1 = el("td","afg");
+  if(gentaget){
+    tr.classList.add("gentaget");
+    t1.appendChild(el("span","samme"));
+    tr.appendChild(t1);
+  }else{
   const b1 = el("b"); b1.textContent = urTekst(r.afgang);
   const s1 = el("span");
   if(r.aflyst){
@@ -742,12 +759,10 @@ function tegnRække(r){
     if(r.forsinkelse >= 1){
       const e = el("em"); e.textContent = " +"+r.forsinkelse; s1.appendChild(e);
     }
-    if(r.medLuft){
-      const l = el("em","luft"); l.textContent = " god tid"; s1.appendChild(l);
-    }
   }
   t1.appendChild(b1); t1.appendChild(s1);
   tr.appendChild(t1);
+  }
 
   const t2 = el("td","linje"); t2.appendChild(mærke(r.et.linje, r.et.art));
   tr.appendChild(t2);
