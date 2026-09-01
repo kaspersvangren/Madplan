@@ -145,6 +145,7 @@ button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
 
 #dvale{display:block;width:100%;text-align:left;margin-bottom:14px;
   border-color:var(--dæmpet);color:var(--dæmpet);}
+#dvale[hidden]{display:none;}
 
 /* ── driftsinformation ─────────────────────────────────── */
 .drift{background:var(--flade);border:1px solid var(--hårfin);
@@ -587,6 +588,7 @@ let sidsteSignatur = "";
 
 function signatur(){
   const dele = [hjemad?"h":"u", visFlere?"f":"", visAlt?"a":"",
+                stat.hentetAfgange ? "1" : "0",
                 stat.fejl||"", stat.svigt.join(","), stat.tomme.join(",")];
   stat.kasser.forEach(k => k.forEach(r => dele.push(
     +r.afgang+"|"+ +r.ankomst+"|"+r.et.linje+"|"+r.to.linje+"|"
@@ -998,6 +1000,10 @@ hentAfgange(); hentDriftNu(); hentVejrNu();
 
 
 /* ── genbrugt uændret fra v4.4 ── */
+const SOL = "#e0a132", SKY = "#93a2b0", REGN = "#3d7ab8", SNE = "#79aed4";
+const SKYFORM = '<path d="M7.2 18h9.3a3.9 3.9 0 0 0 .4-7.8 5.4 5.4 0 0 0-10.3 1.6A3.3 3.3 0 0 0 7.2 18z"';
+const produktAf = b => Array.isArray(b.Product)?(b.Product[0]||{}):(b.Product||{});
+const tidAf = (p,rt) => rt ? tilDato(p.rtDate||p.date,p.rtTime||p.time) : tilDato(p.date,p.time);
 function datoTekst(d){
   const uge=["søndag","mandag","tirsdag","onsdag","torsdag","fredag","lørdag"];
   const mdr=["jan.","feb.","mar.","apr.","maj","jun.","jul.","aug.","sep.","okt.","nov.","dec."];
