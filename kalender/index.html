@@ -929,6 +929,16 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .tjekrad.ok .v{opacity:.55}
 .tjekrad.mangler .mark{background:var(--holiday);border-color:var(--holiday)}
 .tjekrad.mangler .navn{color:var(--holiday);font-weight:600}
+/* Delvist leveret: krydset af, men der kom faerre end bestilt. Fluebenet
+   staar, saa man kan se den ER tjekket — men i advarselsfarven, saa den
+   ikke forsvinder i maengden af afkrydsede. */
+.tjekrad.delvis .mark{background:var(--holiday);border-color:var(--holiday)}
+.tjekrad.delvis .antal{color:var(--holiday);font-weight:700}
+.tjekrad .antal.knap{font:inherit;font-size:13px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line);border-radius:999px;padding:5px 10px;min-width:44px}
+.tjekbil{flex:none;padding:0;border:0;background:none;line-height:0}
+.tjekbil img{width:38px;height:38px;border-radius:8px;object-fit:contain;background:#fff;
+  border:1px solid var(--line)}
 
 .nemgruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
   font-weight:700;margin:18px 0 6px;display:flex;align-items:center;gap:8px;
@@ -2335,7 +2345,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.92.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.93.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5578,6 +5588,8 @@ const TJEK_GRUPPER = ["Frost", "Køl", "Kød & fisk", "Grønt", "Kolonial", "Dri
 let tjekOrdre   = null;   // rækken fra nemlig_ordre_oversigt
 let tjekLinjer  = [];     // varelinjerne
 let tjekMark    = {};     // produkt_id -> 0/1/2
+let tjekFik     = {};     // produkt_id -> antal man FIK, når det ikke er alle
+let tjekVarer   = {};     // produkt_id -> varen fra Nemlig (billede, pris …)
 let tjekUge     = null;   // ugens fredag (iso) når listen er åbnet fra ugevisningen
 let tjekVaelger = false;  // viser kandidaterne i stedet for listen
 let tjekTravl   = false;
@@ -5661,7 +5673,7 @@ async function tjekAabn(opts){
   opts = opts || {};
   tjekUge = opts.uge || null;
   tjekVaelger = false;
-  tjekOrdre = null; tjekLinjer = []; tjekMark = {};
+  tjekOrdre = null; tjekLinjer = []; tjekMark = {}; tjekFik = {}; tjekVarer = {};
   document.getElementById("tjek-anden").textContent = "Vælg en anden ordre";
   show("tjek-back");
   tjekTegn("Henter ordren…");
@@ -5691,12 +5703,34 @@ async function tjekAabn(opts){
     sb.from("nemlig_ordrelinjer")
       .select("produkt_id,produkt_navn,beskrivelse,antal,hovedgruppe,gruppe")
       .eq("ordre_id", o.id),
-    sb.from("nemlig_tjek").select("produkt_id,tilstand").eq("ordre_id", o.id),
+    sb.from("nemlig_tjek").select("produkt_id,tilstand,faaet").eq("ordre_id", o.id),
   ]);
   tjekLinjer = (linjer || []).filter(l => l.produkt_id);
-  tjekMark = {};
-  (mark || []).forEach(m => { tjekMark[m.produkt_id] = m.tilstand; });
+  tjekMark = {}; tjekFik = {};
+  (mark || []).forEach(m => {
+    tjekMark[m.produkt_id] = m.tilstand;
+    if(typeof m.faaet === "number") tjekFik[m.produkt_id] = m.faaet;
+  });
   tjekTegn();
+  /* Billederne hentes BAGEFTER, saa listen staar med det samme. Ordren
+     kan have varer der ikke laengere er i kataloget; de faar bare intet
+     billede. Fejler kaldet, sker der ingenting. */
+  tjekHentVarer(o.id);
+}
+
+/* Billede, pris og resten af varekortet. Samme kald som arket bruger, og
+   det tager hold à 20 varenumre, saa en ordre paa 63 varer er tre kald. */
+async function tjekHentVarer(ordreId){
+  const ider = [...new Set(tjekLinjer.map(l => String(l.produkt_id)))];
+  if(!ider.length) return;
+  try{
+    const { data, error } = await sb.functions.invoke("nemlig-tjek",
+      { body: { ider, levering: nemLevering() } });
+    if(error) throw error;
+    if(!tjekOrdre || String(tjekOrdre.id) !== String(ordreId)) return;  // lukket eller skiftet imens
+    tjekVarer = (data && data.fundet) || {};
+    if(!tjekVaelger) tjekTegn();
+  }catch(e){ /* uden billeder virker listen praecis som foer */ }
 }
 
 /* ---------- Tegn ---------- */
@@ -5744,10 +5778,13 @@ function tjekTegn(besked){
 
   if(tjekVaelger){ tjekTegnVaelger(); return; }
 
-  const antalOk = tjekLinjer.filter(l => tjekMark[l.produkt_id] === 1).length;
-  const antalMangler = tjekLinjer.filter(l => tjekMark[l.produkt_id] === 2).length;
+  /* "Tjekket" betyder TAGET STILLING TIL. En vare der mangler er jo
+     tjekket — den talte bare ikke med foer, saa taelleren kunne staa paa
+     "0 af 35 tjekket · 1 mangler", hvilket ikke gav mening. */
+  const antalTjekket = tjekLinjer.filter(l => (tjekMark[l.produkt_id] || 0) !== 0).length;
+  const antalMangler = tjekLinjer.filter(l => tjekMangel(l)).length;
   hoved.innerHTML =
-      '<span class="tal">' + antalOk + ' af ' + tjekLinjer.length + ' tjekket'
+      '<span class="tal">' + antalTjekket + ' af ' + tjekLinjer.length + ' tjekket'
     + (antalMangler ? ' · <b class="mangler">' + antalMangler + ' mangler</b>' : '') + '</span>'
     + '<span class="skift" role="group" aria-label="Sortering">'
     +   '<button data-tjeksort="gruppe" class="' + (tjekSort === "gruppe" ? "aktiv" : "") + '">Gruppe</button>'
@@ -5760,45 +5797,119 @@ function tjekTegn(besked){
     if(g.titel) h += '<div class="tjekgruppe">' + esc(g.titel) + '<span class="n">' + g.linjer.length + '</span></div>';
     g.linjer.forEach(l => {
       const t = tjekMark[l.produkt_id] || 0;
-      const kl = t === 1 ? " ok" : t === 2 ? " mangler" : "";
-      const antal = (typeof l.antal === "number" && l.antal !== 1) ? l.antal + " ×" : "";
+      const b = tjekBestilt(l), f = tjekFaaet(l);
+      const kl = tjekDelvis(l) ? " delvis" : t === 1 ? " ok" : t === 2 ? " mangler" : "";
+      const v = tjekVarer[l.produkt_id];
+      /* Antallet er en KNAP naar der er bestilt mere end eet: et tryk
+         taeller ned, 3 → 2 → 1 → 0 → 3. Saa kan man sige "fik 2 af 3"
+         uden en ekstra dialog. Ved eet stykke ville nedtaellingen bare
+         vaere en daarligere udgave af raekkens eget tryk. */
+      const antalTekst = (t !== 0 && f !== b) ? (f + " af " + b) : (b !== 1 ? b + " ×" : "");
       h += '<div class="tjekrad' + kl + '" data-tjek="' + esc(l.produkt_id) + '" role="button" tabindex="0">'
          +   '<span class="mark" aria-hidden="true">' + (t === 1 ? "✓" : t === 2 ? "−" : "") + '</span>'
+         +   (v && v.billede
+              ? '<button class="tjekbil" data-tjekbil="' + esc(l.produkt_id) + '" aria-label="Se varen">'
+                + '<img src="' + esc(nemBillede(v.billede, 120)) + '" alt="" loading="lazy"></button>'
+              : "")
          +   '<span class="v"><span class="navn">' + esc(storNavn(l.produkt_navn || "")) + '</span>'
          +     (l.beskrivelse ? '<span class="under">' + esc(String(l.beskrivelse).replace(/\s*\/\s*/g, " · ")) + '</span>' : "")
          +   '</span>'
-         +   (antal ? '<span class="antal">' + esc(antal) + '</span>' : "")
+         +   (b > 1
+              ? '<button class="antal knap" data-tjekantal="' + esc(l.produkt_id) + '">' + esc(antalTekst) + '</button>'
+              : (antalTekst ? '<span class="antal">' + esc(antalTekst) + '</span>' : ""))
          + '</div>';
     });
   });
   krop.innerHTML = h;
 }
 
+/* Bestilt antal, og hvor mange der kom.
+
+   tjekFik er null saa laenge man ikke har sagt noget saerligt: saa foelger
+   antallet tilstanden — leveret betyder alle, mangler betyder ingen.
+   Foerst naar man taeller ned, staar der et tal. */
+function tjekBestilt(l){
+  const n = Number(l.antal);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 1;
+}
+function tjekFaaet(l){
+  const t = tjekMark[l.produkt_id] || 0;
+  const b = tjekBestilt(l);
+  const g = tjekFik[l.produkt_id];
+  if(typeof g === "number") return Math.max(0, Math.min(b, g));
+  return t === 1 ? b : 0;
+}
+/* Delvis = krydset af som leveret, men der kom faerre end bestilt. */
+function tjekDelvis(l){
+  return (tjekMark[l.produkt_id] || 0) === 1 && tjekFaaet(l) < tjekBestilt(l);
+}
+/* Mangler der noget paa linjen? Baade "fik ingen" og "fik 2 af 3". */
+function tjekMangel(l){
+  return (tjekMark[l.produkt_id] || 0) === 2 || tjekDelvis(l);
+}
+
 /* ---------- Tryk på en vare ---------- */
-async function tjekSkift(pid){
-  if(!tjekOrdre) return;
-  const nu = tjekMark[pid] || 0;
-  const ny = (nu + 1) % 3;          // tom → leveret → mangler → tom
-  tjekMark[pid] = ny;
+async function tjekGem(pid, tilstand, faaet){
+  const foerT = tjekMark[pid], foerF = tjekFik[pid];
+  tjekMark[pid] = tilstand;
+  if(faaet == null) delete tjekFik[pid]; else tjekFik[pid] = faaet;
   tjekTegn();
   const { error } = await sb.from("nemlig_tjek").upsert(
-    { ordre_id: tjekOrdre.id, produkt_id: pid, tilstand: ny, aendret: new Date().toISOString() },
+    { ordre_id: tjekOrdre.id, produkt_id: pid, tilstand, faaet: faaet == null ? null : faaet,
+      aendret: new Date().toISOString() },
     { onConflict: "ordre_id,produkt_id" });
   if(error){
-    tjekMark[pid] = nu;             // kunne ikke gemmes: tilbage til det gamle
+    /* Kunne det ikke gemmes, maa skaermen ikke paastaa noget andet end
+       basen. Tilbage til det gamle, og sig det. */
+    if(foerT === undefined) delete tjekMark[pid]; else tjekMark[pid] = foerT;
+    if(foerF === undefined) delete tjekFik[pid];  else tjekFik[pid] = foerF;
     tjekTegn();
     vis("Kunne ikke gemme krydset: " + error.message);
   }
+}
+
+/* Tryk paa raekken: tom → leveret → mangler → tom. Antallet nulstilles,
+   for de tre tilstande betyder "alle", "ingen" og "ikke sagt endnu". */
+async function tjekSkift(pid){
+  if(!tjekOrdre) return;
+  await tjekGem(pid, ((tjekMark[pid] || 0) + 1) % 3, null);
+}
+
+/* Tryk paa antallet: taeller EN ned, og ruller rundt naar den rammer nul.
+   Bestilt 3 giver 3 → 2 → 1 → 0 → 3. Nul betyder "fik ingen" og er samme
+   tilstand som minus; fuldt hus betyder "fik alle". */
+async function tjekAntal(pid){
+  if(!tjekOrdre) return;
+  const l = tjekLinjer.find(x => String(x.produkt_id) === String(pid));
+  if(!l) return;
+  const b = tjekBestilt(l);
+  if(b <= 1) return;
+  const nuv = (tjekMark[pid] || 0) === 0 ? b : tjekFaaet(l);
+  const ny = nuv - 1 < 0 ? b : nuv - 1;
+  await tjekGem(pid, ny === 0 ? 2 : 1, ny === b ? null : ny);
 }
 
 /* Den anden telefon har trykket. */
 function tjekLive(p){
   const r = p.new && p.new.ordre_id ? p.new : p.old;
   if(!tjekOrdre || !r || String(r.ordre_id) !== String(tjekOrdre.id)) return;
-  if(p.eventType === "DELETE") delete tjekMark[r.produkt_id];
-  else if(typeof p.new.tilstand === "number") tjekMark[r.produkt_id] = p.new.tilstand;
+  if(p.eventType === "DELETE"){ delete tjekMark[r.produkt_id]; delete tjekFik[r.produkt_id]; }
+  else if(typeof p.new.tilstand === "number"){
+    tjekMark[r.produkt_id] = p.new.tilstand;
+    if(typeof p.new.faaet === "number") tjekFik[r.produkt_id] = p.new.faaet;
+    else delete tjekFik[r.produkt_id];
+  }
   else return;
   if(!tjekVaelger) tjekTegn();
+}
+
+/* Varekortet, som i indkøbsarket. Ligger over tjeklisten (z-index 70). */
+function tjekVis(pid){
+  const v = tjekVarer[pid];
+  const l = tjekLinjer.find(x => String(x.produkt_id) === String(pid));
+  if(!v){ vis("Varen kunne ikke hentes hos Nemlig."); return; }
+  const b = l ? tjekBestilt(l) : 1;
+  nemKortVis(v, "Bestilt " + b + (b === 1 ? " stk" : " stk") + " i denne ordre");
 }
 
 /* ---------- Vælg en anden ordre ---------- */
@@ -5846,6 +5957,12 @@ async function tjekVaelgOrdre(id){
 
 /* ---------- Ledninger ---------- */
 document.getElementById("tjek-krop").addEventListener("click", async ev => {
+  /* Billede og antal ligger INDE i raekken, saa de skal fanges foerst —
+     ellers ville et tryk paa dem ogsaa krydse linjen af. */
+  const bil = ev.target.closest("[data-tjekbil]");
+  if(bil){ tjekVis(bil.dataset.tjekbil); return; }
+  const ant = ev.target.closest("[data-tjekantal]");
+  if(ant){ await tjekAntal(ant.dataset.tjekantal); return; }
   const r = ev.target.closest("[data-tjek]");
   if(r){ await tjekSkift(r.dataset.tjek); return; }
   const v = ev.target.closest("[data-tjekvalg]");
@@ -7947,7 +8064,15 @@ function nemTilstand(l){
   if(l.vipSpaerret) return "vipspaerret";
   if(!l.kort || !l.kort.produkt_id) return "ukendt";
   const id = String(l.kort.produkt_id);
-  if(nemArk.findesIkke.includes(id)) return "udgaaet";
+  /* En VIP-GAVE maa ALDRIG bedoemmes af soegningen. Gaverne har
+     findes = false i Nemligs soegning og katalog — det var jo netop derfor
+     mailen paastod at de ikke kunne findes — men de ligger i VIP-gruppen
+     og er hentet DERFRA, med leveringsstatus og det hele. Uden det her
+     meldte appen "varen findes ikke laengere, skift den" om en gave der
+     stod klar til at blive lagt i kurven. Og "skift den" giver alligevel
+     ingen mening paa en gave: der er ingen anden vare der kan traede i
+     stedet. Fundet i drift 2. september 2026. */
+  if(!l.erVip && nemArk.findesIkke.includes(id)) return "udgaaet";
   const p = nemArk.priser[id];
   if(p && !p.paaLager) return "udsolgt";
   /* Tredje blokerende tilstand: en fast vare som ugens retter bruger, men
