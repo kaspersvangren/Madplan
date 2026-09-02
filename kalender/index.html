@@ -901,6 +901,34 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   background:var(--surface);color:var(--ink);font:inherit;font-weight:600}
 .nemknap:hover{border-color:var(--line-strong)}
 .nemknap svg{flex:none}
+/* Tjeklisten ved levering. Knappen tager "Læg i kurven"s plads fra
+   leveringsdagen og frem — der er ikke brug for begge. */
+.nemknap.tjek{border-color:var(--mad);color:var(--mad)}
+.levfelt[data-levtjek]{cursor:pointer}
+.tjekhoved{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:6px 0 4px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tjekhoved .mangler{color:var(--holiday)}
+.tjekhoved .skift{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
+.tjekhoved .skift button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border:0;
+  background:transparent;color:var(--muted)}
+.tjekhoved .skift button.aktiv{background:var(--ink);color:var(--surface)}
+.tjekgruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  font-weight:700;margin:16px 0 4px;display:flex;align-items:center;gap:8px}
+.tjekgruppe .n{font-weight:600;text-transform:none;letter-spacing:0}
+/* Hele rækken er trykflade — man står med en kasse i den ene hånd. */
+.tjekrad{display:flex;gap:12px;align-items:center;padding:11px 4px;border-top:1px solid var(--line);
+  font-size:15px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.tjekrad:active{background:var(--line)}
+.tjekrad .v{flex:1;min-width:0}
+.tjekrad .navn{display:block}
+.tjekrad .under{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.tjekrad .antal{flex:none;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tjekrad .mark{flex:none;width:30px;height:30px;border-radius:999px;border:2px solid var(--line-strong);
+  display:grid;place-items:center;font-weight:800;font-size:17px;line-height:1;color:#fff}
+.tjekrad.ok .mark{background:var(--mad);border-color:var(--mad)}
+.tjekrad.ok .v{opacity:.55}
+.tjekrad.mangler .mark{background:var(--holiday);border-color:var(--holiday)}
+.tjekrad.mangler .navn{color:var(--holiday);font-weight:600}
 
 .nemgruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
   font-weight:700;margin:18px 0 6px;display:flex;align-items:center;gap:8px;
@@ -1918,6 +1946,21 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
   </div>
 </div>
 
+<!-- Nemlig: tjekliste ved levering -->
+<div class="backdrop" id="tjek-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <button class="lukkryds" id="tjek-kryds" aria-label="Luk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <h2 id="tjek-titel">Tjekliste</h2>
+    <div class="meta" id="tjek-meta"></div>
+    <div class="tjekhoved" id="tjek-hoved"></div>
+    <div id="tjek-krop"></div>
+    <div class="actions">
+      <button class="btn" id="tjek-anden" hidden>Vælg en anden ordre</button>
+      <button class="btn" id="tjek-luk">Luk</button>
+    </div>
+  </div>
+</div>
+
 <!-- Nemlig: vælg vare -->
 <div class="backdrop" id="nemvalg-back">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -2292,7 +2335,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.91.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.92.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4409,9 +4452,20 @@ function renderIndkoeb(){
     +   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
     +   'Kopiér listen</button>';
 
-  h += '<button class="nemknap" id="nem-knap">'
-    +   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>'
-    +   'Læg i kurven hos Nemlig</button>';
+  /* Fra leveringsdagen og frem tager tjeklisten knappens plads: der er
+     ikke brug for at lægge i kurven, når varerne er kommet — og heller
+     ikke for en tjekliste, før de er det. Opslaget af ugens ordre er
+     asynkront; første gang står "Læg i kurven", og knappen skifter når
+     svaret er hjemme. */
+  if(ugeHarTjekliste(ugeStart)){
+    h += '<button class="nemknap tjek" id="tjek-knap">'
+      +   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>'
+      +   'Tjekliste for leveringen</button>';
+  }else{
+    h += '<button class="nemknap" id="nem-knap">'
+      +   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>'
+      +   'Læg i kurven hos Nemlig</button>';
+  }
 
   return h;
 }
@@ -5125,6 +5179,14 @@ function lytPaaAendringer(){
     .on("postgres_changes", { event:"*", schema:"public", table:"gentag_undtag" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"paamind_skjult" }, () => hentAlt())
     .on("postgres_changes", { event:"*", schema:"public", table:"madplan_ingrediens" }, () => hentAlt())
+    /* Tjeklisten: den anden telefons kryds, og en kobling nogen har
+       valgt. Ingen hentAlt — det er små, målrettede opdateringer. */
+    .on("postgres_changes", { event:"*", schema:"public", table:"nemlig_tjek" }, p => tjekLive(p))
+    .on("postgres_changes", { event:"*", schema:"public", table:"nemlig_uge_ordre" }, p => {
+      const r = (p.new && p.new.uge_start) ? p.new : p.old;
+      if(r && r.uge_start) delete ugeOrdre[r.uge_start];
+      if(fane === "indkoeb") render();
+    })
     .subscribe(status => {
       realtidOk = status === "SUBSCRIBED";
       console.info("Realtid:", status);
@@ -5468,7 +5530,10 @@ function renderLevering(ds){
      højre. Overskriften "LEVERING FRA NEMLIG" er væk — lastbilen siger
      det samme på en fjerdedel af pladsen, og forsiden var ved at blive
      for tæt. Fremdriftsstregen ligger under, sammen med fluebenet. */
-  return '<div class="levblok"><div class="levfelt' + (L.leveret ? " klaret" : "") + '">'
+  /* Hele feltet kan trykkes på og åbner tjeklisten for ordren. Krydset
+     til at skjule feltet fanges først i klikbehandleren. */
+  return '<div class="levblok"><div class="levfelt' + (L.leveret ? " klaret" : "") + '"'
+       +   (L.ordre ? ' data-levtjek="' + esc(L.ordre) + '" role="button"' : '') + '>'
        +   '<div class="levtop">'
        +     '<span class="levikon">'
        +       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
@@ -5484,6 +5549,329 @@ function renderLevering(ds){
        +   bar
        + '</div></div>';
 }
+
+/* =======================================================================
+   Tjekliste ved levering (v2.92.0)
+
+   Når varerne fra Nemlig står i køkkenet, skal de tælles op mod ordren.
+   Listen er delt mellem telefonerne (krydserne ligger i basen, og de
+   andre får dem live), og hver vare har tre tilstande: ikke tjekket,
+   leveret, mangler. Hele rækken er trykflade — det almindelige tilfælde,
+   "varen er der", koster ét tryk.
+
+   HVILKEN ORDRE HØRER TIL UGEN? Det regner basen ud (nemlig_uge_kobling)
+   ud fra fire signaler: datoen, ligheden med ugens madplan vægtet efter
+   hvor sjælden varen er, fingeraftryksvarer, og at en ordre kun kan høre
+   til én uge. Svaret gemmes én gang i nemlig_uge_ordre og er derefter
+   et faktum — også når madplanen for ugen er væk om ti uger. Peger det
+   gemte på en ordre der er annulleret hos Nemlig, regnes der forfra.
+   Familien kan altid selv pege på en anden ordre.
+
+   Ordrehistorikken hos Nemlig viser INGEN udsolgte varer eller
+   erstatninger (målt på 6.833 linjer: nul). Derfor kan listen ikke selv
+   vide hvad der manglede — det er netop det, minus-tilstanden er til.
+   ======================================================================= */
+const TJEK_SORT_NOEGLE = "tjek-sortering";
+const TJEK_GRUPPER = ["Frost", "Køl", "Kød & fisk", "Grønt", "Kolonial", "Drikke",
+                      "Husholdning", "Pleje"];   // rækkefølgen man pakker ud i
+
+let tjekOrdre   = null;   // rækken fra nemlig_ordre_oversigt
+let tjekLinjer  = [];     // varelinjerne
+let tjekMark    = {};     // produkt_id -> 0/1/2
+let tjekUge     = null;   // ugens fredag (iso) når listen er åbnet fra ugevisningen
+let tjekVaelger = false;  // viser kandidaterne i stedet for listen
+let tjekTravl   = false;
+let tjekSort    = (() => { try{ return localStorage.getItem(TJEK_SORT_NOEGLE) || "gruppe"; }catch(e){ return "gruppe"; } })();
+
+/* Ugens kobling, én pr. uge. undefined = ikke slået op endnu,
+   null = ingen ordre, ellers { ordre, sikkerhed, kilde }. */
+const ugeOrdre = {};
+const ugeOrdreIgang = new Set();
+
+async function ordreOversigt(noegle){
+  if(!noegle) return null;
+  const n = String(noegle);
+  /* Leveringsfeltet kender ordren på Nemligs interne id, ugevisningen
+     på det samme id fra basen — men ordrenummeret er et ANDET tal, og
+     det er ikke bevist hvilket af dem DeliverySpot bruger. Så slås der
+     op på begge. */
+  const { data } = await sb.from("nemlig_ordre_oversigt").select("*")
+    .or("id.eq." + n + ",ordrenummer.eq." + n).limit(2);
+  if(!data || !data.length) return null;
+  return data.find(o => String(o.id) === n) || data[0];
+}
+
+async function ugeOrdreSlaaOp(ugeStart){
+  if(ugeOrdre[ugeStart] !== undefined || ugeOrdreIgang.has(ugeStart)) return;
+  ugeOrdreIgang.add(ugeStart);
+  try{
+    const { data: gemt } = await sb.from("nemlig_uge_ordre").select("*")
+      .eq("uge_start", ugeStart).maybeSingle();
+    if(gemt){
+      const o = await ordreOversigt(gemt.ordre_id);
+      if(o && !o.annulleret){
+        ugeOrdre[ugeStart] = { ordre: o, sikkerhed: gemt.sikkerhed, kilde: gemt.kilde };
+        return;
+      }
+      /* Det gemte peger på et spøgelse: ordren er slettet hos Nemlig.
+         Så er koblingen ikke et faktum længere, og der regnes forfra. */
+      await sb.from("nemlig_uge_ordre").delete().eq("uge_start", ugeStart);
+    }
+    const { data: k, error } = await sb.rpc("nemlig_uge_kobling", { fredag: ugeStart });
+    if(error) throw error;
+    const svar = Array.isArray(k) ? k[0] : k;
+    if(!svar || !svar.ordre_id || svar.sikkerhed === "ingen ordre"){ ugeOrdre[ugeStart] = null; return; }
+    const o = await ordreOversigt(svar.ordre_id);
+    if(!o){ ugeOrdre[ugeStart] = null; return; }
+    ugeOrdre[ugeStart] = { ordre: o, sikkerhed: svar.sikkerhed, kilde: "automatisk" };
+    /* "sikker" og "rimelig" gemmes som fakta. "spoerg" gemmes IKKE —
+       arket viser den bedste og siger at familien bør se efter. */
+    if(svar.sikkerhed === "sikker" || svar.sikkerhed === "rimelig"){
+      await sb.from("nemlig_uge_ordre").upsert(
+        { uge_start: ugeStart, ordre_id: o.id, kilde: "automatisk", sikkerhed: svar.sikkerhed },
+        { onConflict: "uge_start" });
+    }
+  }catch(e){
+    /* Tavst: så står der bare "Læg i kurven" som før. Prøves igen ved
+       næste åbning af appen. */
+    console.warn("Ugens ordre kunne ikke slås op:", e);
+    ugeOrdre[ugeStart] = null;
+  }finally{
+    ugeOrdreIgang.delete(ugeStart);
+    if(fane === "indkoeb") render();
+  }
+}
+
+/* Fra leveringsdagen og frem hører tjeklisten til; før den giver den
+   ingen mening — varerne er der jo ikke endnu. */
+function ugeHarTjekliste(ugeStart){
+  const uo = ugeOrdre[ugeStart];
+  if(uo === undefined){ ugeOrdreSlaaOp(ugeStart); return false; }
+  return !!(uo && uo.ordre && uo.ordre.leveret_dag && uo.ordre.leveret_dag <= iso(new Date()));
+}
+
+function tjekDatoTekst(isoDag){
+  if(!isoDag) return "";
+  const d = fromIso(isoDag);
+  return UGEDAGE[(d.getDay()+6)%7] + " " + d.getDate() + ". " + MAANEDER[d.getMonth()];
+}
+
+/* ---------- Åbn ---------- */
+async function tjekAabn(opts){
+  opts = opts || {};
+  tjekUge = opts.uge || null;
+  tjekVaelger = false;
+  tjekOrdre = null; tjekLinjer = []; tjekMark = {};
+  document.getElementById("tjek-anden").textContent = "Vælg en anden ordre";
+  show("tjek-back");
+  tjekTegn("Henter ordren…");
+
+  let o = null;
+  if(opts.uge){
+    const uo = ugeOrdre[opts.uge];
+    o = uo && uo.ordre ? uo.ordre : null;
+  }else if(opts.ordreId){
+    o = await ordreOversigt(opts.ordreId);
+  }
+  if(!o){ tjekTegn("Ingen ordre fundet."); return; }
+
+  /* Er ordren ikke meldt leveret i basen, hentes den forfra først: den
+     kan være rettet siden sidst, og appen ser først leveringen når
+     Nemlig melder den. Fejler det, vises det vi har. */
+  if(o.leveringsstatus !== 1){
+    tjekTegn("Henter ordren forfra hos Nemlig…");
+    try{
+      await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+      o = (await ordreOversigt(o.id)) || o;
+    }catch(e){ /* så er det den gamle udgave */ }
+  }
+  tjekOrdre = o;
+
+  const [{ data: linjer }, { data: mark }] = await Promise.all([
+    sb.from("nemlig_ordrelinjer")
+      .select("produkt_id,produkt_navn,beskrivelse,antal,hovedgruppe,gruppe")
+      .eq("ordre_id", o.id),
+    sb.from("nemlig_tjek").select("produkt_id,tilstand").eq("ordre_id", o.id),
+  ]);
+  tjekLinjer = (linjer || []).filter(l => l.produkt_id);
+  tjekMark = {};
+  (mark || []).forEach(m => { tjekMark[m.produkt_id] = m.tilstand; });
+  tjekTegn();
+}
+
+/* ---------- Tegn ---------- */
+function tjekSorteret(){
+  const navn = l => (l.produkt_navn || "").toLocaleLowerCase("da");
+  const efterNavn = (a, b) => navn(a).localeCompare(navn(b), "da");
+  if(tjekSort === "alfa") return [{ titel: null, linjer: tjekLinjer.slice().sort(efterNavn) }];
+  const grupper = {};
+  tjekLinjer.forEach(l => {
+    const g = l.hovedgruppe || "Andet";
+    (grupper[g] = grupper[g] || []).push(l);
+  });
+  const orden = g => { const i = TJEK_GRUPPER.indexOf(g); return i < 0 ? 99 : i; };
+  return Object.keys(grupper)
+    .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, "da"))
+    .map(g => ({ titel: g, linjer: grupper[g].sort(efterNavn) }));
+}
+
+function tjekTegn(besked){
+  const titel = document.getElementById("tjek-titel");
+  const meta  = document.getElementById("tjek-meta");
+  const hoved = document.getElementById("tjek-hoved");
+  const krop  = document.getElementById("tjek-krop");
+  const anden = document.getElementById("tjek-anden");
+  if(!krop) return;
+
+  if(besked || !tjekOrdre){
+    titel.textContent = "Tjekliste";
+    meta.textContent = "";
+    hoved.innerHTML = "";
+    krop.innerHTML = '<div class="meta" style="padding:18px 0">' + esc(besked || "") + '</div>';
+    anden.hidden = !tjekUge;
+    return;
+  }
+
+  const o = tjekOrdre;
+  titel.textContent = "Levering " + tjekDatoTekst(o.leveret_dag);
+  const uo = tjekUge ? ugeOrdre[tjekUge] : null;
+  const tvivl = uo && uo.kilde === "automatisk" && uo.sikkerhed === "spoerg";
+  meta.textContent = tjekLinjer.length + " varer"
+    + (o.beloeb != null ? " · " + nemKr(o.beloeb) + " kr" : "")
+    + (uo && uo.kilde === "valgt" ? " · valgt af jer" : "")
+    + (tvivl ? " · USIKKER KOBLING — se efter at det er den rigtige ordre" : "");
+  anden.hidden = !tjekUge;
+
+  if(tjekVaelger){ tjekTegnVaelger(); return; }
+
+  const antalOk = tjekLinjer.filter(l => tjekMark[l.produkt_id] === 1).length;
+  const antalMangler = tjekLinjer.filter(l => tjekMark[l.produkt_id] === 2).length;
+  hoved.innerHTML =
+      '<span class="tal">' + antalOk + ' af ' + tjekLinjer.length + ' tjekket'
+    + (antalMangler ? ' · <b class="mangler">' + antalMangler + ' mangler</b>' : '') + '</span>'
+    + '<span class="skift" role="group" aria-label="Sortering">'
+    +   '<button data-tjeksort="gruppe" class="' + (tjekSort === "gruppe" ? "aktiv" : "") + '">Gruppe</button>'
+    +   '<button data-tjeksort="alfa" class="' + (tjekSort === "alfa" ? "aktiv" : "") + '">A–Å</button>'
+    + '</span>';
+
+  let h = "";
+  if(!tjekLinjer.length) h = '<div class="meta" style="padding:18px 0">Ordren har ingen varelinjer.</div>';
+  tjekSorteret().forEach(g => {
+    if(g.titel) h += '<div class="tjekgruppe">' + esc(g.titel) + '<span class="n">' + g.linjer.length + '</span></div>';
+    g.linjer.forEach(l => {
+      const t = tjekMark[l.produkt_id] || 0;
+      const kl = t === 1 ? " ok" : t === 2 ? " mangler" : "";
+      const antal = (typeof l.antal === "number" && l.antal !== 1) ? l.antal + " ×" : "";
+      h += '<div class="tjekrad' + kl + '" data-tjek="' + esc(l.produkt_id) + '" role="button" tabindex="0">'
+         +   '<span class="mark" aria-hidden="true">' + (t === 1 ? "✓" : t === 2 ? "−" : "") + '</span>'
+         +   '<span class="v"><span class="navn">' + esc(storNavn(l.produkt_navn || "")) + '</span>'
+         +     (l.beskrivelse ? '<span class="under">' + esc(String(l.beskrivelse).replace(/\s*\/\s*/g, " · ")) + '</span>' : "")
+         +   '</span>'
+         +   (antal ? '<span class="antal">' + esc(antal) + '</span>' : "")
+         + '</div>';
+    });
+  });
+  krop.innerHTML = h;
+}
+
+/* ---------- Tryk på en vare ---------- */
+async function tjekSkift(pid){
+  if(!tjekOrdre) return;
+  const nu = tjekMark[pid] || 0;
+  const ny = (nu + 1) % 3;          // tom → leveret → mangler → tom
+  tjekMark[pid] = ny;
+  tjekTegn();
+  const { error } = await sb.from("nemlig_tjek").upsert(
+    { ordre_id: tjekOrdre.id, produkt_id: pid, tilstand: ny, aendret: new Date().toISOString() },
+    { onConflict: "ordre_id,produkt_id" });
+  if(error){
+    tjekMark[pid] = nu;             // kunne ikke gemmes: tilbage til det gamle
+    tjekTegn();
+    vis("Kunne ikke gemme krydset: " + error.message);
+  }
+}
+
+/* Den anden telefon har trykket. */
+function tjekLive(p){
+  const r = p.new && p.new.ordre_id ? p.new : p.old;
+  if(!tjekOrdre || !r || String(r.ordre_id) !== String(tjekOrdre.id)) return;
+  if(p.eventType === "DELETE") delete tjekMark[r.produkt_id];
+  else if(typeof p.new.tilstand === "number") tjekMark[r.produkt_id] = p.new.tilstand;
+  else return;
+  if(!tjekVaelger) tjekTegn();
+}
+
+/* ---------- Vælg en anden ordre ---------- */
+async function tjekTegnVaelger(){
+  const krop = document.getElementById("tjek-krop");
+  const hoved = document.getElementById("tjek-hoved");
+  hoved.innerHTML = '<span class="tal">Hvilken ordre hører til ugen fra ' + tjekDatoTekst(tjekUge) + '?</span>';
+  krop.innerHTML = '<div class="meta" style="padding:18px 0">Finder ordrerne…</div>';
+  let kand = [];
+  try{
+    const { data, error } = await sb.rpc("nemlig_uge_kandidater", { fredag: tjekUge });
+    if(error) throw error;
+    kand = data || [];
+  }catch(e){ krop.innerHTML = '<div class="meta" style="padding:18px 0">Kunne ikke hente ordrerne.</div>'; return; }
+  if(!tjekVaelger) return;   // lukket imens
+  const over = await Promise.all(kand.map(k => ordreOversigt(k.ordre_id)));
+  if(!tjekVaelger) return;
+  let h = "";
+  kand.forEach((k, i) => {
+    const o = over[i]; if(!o) return;
+    const valgt = tjekOrdre && String(o.id) === String(tjekOrdre.id);
+    h += '<div class="tjekrad tjekkand' + (valgt ? " ok" : "") + '" data-tjekvalg="' + esc(o.id) + '" role="button" tabindex="0">'
+       +   '<span class="mark" aria-hidden="true">' + (valgt ? "✓" : "") + '</span>'
+       +   '<span class="v"><span class="navn">' + esc(tjekDatoTekst(o.leveret_dag)) + '</span>'
+       +     '<span class="under">' + o.antal_varer + ' varer · ' + nemKr(o.beloeb) + ' kr'
+       +       (k.point >= 3 ? " · passer godt" : k.point >= 2 ? " · passer nogenlunde" : "") + '</span>'
+       +   '</span>'
+       + '</div>';
+  });
+  krop.innerHTML = h || '<div class="meta" style="padding:18px 0">Der er ingen ordrer omkring den uge.</div>';
+}
+
+async function tjekVaelgOrdre(id){
+  if(!tjekUge) return;
+  const o = await ordreOversigt(id);
+  if(!o) return;
+  const { error } = await sb.from("nemlig_uge_ordre").upsert(
+    { uge_start: tjekUge, ordre_id: o.id, kilde: "valgt", sikkerhed: "valgt" },
+    { onConflict: "uge_start" });
+  if(error){ vis("Kunne ikke gemme valget: " + error.message); return; }
+  ugeOrdre[tjekUge] = { ordre: o, sikkerhed: "valgt", kilde: "valgt" };
+  if(fane === "indkoeb") render();
+  await tjekAabn({ uge: tjekUge });
+}
+
+/* ---------- Ledninger ---------- */
+document.getElementById("tjek-krop").addEventListener("click", async ev => {
+  const r = ev.target.closest("[data-tjek]");
+  if(r){ await tjekSkift(r.dataset.tjek); return; }
+  const v = ev.target.closest("[data-tjekvalg]");
+  if(v){ await tjekVaelgOrdre(v.dataset.tjekvalg); return; }
+});
+document.getElementById("tjek-krop").addEventListener("keydown", ev => {
+  if(ev.key !== "Enter" && ev.key !== " ") return;
+  const r = ev.target.closest("[data-tjek],[data-tjekvalg]");
+  if(!r) return;
+  ev.preventDefault(); r.click();
+});
+document.getElementById("tjek-hoved").addEventListener("click", ev => {
+  const s = ev.target.closest("[data-tjeksort]");
+  if(!s) return;
+  tjekSort = s.dataset.tjeksort;
+  try{ localStorage.setItem(TJEK_SORT_NOEGLE, tjekSort); }catch(e){}
+  tjekTegn();
+});
+document.getElementById("tjek-anden").onclick = () => {
+  tjekVaelger = !tjekVaelger;
+  document.getElementById("tjek-anden").textContent = tjekVaelger ? "Tilbage til listen" : "Vælg en anden ordre";
+  tjekTegn();
+};
+document.getElementById("tjek-kryds").onclick = () => { tjekVaelger = false; hide("tjek-back"); };
+document.getElementById("tjek-luk").onclick   = () => { tjekVaelger = false; hide("tjek-back"); };
+
 
 /* =======================================================================
    Dagsvisning
@@ -10032,6 +10420,9 @@ document.getElementById("stage").addEventListener("click", async ev => {
   const opt = ev.target.closest("[data-optoen]");
   if(opt){ spoergOptoen(opt.dataset.optoen); return; }
   if(ev.target.closest("[data-levvaek]")){ levSkjul(); return; }
+  const levtjek = ev.target.closest("[data-levtjek]");
+  if(levtjek){ await tjekAabn({ ordreId: levtjek.dataset.levtjek }); return; }
+  if(ev.target.closest("#tjek-knap")){ await tjekAabn({ uge: iso(indkoebUge) }); return; }
   const goto = ev.target.closest("[data-goto]");
   const week = ev.target.closest("[data-week]");
   const evb  = ev.target.closest("[data-ev]");
