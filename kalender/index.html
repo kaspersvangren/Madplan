@@ -984,6 +984,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
   border-radius:9px;overflow:hidden;background:var(--surface);width:104px}
 .nemtrin button{width:34px;height:32px;flex:none;font-size:17px;color:var(--muted)}
 .nemtrin button:hover{color:var(--ink);background:var(--chip)}
+/* Naaet loftet — gratis er een pr. kunde. Dæmpet frem for skjult, saa
+   knapperne ikke flytter sig under fingeren. */
+.nemtrin button[disabled]{opacity:.3}
+.nemtrin button[disabled]:hover{color:var(--muted);background:none}
 .nemtrin .tal{flex:1;text-align:center;font-variant-numeric:tabular-nums;font-size:14px}
 .nemhusk{margin-top:6px;font-size:13px;color:var(--muted);line-height:1.6}
 .nemtom{padding:18px 2px;color:var(--muted);font-size:14px}
@@ -2345,7 +2349,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.93.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.93.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7902,9 +7906,12 @@ async function nemHentGratis(){
           styk: null
         },
         ekstra: [],
-        /* Max 1 stk. er Nemligs egen grænse, ikke vores. */
+        /* Max 1 stk. er Nemligs egen grænse, ikke vores. FAST 1: en
+           gratis vare er altid én pr. kunde, uanset hvad kampagnen
+           skriver. Før stod der (kampagne.maxAntal || 1), og et forkert
+           MaxQuantity fra Nemlig kunne dermed hæve loftet. */
         standardAntal: 1,
-        maxAntal: (v.kampagne && v.kampagne.maxAntal) || 1,
+        maxAntal: 1,
         medtaget: !!valgt,
         antal: valgt ? 1 : 0,
         erGratis: true,
@@ -7994,7 +8001,7 @@ async function nemHentVip(){
         },
         ekstra: [],
         standardAntal: 1,
-        maxAntal: (g.kampagne && g.kampagne.maxAntal) || 1,
+        maxAntal: 1,          // gratis er altid én pr. kunde — også VIP-gaver
         medtaget: !!valgt,
         antal: valgt ? 1 : 0,
         erGratis: !!g.gratis,
@@ -8120,13 +8127,17 @@ function nemTegn(){
     + " – " + u1.getDate() + ". " + MAANEDER[u1.getMonth()]
     + (nemArk.henter ? " · henter priser…" : "");
 
-  const trin = (gruppe, i, antal, uafklaret) =>
+  /* maks = linjens loft, hvis den har et. En død plus-knap er værre end
+     ingen: knappen slås fra, så man kan SE at det er grænsen og ikke en
+     fejl. */
+  const trin = (gruppe, i, antal, uafklaret, maks) =>
     '<span class="nemtrin' + (uafklaret ? " spoerg" : "") + '">'
     + '<button type="button" data-nemtrin="' + gruppe + ':' + i + ':-1" aria-label="Færre">–</button>'
     /* Spørgsmålstegn frem for et tal: appen har ikke gættet, den venter
        på svar. Plus og minus er begge et svar. */
     + '<span class="tal">' + (uafklaret ? "?" : antal) + '</span>'
-    + '<button type="button" data-nemtrin="' + gruppe + ':' + i + ':1" aria-label="Flere">+</button>'
+    + '<button type="button" data-nemtrin="' + gruppe + ':' + i + ':1" aria-label="Flere"'
+    +   (!uafklaret && typeof maks === "number" && antal >= maks ? " disabled" : "") + '>+</button>'
     + '</span>';
 
   const linje = (l, gruppe, i) => {
@@ -8335,7 +8346,7 @@ function nemTegn(){
                      ? l.ekstra.length + 1 + " slags"
                      : l.kort._byttet ? "byttet" : "Varianter") + '</button>' : "")
       + '</span>'
-      + '<span class="trin">' + trin(gruppe, i, l.antal, l.uafklaret)
+      + '<span class="trin">' + trin(gruppe, i, l.antal, l.uafklaret, l.maxAntal)
       /* Stykprisen står altid. Køber man flere, står summen for linjen
          under — ellers skal man selv gange, og det er netop dét man
          gerne vil slippe for, når man står og skruer op og ned. */
@@ -10165,6 +10176,11 @@ document.getElementById("nem-krop").addEventListener("click", async ev => {
       } else {
         l.antal = Math.max(0, l.antal + Number(retning));
       }
+      /* Loftet HOLDER nu. maxAntal blev sat på gratis-linjerne helt
+         tilbage fra begyndelsen, men blev aldrig læst her — så kunne man
+         skrue en gratis vare op til fem og sende dem alle til Nemlig,
+         som kun giver én. Kun linjer der HAR et loft, begrænses. */
+      if(typeof l.maxAntal === "number" && l.antal > l.maxAntal) l.antal = l.maxAntal;
       l.medtaget = l.antal > 0;
       /* Sat helt til nul: saa er ugens bytte ogsaa ligegyldigt. Uden det
          stod der "byttet" paa en linje der slet ikke blev koebt. */
