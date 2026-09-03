@@ -911,8 +911,20 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemlink{display:block;width:100%;margin-top:8px;padding:10px;font:inherit;font-size:14px;
   font-weight:600;color:var(--muted);background:none;border:0}
 .levfelt[data-levtjek]{cursor:pointer}
-.tjekhoved{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin:6px 0 4px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Klæber til toppen af arket, saa status ikke ruller vaek. Arket ruller i
+   sig selv (.sheet), saa top:0 er arkets top — ikke skaermens. Baggrund og
+   lidt luft, ellers ville raekkerne skinne igennem under den. */
+/* Klaeber til toppen af arket, saa status ikke ruller vaek. Arket ruller i
+   sig selv (.sheet), saa top:0 er arkets scrollkant. De negative
+   sidemargener traekker baggrunden ud gennem arkets 18px polstring —
+   ellers ville raekkerne skinne igennem i siderne naar de ruller under.
+   width:auto er noedvendig sammen med negative margener, ellers giver de
+   vandret overloeb (samme faelde som opskriftens .fold i 2.20.2). */
+.tjekhoved{position:sticky;top:0;z-index:3;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;
+  margin:0 -18px 2px;width:auto;padding:8px 18px 6px;
+  font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;
+  background:var(--surface);box-shadow:0 6px 8px -8px rgba(0,0,0,.28)}
 .tjekhoved .mangler{color:var(--holiday)}
 .tjekhoved .skift{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
 .tjekhoved .skift button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border:0;
@@ -2360,7 +2372,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.94.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.95.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5630,6 +5642,9 @@ let tjekUge     = null;   // ugens fredag (iso) når listen er åbnet fra ugevis
 let tjekVaelger = false;  // viser kandidaterne i stedet for listen
 let tjekTravl   = false;
 let tjekSort    = (() => { try{ return localStorage.getItem(TJEK_SORT_NOEGLE) || "gruppe"; }catch(e){ return "gruppe"; } })();
+/* Omvendt rækkefølge. Nyttig når man pakker den sidste kasse ud først,
+   eller leder efter en vare langt nede i alfabetet. */
+let tjekOmvendt = (() => { try{ return localStorage.getItem(TJEK_SORT_NOEGLE + "-om") === "1"; }catch(e){ return false; } })();
 
 /* Ugens kobling, én pr. uge. undefined = ikke slået op endnu,
    null = ingen ordre, ellers { ordre, sikkerhed, kilde }. */
@@ -5800,8 +5815,9 @@ async function tjekHentVarer(ordreId){
 
 /* ---------- Tegn ---------- */
 function tjekSorteret(){
+  const vend = tjekOmvendt ? -1 : 1;
   const navn = l => (l.produkt_navn || "").toLocaleLowerCase("da");
-  const efterNavn = (a, b) => navn(a).localeCompare(navn(b), "da");
+  const efterNavn = (a, b) => navn(a).localeCompare(navn(b), "da") * vend;
   if(tjekSort === "alfa") return [{ titel: null, linjer: tjekLinjer.slice().sort(efterNavn) }];
   const grupper = {};
   tjekLinjer.forEach(l => {
@@ -5809,8 +5825,10 @@ function tjekSorteret(){
     (grupper[g] = grupper[g] || []).push(l);
   });
   const orden = g => { const i = TJEK_GRUPPER.indexOf(g); return i < 0 ? 99 : i; };
+  /* Vendes rækkefølgen, vendes BÅDE grupperne og varerne inde i dem —
+     ellers ville "omvendt" kun være halvt omvendt. */
   return Object.keys(grupper)
-    .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, "da"))
+    .sort((a, b) => (orden(a) - orden(b) || a.localeCompare(b, "da")) * vend)
     .map(g => ({ titel: g, linjer: grupper[g].sort(efterNavn) }));
 }
 
@@ -5851,14 +5869,22 @@ function tjekTegn(besked){
   /* Før leveringsdagen er listen til at SE på. Så står der hvornår den
      kan bruges i stedet for en tæller der alligevel ville stå på nul. */
   const kan = tjekKanKrydse();
+  const mangler = tjekLinjer.length - antalTjekket;
+  /* Hovedet klæber til toppen af arket, saa tallene bliver staaende mens
+     man ruller. "N tilbage" staar med, fordi det er DEM man leder efter,
+     naar man er sprunget over noget og skal huske at gaa tilbage. */
+  const pil = v => (tjekOmvendt ? " ↑" : " ↓");
   hoved.innerHTML =
       '<span class="tal">' + (kan
-        ? antalTjekket + ' af ' + tjekLinjer.length + ' tjekket'
+        ? antalTjekket + ' af ' + tjekLinjer.length
+          + (mangler ? ' · ' + mangler + ' tilbage' : ' · færdig')
           + (antalMangler ? ' · <b class="mangler">' + antalMangler + ' mangler</b>' : '')
         : 'Kan krydses af ' + tjekNaarTekst()) + '</span>'
     + '<span class="skift" role="group" aria-label="Sortering">'
-    +   '<button data-tjeksort="gruppe" class="' + (tjekSort === "gruppe" ? "aktiv" : "") + '">Gruppe</button>'
-    +   '<button data-tjeksort="alfa" class="' + (tjekSort === "alfa" ? "aktiv" : "") + '">A–Å</button>'
+    +   '<button data-tjeksort="gruppe" class="' + (tjekSort === "gruppe" ? "aktiv" : "") + '">Gruppe'
+    +     (tjekSort === "gruppe" ? pil() : "") + '</button>'
+    +   '<button data-tjeksort="alfa" class="' + (tjekSort === "alfa" ? "aktiv" : "") + '">A–Å'
+    +     (tjekSort === "alfa" ? pil() : "") + '</button>'
     + '</span>';
 
   let h = "";
@@ -6049,8 +6075,15 @@ document.getElementById("tjek-krop").addEventListener("keydown", ev => {
 document.getElementById("tjek-hoved").addEventListener("click", ev => {
   const s = ev.target.closest("[data-tjeksort]");
   if(!s) return;
-  tjekSort = s.dataset.tjeksort;
-  try{ localStorage.setItem(TJEK_SORT_NOEGLE, tjekSort); }catch(e){}
+  /* Tryk paa den knap der ALLEREDE er valgt vender raekkefoelgen om.
+     Skifter man derimod slags, starter man forfra den rigtige vej —
+     ellers ville man arve en omvendt orden man ikke bad om. */
+  if(s.dataset.tjeksort === tjekSort){ tjekOmvendt = !tjekOmvendt; }
+  else { tjekSort = s.dataset.tjeksort; tjekOmvendt = false; }
+  try{
+    localStorage.setItem(TJEK_SORT_NOEGLE, tjekSort);
+    localStorage.setItem(TJEK_SORT_NOEGLE + "-om", tjekOmvendt ? "1" : "0");
+  }catch(e){}
   tjekTegn();
 });
 document.getElementById("tjek-anden").onclick = () => {
@@ -12142,7 +12175,11 @@ slor().addEventListener("pointerdown", ev => {
    spørger om det er tid nu, i stedet for en frist der låses fast.
    ======================================================================= */
 const ARBEJDSBOKSE = ["edit-back", "opg-back", "retred-back", "skrald-back"];  // halvfærdigt: 1 time
-const LAESEBOKSE   = ["ret-back"];                                            // opskrift: aldrig
+/* Aldrig hjem til i dag mens en af disse står åben. Tjeklisten hører til
+   her af samme grund som opskriften: man står med hænderne i varerne og
+   rører ikke skærmen i lange stræk — og springer visningen hjem, mister
+   man det sted man var nået til. */
+const LAESEBOKSE   = ["ret-back", "tjek-back"];                               // opskrift, tjekliste: aldrig
 
 var sidsteBeroering = Date.now();
 function resetIdle(){ sidsteBeroering = Date.now(); }
