@@ -10,20 +10,23 @@
      theme_color der gælder, og den kender kun én farve. Resultatet var en
      statuslinje der hverken fulgte telefonen eller appens måneknap.
      Nu sætter saetTema() farven direkte, og en eksplicit theme-color
-     slår både manifestet og mediebetingelserne. -->
-<meta name="theme-color" id="temafarve" content="#F2F1ED">
-<!-- Farven skal vaere rigtig FOER foerste tegning. Den installerede app
-     ser ud til kun at laese theme-color ved opstart (Chrome aendrede
-     haandteringen af statuslinjen i sommeren 2026), og saa hjaelper det
-     ikke at rette den senere i scriptet. Derfor et lille synkront script
-     her, foer noget som helst er tegnet. Samme localStorage-noegle som
-     resten af appen bruger. -->
-<script>
-try{
-  if(localStorage.getItem("kalender-tema") === "dark")
-    document.getElementById("temafarve").setAttribute("content", "#121412");
-}catch(e){}
-</script>
+     slår både manifestet og mediebetingelserne.
+
+     RETTET 5. september 2026 — ALTID MØRK, uanset appens tema.
+     Statuslinjen tegnes ikke længere i den farve vi beder om; Android
+     tegner den sort uanset hvad. Men farven bruges STADIG til at vælge
+     ikonernes farve: siger vi lys, sætter systemet mørke ikoner — og så
+     stod uret mørkegråt på sort og kunne slet ikke læses. Vi opgiver
+     altså at farve linjen, som vi alligevel ikke bestemmer over, og
+     bruger tagget til det eneste det stadig kan: at gøre uret læsbart.
+     Manifestet har med vilje INGEN theme_color; se v2.95.1. -->
+<meta name="theme-color" id="temafarve" content="#121412">
+<!-- Det lille synkrone script her, som satte farven efter det gemte tema
+     foer foerste tegning, er FJERNET i v2.95.1: farven er den samme i
+     begge temaer nu, saa der er intet at rette op paa ved opstart. Det
+     fjerner samtidig den vaklen han saa — uret var hvidt den ene gang og
+     ulaeseligt graat den naeste, alt efter om tagget naaede at blive
+     laest. -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hverdag">
@@ -2372,7 +2375,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.95.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.95.1";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -6492,12 +6495,17 @@ document.addEventListener("click", ev => {
 });
 
 /* ---------- Lyst og mørkt ---------- */
-/* Farverne er de samme som --bg i de to temaer. Staar de to steder,
-   fordi meta-tagget skal have en ren vaerdi, ikke en CSS-variabel. */
-const TEMAFARVE = { light: "#F2F1ED", dark: "#121412" };
+/* MØRK I BEGGE TEMAER, med vilje. Se den lange forklaring ved
+   meta-tagget øverst i filen: Android tegner statuslinjen sort uanset
+   hvad vi beder om, men bruger stadig vores farve til at vælge ikonernes.
+   Bad vi om lys, blev uret mørkegråt på sort og forsvandt.
+
+   Funktionen bliver stående og kaldes stadig fra saetTema, så der er ét
+   sted at rette den dag Chrome laver om på det igen. */
+const TEMAFARVE = { light: "#121412", dark: "#121412" };
 function saetTemafarve(t){
   const m = document.getElementById("temafarve");
-  if(m) m.setAttribute("content", TEMAFARVE[t] || TEMAFARVE.light);
+  if(m) m.setAttribute("content", TEMAFARVE[t] || TEMAFARVE.dark);
 }
 function saetTema(t){
   document.documentElement.setAttribute("data-theme", t);
