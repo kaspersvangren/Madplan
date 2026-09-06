@@ -23,12 +23,10 @@ self.addEventListener('fetch', event => {
       .catch(() => fetch(event.request))
   );
 });
-/* =====================================================================
-   INDSAETTES NEDERST I sw.js - rør ikke det der står i forvejen.
 
-   Jeg har ikke set din sw.js, så den her blok står helt for sig selv
-   og bruger ingen af dens variabler. To hændelser: push viser beskeden,
-   notificationclick åbner appen det rigtige sted.
+/* =====================================================================
+   Push: to hændelser. push viser beskeden, notificationclick åbner
+   appen det rigtige sted.
    ===================================================================== */
 
 self.addEventListener("push", event => {
@@ -38,8 +36,18 @@ self.addEventListener("push", event => {
   const titel = d.titel || "Vores Hverdag";
   const valg = {
     body: d.tekst || "",
+    /* To forskellige ikoner, og de må IKKE være den samme fil.
+
+       icon er det store, farvede til højre i beskeden. Der er appikonet
+       det rigtige.
+
+       badge er det lille i statuslinjen, og Android tegner det som en
+       SILHUET: alt der ikke er gennemsigtigt, males hvidt. Peger badge
+       på appikonet — som den gjorde indtil 6. september 2026 — bliver
+       hele den firkantede flade til én hvid klat. icon-badge.png er
+       tegnet til formålet: hvid streg på gennemsigtig bund. */
     icon: "./icon-192.png",
-    badge: "./icon-192.png",
+    badge: "./icon-badge.png",
     lang: "da",
     /* Samme tag = en ny besked afløser den gamle i stedet for at
        stable sig op. Morgen og aften har hver sit. */
@@ -56,7 +64,7 @@ self.addEventListener("notificationclick", event => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true })
       .then(vinduer => {
-        /* Står appen allerede aaben, så brug den frem for at åbne en til. */
+        /* Står appen allerede åben, så brug den frem for at åbne en til. */
         for (const v of vinduer) {
           if ("focus" in v) {
             if (v.navigate && maal !== "./") { v.navigate(maal).catch(() => {}); }
