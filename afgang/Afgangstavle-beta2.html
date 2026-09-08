@@ -19,7 +19,7 @@
    Supabase, som holder nøglen. Filen kan derfor ligge offentligt.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "6.0.0 beta";
+const VERSION = "6.0.1 beta";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -159,21 +159,28 @@ button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
 .bånd .vejrder b{font-size:17px;}
 .bånd .vejrder.vådt{color:var(--stram);}
 
-.rk{display:grid;grid-template-columns:auto auto 1fr;gap:6px 14px;align-items:start;
-  padding:11px 16px;border-top:1px solid #eef1f4;cursor:pointer;
-  transition:background .15s;}
+.rk{display:grid;grid-template-columns:76px auto 1fr;gap:3px 12px;align-items:baseline;
+  padding:10px 16px;border-top:1px solid #eef1f4;cursor:pointer;transition:background .15s;}
 .rk:first-of-type,.bånd + .rk{border-top:none;}
 .rk:hover{background:#f4f7fa;}
 .rk.ændret{animation:blink 1.6s ease-out;}
 @keyframes blink{0%{background:#fff7d6;}100%{background:transparent;}}
 .rk.gammel{opacity:.6;}
+/* den nære afgang: en rolig puls i venstre kant, så øjet finder den */
+.rk.snart{box-shadow:inset 3px 0 0 var(--stram);animation:kant 2.4s ease-in-out infinite;}
+.rk.nu{box-shadow:inset 3px 0 0 var(--god);}
+@keyframes kant{0%,100%{box-shadow:inset 3px 0 0 var(--stram);}50%{box-shadow:inset 3px 0 0 #e8cf8a;}}
+.afg .presser{color:var(--stram);font-weight:600;}
+.bånd .omfremme{margin-left:auto;font-size:12px;color:var(--dæmpet);}
+.bånd .vejrder{margin-left:14px;}
 .rk.knap{opacity:.55;}
 .rk.aflyst{cursor:default;}
 .rk.aflyst:hover{background:transparent;}
 
-.afg{white-space:nowrap;}
-.afg b{font-size:18px;font-weight:600;display:block;line-height:1.15;}
-.afg span{font-size:11.5px;color:var(--dæmpet);}
+/* øverste linje: klokkeslæt og nedtælling side om side */
+.afg{grid-column:1 / -1;display:flex;align-items:baseline;gap:9px;white-space:nowrap;}
+.afg b{font-size:18px;font-weight:600;line-height:1.15;}
+.afg span{font-size:12px;color:var(--dæmpet);}
 .afg em{font-style:normal;color:var(--forsinket);font-weight:600;}
 .rk.aflyst .afg b{text-decoration:line-through;opacity:.5;}
 .aflystmærkat{color:var(--aflyst);font-weight:600;}
@@ -185,10 +192,11 @@ button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
 .mærke.letbane{background:var(--letbane);color:#fff;}
 .mærke.stog{background:var(--stog);color:#fff;}
 .rk.aflyst .mærke{opacity:.45;}
-.medlinje{padding-top:2px;}
+/* mærket står foran vejene, ikke oppe ved tiden */
+.medlinje{grid-column:1;justify-self:start;}
 
 /* mulighederne videre — én linje per vej */
-.veje{display:flex;flex-direction:column;gap:5px;}
+.veje{grid-column:2 / -1;display:flex;flex-direction:column;gap:4px;}
 .vej{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dæmpet);white-space:nowrap;}
 .vej .skift{min-width:112px;}
 .vej .vent{font-weight:600;font-style:normal;}
@@ -242,8 +250,7 @@ button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
 .fod{margin-top:20px;font-size:12px;color:var(--dæmpet);}
 
 @media(max-width:640px){
-  .rk{grid-template-columns:auto 1fr;}
-  .rk .veje{grid-column:1 / -1;}
+  .rk{grid-template-columns:auto 1fr;padding:10px 14px;}
   .vej .skift{min-width:0;}
   .trin{grid-template-columns:auto 1fr;row-gap:4px;}
   .trinstatus{grid-column:2;text-align:left;}
@@ -781,6 +788,9 @@ function tegnBånd(k){
   const tider=k.map(r=>r.samlet); const kortest=Math.min.apply(null,tider), længst=Math.max.apply(null,tider);
   const n=el("span","antal"); n.textContent = kortest===længst ? varighed(kortest) : kortest+"–"+varighed(længst);
   b.appendChild(e); b.appendChild(t); b.appendChild(n);
+  const om = el("span","omfremme mono");
+  levende.push(n2 => { om.textContent = k[0].ankomst > n2 ? nedtæl(k[0].ankomst, n2) : "fremme"; });
+  b.appendChild(om);
   const v=vejrPå(stedDer(), k[0].ankomst);
   if(v){ const w=el("span","vejrder"); w.appendChild(vejrIkon(v.kode,26));
     const g=el("b","mono"); g.textContent=v.grader+"°"; w.appendChild(g);
@@ -801,7 +811,13 @@ function tegnRække(r, nu){
   if(r.aflyst){ s.textContent="aflyst"; s.classList.add("aflystmærkat"); }
   else{
     const t=el("span"); s.appendChild(t);
-    levende.push(n => { t.textContent=nedtæl(r.et.afgang,n); });
+    levende.push(n => {
+      t.textContent = nedtæl(r.et.afgang, n);
+      const sek = (r.et.afgang - n)/1000;
+      rk.classList.toggle("snart", sek > 0 && sek <= 180);
+      rk.classList.toggle("nu", sek <= 0);
+      t.classList.toggle("presser", sek > 0 && sek <= 120);
+    });
     if(r.et.forsinkelse>=1){ const e=el("em"); e.textContent=" +"+r.et.forsinkelse; s.appendChild(e); }
   }
   afg.appendChild(s); rk.appendChild(afg);
