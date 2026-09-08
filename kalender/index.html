@@ -2396,7 +2396,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.96.1";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.97.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -5490,6 +5490,13 @@ async function hentLevering(){
     levLaes();
     levNoter(levering);
     leveringHentet = Date.now();
+    /* Nemlig kender ordren i samme sekund den er afgivet; basen gør
+       ikke, for ordrer læses kun ned efter en levering og som bagkant
+       om ugen. Bestiller Fie direkte, skal ordren altså hentes her —
+       ellers kan man se leveringen uden at kunne se hvad der kommer.
+       ordreOversigt henter selv forfra hvis den mangler, og gør det
+       kun én gang pr. ordre. Uden await: kalenderen skal ikke vente. */
+    if(levering && levering.ordre) ordreOversigt(levering.ordre);
   }catch(err){
     /* Leveringen er en ekstra oplysning, ikke noget kalenderen står og
        falder med. Går kaldet galt, siger vi ingenting i skærmbilledet —
@@ -5705,9 +5712,7 @@ let tjekOmvendt = (() => { try{ return localStorage.getItem(TJEK_SORT_NOEGLE + "
 const ugeOrdre = {};
 const ugeOrdreIgang = new Set();
 
-async function ordreOversigt(noegle){
-  if(!noegle) return null;
-  const n = String(noegle);
+async function ordreSlaaOp(n){
   /* Leveringsfeltet kender ordren på Nemligs interne id, ugevisningen
      på det samme id fra basen — men ordrenummeret er et ANDET tal, og
      det er ikke bevist hvilket af dem DeliverySpot bruger. Så slås der
@@ -5716,6 +5721,43 @@ async function ordreOversigt(noegle){
     .or("id.eq." + n + ",ordrenummer.eq." + n).limit(2);
   if(!data || !data.length) return null;
   return data.find(o => String(o.id) === n) || data[0];
+}
+
+/* Ordrer læses kun ned i basen når en levering er gennemført, og som
+   bagkant én gang om ugen. Bestiller Fie direkte hos Nemlig, kender
+   leveringsfeltet ordren med det samme — det spørger Nemlig live — mens
+   basen intet ved. Så kunne man se leveringen i kalenderen, men "Se
+   ordren" gav ingenting. Fundet i drift 6. september 2026.
+
+   Derfor: rammer et opslag ved siden af, hentes der forfra én gang og
+   slås op igen. Én gang PR. NØGLE, så en ordre der virkelig ikke findes
+   ikke sender appen til Nemlig igen og igen. */
+const ordreHentet = new Set();
+async function ordreOversigt(noegle){
+  if(!noegle) return null;
+  const n = String(noegle);
+  const foerste = await ordreSlaaOp(n);
+  if(foerste || ordreHentet.has(n)) return foerste;
+  ordreHentet.add(n);
+  try{
+    const r = await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+    if(!r.ok) throw new Error("svar " + r.status);
+    /* Funktionen svarer ALTID 200 med en tekstside, også når Nemlig
+       afviser. Teksten er det eneste der afslører det. */
+    const tekst = await r.text();
+    if(/afviste|Intet Nemlig-login|fejlede/i.test(tekst)) throw new Error(tekst.slice(0, 90));
+  }catch(err){
+    console.warn("Ordren kunne ikke hentes hos Nemlig:", err);
+    return null;
+  }
+  const o = await ordreSlaaOp(n);
+  /* Kom der noget nyt i basen, kan ugerne have fået en ordre de ikke
+     havde før. Cachen tømmes, så knappen i indkøbsfanen finder den. */
+  if(o){
+    Object.keys(ugeOrdre).forEach(k => { delete ugeOrdre[k]; });
+    if(fane === "indkoeb") render();
+  }
+  return o;
 }
 
 async function ugeOrdreSlaaOp(ugeStart){
