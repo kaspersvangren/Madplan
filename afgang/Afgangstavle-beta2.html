@@ -19,7 +19,7 @@
    Supabase, som holder nøglen. Filen kan derfor ligge offentligt.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "6.0.1 beta";
+const VERSION = "6.0.2 beta";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -462,9 +462,12 @@ function tolkBen(trip){
 const lager = {};   // rute.navn → { et: Map, to: Map }
 const RYD_MINUTTER = 60;
 
+/* Hylden er delt op på RETNING. Uden det blander hjem- og udturens
+   ben sig, og så kobles en letbane til en letbane.                */
 function hylde(rute){
-  if(!lager[rute.navn]) lager[rute.navn] = { et:new Map(), to:new Map() };
-  return lager[rute.navn];
+  const n = (hjemad ? "hjem" : "ud") + "|" + rute.navn;
+  if(!lager[n]) lager[n] = { et:new Map(), to:new Map() };
+  return lager[n];
 }
 const benNøgle = b => b.linje+"|"+(+b.planlagt)+"|"+(b.videre?b.videre.linje+"|"+(+b.videre.planlagt):"");
 
