@@ -2396,14 +2396,80 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.97.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.98.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* =======================================================================
+   ÉT sted at prøve igen
+
+   Alt hvad appen siger til Supabase — de 80 opslag, de 14 funktionskald,
+   rpc, storage og selve loginnet — går gennem den fetch vi giver klienten
+   her. Derfor sidder værnet HER og ikke i hvert enkelt kald: ellers
+   skulle det tilføjes ét sted ad gangen, og den næste nye forespørgsel
+   ville stå uden.
+
+   To slags forbigående fejl, og de behandles FORSKELLIGT:
+
+   1. "JWT issued at future". Supabase er ikke én maskine: beviset udstedes
+      af login-tjenesten og kontrolleres af data-tjenesten, og har de to
+      ure et sekund i forskel, ser et helt frisk bevis ud som om det kommer
+      fra fremtiden. Set i drift 13. og 14. september 2026 — først på
+      skraldedage, dagen efter på madplan_ingrediens.
+      Forespørgslen bliver AFVIST, altså nåede den aldrig at gøre noget.
+      Derfor er det trygt at gentage den, også når den skriver.
+
+   2. Serverfejl og døde kald (504 og den slags, som ramte beskederne og
+      sikkerhedskopien i september). Her ved vi IKKE om skrivningen nåede
+      igennem, før forbindelsen røg. Derfor gentages kun opslag der LÆSER.
+      En gentaget sletning kunne slette to gange.
+
+   Alt andet — 401 på en forkert kode, 404, 409 — sendes videre med det
+   samme. Den slags retter sig ikke af at blive spurgt igen. */
+const SB_VENTETIDER = [500, 1500, 4000];
+const sbSoevn = ms => new Promise(r => setTimeout(r, ms));
+
+/* Teksten står i svarets krop, ikke i statuskoden, så den skal læses.
+   Kroppen kan kun læses én gang — derfor en kopi. */
+async function erUrFejl(svar){
+  if(!svar || (svar.status !== 401 && svar.status !== 403)) return false;
+  try{
+    const t = await svar.clone().text();
+    return /issued at future|IssuedAt|clock skew/i.test(t);
+  }catch(e){ return false; }
+}
+
+async function sbFetch(indgang, init){
+  const metode = String((init && init.method) || "GET").toUpperCase();
+  const laeser = metode === "GET" || metode === "HEAD";
+
+  for(let forsoeg = 0; ; forsoeg++){
+    let svar = null, doede = null;
+    try { svar = await fetch(indgang, init); }
+    catch(err){ doede = err; }
+
+    if(svar && svar.ok) return svar;
+
+    const urfejl = await erUrFejl(svar);
+    const maaGentages = urfejl || ((doede || svar.status >= 500) && laeser);
+
+    if(!maaGentages || forsoeg >= SB_VENTETIDER.length){
+      if(doede) throw doede;
+      return svar;
+    }
+    console.warn("Forsøg " + (forsoeg + 1) + " fejlede ("
+      + (doede ? (doede.message || doede) : (urfejl ? "ur ude af trit" : svar.status))
+      + ") — prøver igen om " + SB_VENTETIDER[forsoeg] + " ms");
+    await sbSoevn(SB_VENTETIDER[forsoeg]);
+  }
+}
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: { fetch: sbFetch }
+});
 
 /* Bruges indtil personer er hentet fra databasen */
 let PEOPLE = [
@@ -2892,6 +2958,17 @@ const tilRaekke = e => ({
    ======================================================================= */
 let beskedUr = null;
 
+/* "Er SQL'en kørt?" var et godt gæt dengang tabellerne var nye. I dag er
+   de kørt for længst, og halen sendte ham et helt forkert sted hen da
+   uret drillede: "er SQL'en til madplan_ingrediens kørt?" om en tabel der
+   findes og virker. Nu står halen kun når serveren FAKTISK siger at
+   tabellen mangler. */
+function manglerTabel(fejl){
+  const t = ((fejl && (fejl.message || "")) + " " + (fejl && fejl.code || "")).toLowerCase();
+  return /does not exist|could not find the table|schema cache|pgrst205|42p01/.test(t);
+}
+const halen = (fejl, hale) => manglerTabel(fejl) ? " — " + hale : "";
+
 function vis(besked){
   document.getElementById("banner-text").textContent = besked;
   document.getElementById("banner").hidden = false;
@@ -2962,7 +3039,7 @@ async function hentAlt(forsoeg){
   paamindSkjult.clear();
   if(phRes.error){
     vis("Skjulte påmindelser kunne ikke hentes: " + phRes.error.message
-      + " — er SQL'en til påmindelser kørt?");
+      + halen(phRes.error, "er SQL'en til påmindelser kørt?"));
   } else {
     (phRes.data || []).forEach(r =>
       paamindSkjult.add(r.aftale_id + "|" + r.forekomst_dato));
@@ -2989,7 +3066,7 @@ async function hentAlt(forsoeg){
   if(miRes.error){
     madplanIng = [];
     vis("Markeringer pr. ingrediens kunne ikke hentes: " + miRes.error.message
-      + " — er SQL'en til madplan_ingrediens kørt?");
+      + halen(miRes.error, "er SQL'en til madplan_ingrediens kørt?"));
   } else {
     madplanIng = miRes.data || [];
   }
@@ -3015,7 +3092,7 @@ async function hentAlt(forsoeg){
   if(feRes.error){
     ferier = [];
     vis("Ferier kunne ikke hentes: " + feRes.error.message
-      + " — er SQL'en til etape 5 kørt?");
+      + halen(feRes.error, "er SQL'en til etape 5 kørt?"));
   } else {
     ferier = feRes.data || [];
   }
@@ -4987,7 +5064,10 @@ let vejrFejl = "";
 
 async function hentVejr(){
   try{
-    const res = await fetch(VEJR_URL, {cache:"no-store"});
+    /* Vejret ligger hos en fremmed tjeneste, ikke hos Supabase, men et
+       hik er lige så forbigående der. sbFetch gentager kun opslag der
+       læser, og det her er et. */
+    const res = await sbFetch(VEJR_URL, {cache:"no-store"});
     if(!res.ok) throw new Error("status " + res.status);
     const j = await res.json();
     const t = j.hourly;
@@ -5428,7 +5508,7 @@ async function statImport(ordre){
   }
   statTravl = true;
   try{
-    const r = await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+    const r = await sbFetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
     if(!r.ok) throw new Error("svar " + r.status);
     /* Funktionen svarer ALTID 200 med en tekstside — også når Nemlig
        afviser, eller når loginnet er udløbet. Derfor læses teksten, i
@@ -5740,7 +5820,7 @@ async function ordreOversigt(noegle){
   if(foerste || ordreHentet.has(n)) return foerste;
   ordreHentet.add(n);
   try{
-    const r = await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+    const r = await sbFetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
     if(!r.ok) throw new Error("svar " + r.status);
     /* Funktionen svarer ALTID 200 med en tekstside, også når Nemlig
        afviser. Teksten er det eneste der afslører det. */
@@ -5869,7 +5949,7 @@ async function tjekAabn(opts){
   if(o.leveringsstatus !== 1){
     tjekTegn("Henter ordren forfra hos Nemlig…");
     try{
-      await fetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
+      await sbFetch(SUPABASE_URL + "/functions/v1/nemlig-historik?antal=3&forfra=1");
       o = (await ordreOversigt(o.id)) || o;
     }catch(e){ /* så er det den gamle udgave */ }
   }
