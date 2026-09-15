@@ -19,7 +19,7 @@
    Supabase, som holder nøglen. Filen kan derfor ligge offentligt.
    ══════════════════════════════════════════════════════════════ */
 
-const VERSION = "6.0.2 beta";
+const VERSION = "6.0.4 beta";
 
 const FUNKTION = "https://kargzxpaaganyfnpyvmb.supabase.co/functions/v1/rejseplan";
 
@@ -224,6 +224,7 @@ button:focus-visible{outline:2px solid var(--stog);outline-offset:2px;}
 .trinrute{font-size:13.5px;}
 .trintider{font-size:12.5px;color:var(--dæmpet);}
 .trintider em{font-style:normal;color:var(--forsinket);font-weight:600;}
+.trintider em.skøn{font-weight:500;opacity:.85;}
 .trinstatus{font-size:12px;white-space:nowrap;text-align:right;color:var(--dæmpet);}
 .trinstatus.kører{color:var(--god);font-weight:600;}
 .trinstatus.færdig{opacity:.55;}
@@ -441,13 +442,30 @@ function tolkBen(trip){
   if(ben.length!==1) return null;
   const b=ben[0], p=produktAf(b);
   const planlagt=tidAf(b.Origin,false), afgang=tidAf(b.Origin,true)||planlagt;
-  const planAnk=tidAf(b.Destination,false), ankomst=tidAf(b.Destination,true)||planAnk;
+  const planAnk=tidAf(b.Destination,false);
+  let ankomst=tidAf(b.Destination,true)||planAnk;
   if(!afgang||!ankomst) return null;
+
+  const art = artAf(p);
+  const forsinkelse = minutter(planlagt, afgang);
+  let ankForsinkelse = planAnk ? minutter(planAnk, ankomst) : 0;
+  let skønnet = false;
+
+  /* Letbanen kører på fast spor uden overhaling — den henter ikke to
+     minutter ind på ti. Melder Rejseplanen afgangen forsinket uden at
+     melde ankomsten, er ankomsten bare køreplanen. Så fører vi
+     forsinkelsen med over og markerer den som skøn.                */
+  if(art === "letbane" && forsinkelse >= 1 && ankForsinkelse < forsinkelse && planAnk){
+    ankomst = new Date(planAnk.getTime() + forsinkelse*60000);
+    ankForsinkelse = forsinkelse;
+    skønnet = true;
+  }
+
   return {
     linje: p.line||(b.name||"").replace(/^(Bus|S-tog|Letbane)\s+/i,"").trim(),
-    art: artAf(p),
+    art: art,
     planlagt: planlagt, afgang: afgang, planAnk: planAnk, ankomst: ankomst,
-    forsinkelse: minutter(planlagt,afgang), ankForsinkelse: planAnk ? minutter(planAnk,ankomst) : 0,
+    forsinkelse: forsinkelse, ankForsinkelse: ankForsinkelse, skønnet: skønnet,
     aflyst: erAflyst(trip)||benAflyst(b),
     videre: null
   };
@@ -876,7 +894,11 @@ function tegnLås(d, nu){
     t.appendChild(document.createTextNode(urTekst(ben.afgang)));
     if(ben.forsinkelse>=1){ const e=el("em"); e.textContent=" +"+ben.forsinkelse; t.appendChild(e); }
     t.appendChild(document.createTextNode(" – "+urTekst(ben.ankomst)));
-    if(ben.ankForsinkelse>=1){ const e=el("em"); e.textContent=" +"+ben.ankForsinkelse; t.appendChild(e); }
+    if(ben.ankForsinkelse>=1){
+      const e=el("em"); e.textContent = ben.skønnet ? " (+"+ben.ankForsinkelse+")" : " +"+ben.ankForsinkelse;
+      if(ben.skønnet){ e.classList.add("skøn"); e.title="Skøn: letbanen henter ikke forsinkelsen ind"; }
+      t.appendChild(e);
+    }
     return t;
   }
   function trin(ben, fra, til, statusFn, aflyst){
@@ -895,11 +917,14 @@ function tegnLås(d, nu){
     const sk=el("div","trinskift");
     const t=el("span"); t.textContent="Skift på "+sted+" · "+vent+" min"; sk.appendChild(t);
     const dom=el("span","skiftdom");
+    /* Samme tre niveauer som i listen. Fire minutter mod fire nødvendige
+       er nul margen og fortjener ikke et grønt "holder".            */
     levende.push(n => {
-      const kørt=afgTid<n, stramt=vent<krav;
-      if(kørt&&stramt){ dom.textContent="mistet"; dom.className="skiftdom mistet"; }
+      const kørt = afgTid < n;
+      if(kørt && vent < krav){ dom.textContent="mistet"; dom.className="skiftdom mistet"; }
       else if(kørt){ dom.textContent="overstået"; dom.className="skiftdom færdig"; }
-      else if(stramt){ dom.textContent="stramt — skynd dig"; dom.className="skiftdom stramt"; }
+      else if(vent < krav){ dom.textContent="for kort — du når det ikke"; dom.className="skiftdom mistet"; }
+      else if(vent < krav+3){ dom.textContent="lige akkurat"; dom.className="skiftdom stramt"; }
       else { dom.textContent="holder"; dom.className="skiftdom holder"; }
     });
     sk.appendChild(dom); return sk;
