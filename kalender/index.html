@@ -2396,7 +2396,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.98.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "2.99.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -8066,7 +8066,19 @@ function nemByg(){
          gæt — men KUN når det er større end 1 og varen faktisk er købt
          før; ellers står den gamle værdi. */
       standardAntal: nemStandardAntal(v),
-      sortering: v.sortering
+      sortering: v.sortering,
+      /* HUSKELISTE, ikke bestilling. De faste varer står der hver uge for
+         at man skal tage stilling — og svaret er tit "ikke denne uge".
+         Derfor må en udsolgt fast vare ikke spærre send-knappen: den
+         beder om en beslutning der ikke findes. Lader man den være, er
+         den netop i den tilstand man ville have valgt alligevel.
+
+         Mærket sættes KUN her, på de faste varer ugens retter IKKE
+         bruger. En fast vare der OGSÅ er ingrediens i ugens mad
+         (altidMedBehov, fastOgBrugt) er en rigtig ingrediens, og der
+         falder maden på gulvet hvis man ikke tager stilling — den
+         spærrer som før. */
+      erFastHuskeliste: true
     }));
 
   const faste = altidMedBehov.concat(fasteTomme)
@@ -8378,7 +8390,8 @@ function nemTilstand(l){
    håndteret), og en VIP-gave der ikke kan leveres tæller heller ikke — den
    er en oplysning, ikke en opgave. */
 function nemBlokerer(l){
-  return !l.spring && !l.vipSpaerret && nemTilstand(l) !== "klar";
+  return !l.spring && !l.vipSpaerret && !l.erFastHuskeliste
+      && nemTilstand(l) !== "klar";
 }
 
 /* En udsolgt VARIANT spærrer ikke linjen — man har jo allerede sagt ja til
@@ -8496,7 +8509,12 @@ function nemTegn(){
               : tilstand === "ukendt"
               ? '<button class="loes" data-nemloes="' + gruppe + ':' + i + '">find vare</button>'
               : '<button class="loes" data-nemudskift="' + gruppe + ':' + i + '">Udskift</button>')
-        +   '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">spring over</button>'
+        /* "Spring over" fjernes paa en fast vare fra huskelisten: den
+           spaerrer ikke laengere noget, saa knappen ville bede om en
+           handling der ingen virkning har. Udskift bliver staaende — vil
+           man have varen, kan man stadig vaelge en anden variant. */
+        +   (l.erFastHuskeliste ? ""
+              : '<button class="spring" data-nemspring="' + gruppe + ':' + i + '">spring over</button>')
         + '</span></div>';
     }
 
