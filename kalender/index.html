@@ -1223,6 +1223,13 @@ html[data-theme="dark"] .menustjerne path{fill:#D9A63C;stroke:#3A2606}
 .tilret-vare .nu{font-weight:700}
 .tilret-vare s{color:var(--muted);margin-left:4px}
 .tilret-vare .pct{color:var(--holiday);font-weight:700;margin-left:4px}
+.tilret-vare .slut{color:var(--muted);font-weight:400}
+/* Sammenligningsvaren: rykket ind under teksten (44px billede + 10px luft),
+   tydeligt et link med understregning og pil. */
+.tilret-mod{display:block;font:inherit;font-size:13.5px;color:var(--muted);background:none;
+  border:0;padding:2px 0 4px 54px;text-align:left;text-decoration:underline;
+  text-decoration-color:var(--line);text-underline-offset:3px}
+.tilret-mod .pil{text-decoration:none;display:inline-block;margin-left:2px}
 .tilsektion{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   color:var(--muted);margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
 .tilsektion:first-of-type{margin-top:6px}
@@ -2530,7 +2537,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.5.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.6.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -7251,13 +7258,20 @@ let nemTiderHenter = false;
    reservationen er udløbet. Nemlig husker valget selv om beslaget slipper,
    og det er den levering varerne skal med. Har han ikke valgt noget,
    tages den valgte dags billigste ledige tidsrum.                       */
+/* v3.6.0: en leveringsdag I DAG eller tidligere bruges ALDRIG til at
+   planlaegge. [stated] "Vi bestiller jo aldrig til levering samme dag."
+   Tilbudsarket stod med "Leveres i dag" 22/9, uden at der var en ordre
+   til den dag: enten en tid valgt paa kontoen, eller reglen der tager
+   Nemligs foerste ledige dag naar torsdag ikke er med i svaret. */
+const nemEfterIdag = ds => !!ds && ds > iso(new Date());
+
 function nemTidsrum(){
   if(!nemTider) return null;
-  if(nemTider.valgt) return nemTider.valgt.utc;
-  const dag = nemUgeAlt().levering || nemStandardLevering();
+  if(nemTider.valgt && nemEfterIdag(nemTider.valgt.dato)) return nemTider.valgt.utc;
+  const dag = nemLeveringsDag();
   const d = (nemTider.dage || []).find(x => x.dato === dag);
   if(d && d.billigste) return d.billigste.utc;
-  const f = (nemTider.dage || [])[0];
+  const f = (nemTider.dage || []).find(x => nemEfterIdag(x.dato));
   return f && f.billigste ? f.billigste.utc : null;
 }
 
@@ -7271,12 +7285,14 @@ async function nemHentTider(){
     /* Står der en tid hos Nemlig, skal arket vise DEN dag — også når
        reservationen er udløbet. Ellers ville arket påstå én leveringsdag
        mens ordren har en anden. */
-    if(data.valgt && data.valgt.dato){
+    if(data.valgt && nemEfterIdag(data.valgt.dato)){
       nemLeveringSaet(data.valgt.dato);
     } else if(!(nemTider.dage || []).some(d => d.dato === nemLeveringsDag())){
-      /* Den dag arket peger på er slet ikke ledig. Tag den første der er,
-         frem for at vise udsolgt-status for en dag der ikke kan vælges. */
-      nemLeveringSaet(nemTider.dage[0].dato);
+      /* Den dag arket peger på er slet ikke ledig. Tag den første der er
+         — EFTER i dag (v3.6.0) — frem for at vise udsolgt-status for en
+         dag der ikke kan vælges. */
+      const f = (nemTider.dage || []).find(d => nemEfterIdag(d.dato));
+      if(f) nemLeveringSaet(f.dato);
     }
     /* Gaverne hentes forfra med det rigtige tidsrum: det er netop
        tidsrummet der afgør om en gave kan komme med. */
@@ -7292,7 +7308,9 @@ async function nemHentTider(){
 }
 
 function nemLeveringsDag(){
-  return nemUgeAlt().levering || nemStandardLevering();
+  /* En gemt dag der er i dag eller passeret, gaelder ikke laengere. */
+  const gemt = nemUgeAlt().levering;
+  return nemEfterIdag(gemt) ? gemt : nemStandardLevering();
 }
 
 function nemLevering(){
@@ -8466,7 +8484,7 @@ function tilbudVis(noegle){
       (bil ? '<img src="' + esc(bil) + '" alt="Udsnit af avisen">' : "")
     + '<div class="linje"><b>' + esc(f.overskrift || "") + '</b></div>'
     + (f.beskrivelse ? '<div class="linje">' + esc(f.beskrivelse) + '</div>' : "")
-    + '<div class="linje">Det er avisens egen tekst. Om jeres vare er med, må billedet afgøre.</div>';
+    + '<div class="linje">Fundet automatisk — tjek selv, at det er jeres vare.</div>';
   show("tilbudvis-back");
 }
 
@@ -11703,13 +11721,27 @@ function tilbudRetTegn(){
           const egenPct = (normal != null && v.pris != null && normal > v.pris)
             ? Math.round((normal - v.pris) / normal * 100) : null;
           const gange = pakker > 1 ? pakker + " \u00d7 " : "";
+          /* Slutdatoen, naar Nemlig selv viser den (visSlut). */
+          const k = v.kampagne || null;
+          const slut = k && k.slutter && k.visSlut !== false ? new Date(k.slutter) : null;
+          const slutTekst = slut && !isNaN(slut)
+            ? " \u00b7 til " + slut.getDate() + ". " + MAANEDER[slut.getMonth()].slice(0, 3) : "";
           const linje1 = v.pris == null ? ""
             : '<span class="nu">' + esc(gange + nemKr(v.pris) + " kr") + '</span>'
-            + (egenPct ? ' <s>' + esc(nemKr(normal)) + '</s> <span class="pct">\u2212' + egenPct + ' %</span>' : "");
+            + (egenPct ? ' <s>' + esc(nemKr(normal)) + '</s> <span class="pct">\u2212' + egenPct + ' %</span>' : "")
+            + (slutTekst ? '<span class="slut">' + esc(slutTekst) + '</span>' : "");
           const mod = d.fund.normalVare && String(d.fund.normalVare.produkt_id) !== String(p.produkt_id)
             ? d.fund.normalVare : null;
-          const linje2 = '<span class="spar">Spar ' + nemKr(d.kr) + ' kr på retten</span>'
-            + (mod ? ' \u00b7 ' + Math.round(d.fund.pct) + ' % under ' + esc(mod.produkt_navn || "") : "");
+          const linje2 = '<span class="spar">Spar ' + nemKr(d.kr) + ' kr på retten</span>';
+          /* v3.6.0: "12 % under X" paa EGEN linje (et langt navn kunne ikke
+             staa ved siden af) — og som tryk til den vares kort. Egen knap,
+             SEPARAT fra varens: en knap maa ikke ligge inde i en knap. */
+          const modLinje = mod
+            ? '<button type="button" class="tilret-mod" data-tilretvare="' + esc(mod.produkt_id) + '"'
+            +   ' data-tilretretnavn="' + esc(r.ret) + '">'
+            +   Math.round(d.fund.pct) + ' % under ' + esc(mod.produkt_navn || "")
+            +   ' <span class="pil" aria-hidden="true">›</span></button>'
+            : "";
           const bil = v.billede || p.billede || null;
           return '<button type="button" class="tilret-vare" data-tilretvare="' + esc(p.produkt_id) + '"'
             +     ' data-tilretretnavn="' + esc(r.ret) + '">'
@@ -11717,7 +11749,8 @@ function tilbudRetTegn(){
             +   '<span class="v"><b>' + esc(p.produkt_navn || d.vare) + '</b>'
             +     (linje1 ? '<span class="linje pris">' + linje1 + '</span>' : "")
             +     '<span class="linje">' + linje2 + '</span>'
-            +   '</span></button>';
+            +   '</span></button>'
+            + modLinje;
         }).join("")
     + '</div>').join("");
 }
