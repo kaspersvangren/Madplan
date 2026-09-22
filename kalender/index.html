@@ -2537,7 +2537,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.6.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.7.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -11553,7 +11553,20 @@ function tilbudRetNormal(pris){
 }
 
 /* Regnestykket for ÉN vare. Returnerer null når der intet er at sige. */
-function tilbudRetVare(vareNavn){
+/* Staar ingrediensen i STK i opskriften? Saa er det hele stykker der
+   koebes, og der sammenlignes pakke mod pakke (v3.7.0).
+
+   [stated] "Man laver ikke culottesteg med x antal gram, man laver en
+   culottesteg." Foer blev "1 stk culottesteg" regnet om til vinderens
+   pakkevaegt (1,5 kg) og sammenlignet pr. KILO — og saa blev oeko'en
+   maalt mod Culottesteg paa 1,8 kg, fordi den var billigst pr. kilo, selv
+   om den som steg koster 399,95 mod oeko'ens normale 343,95. */
+function tilbudRetErStk(brug){
+  const e = String((brug && brug.enhed) || "").toLowerCase().replace(/\.$/, "").trim();
+  return e === "stk" || e === "styk" || e === "styks" || e === "stykker";
+}
+
+function tilbudRetVare(vareNavn, stk){
   const produkter = tilbudRetProdukter(vareNavn);
   if(!produkter.length) return null;
 
@@ -11562,8 +11575,12 @@ function tilbudRetVare(vareNavn){
     const pris = tilbudRetPriser[String(p.produkt_id)];
     if(!pris || pris.pris == null) return;
     if(pris.paaLager === false) return;           // udsolgt er ikke et tilbud
-    const nu = tilbudRetEnhed(p, pris.pris);
-    const no = tilbudRetEnhed(p, tilbudRetNormal(pris));
+    /* STK: hele stykker, pakke mod pakke. Ellers som foer: kilo- eller
+       literpris naar den kan regnes, ellers pakke. */
+    const normalPris = tilbudRetNormal(pris);
+    const nu = stk ? { pris: pris.pris, basis: "pakke" } : tilbudRetEnhed(p, pris.pris);
+    const no = stk ? (normalPris != null ? { pris: normalPris, basis: "pakke" } : null)
+                   : tilbudRetEnhed(p, normalPris);
     if(nu && (!bedstNu || nu.pris < bedstNu.pris))
       bedstNu = { ...nu, p, kampagne: pris.kampagne || null };
     if(no && (!bedstNormal || no.pris < bedstNormal.pris)) bedstNormal = { ...no, p };
@@ -11582,7 +11599,7 @@ function tilbudRetVare(vareNavn){
      normalpris. Er det en anden vare end vinderen, er besparelsen mindre
      end vinderens egen rabat, og det skal kortet kunne forklare (v3.4.0). */
   return { sparPrEnhed, pct, basis: bedstNu.basis, vinder: bedstNu.p,
-           kampagne: bedstNu.kampagne, normalVare: bedstNormal.p };
+           kampagne: bedstNu.kampagne, normalVare: bedstNormal.p, stk: !!stk };
 }
 
 /* Hvad sparer man så på DENNE ret? Behovet lægges om til samme grundlag
@@ -11590,6 +11607,8 @@ function tilbudRetVare(vareNavn){
    med én pakke — samme antagelse som indkøbslisten allerede gør. */
 function tilbudRetKroner(fund, brug){
   const p = fund.vinder;
+  /* STK: antallet af stykker i opskriften er antallet af pakker. */
+  if(fund.stk) return fund.sparPrEnhed * Math.max(1, Number(brug.maengde) || 1);
   if(fund.basis === "pakke"){
     const a = (brug.maengde == null) ? 1
       : nemAntal(brug.maengde, brug.enhed, p.pakke_maengde, p.pakke_enhed, p).antal;
@@ -11607,9 +11626,17 @@ function tilbudRetKroner(fund, brug){
 function tilbudRetSamle(){
   const ud = new Map();
   tilbudRetKilder().forEach((k, noegle) => {
-    const fund = tilbudRetVare(k.navn);
-    if(!fund) return;
+    /* Samme ingrediens kan staa i gram i een ret og i stk i en anden, saa
+       sammenligningen vaelges PR. OPSKRIFT. Hver slags regnes kun een gang. */
+    const cache = {};
+    const fundFor = b => {
+      const stk = tilbudRetErStk(b);
+      if(!(stk in cache)) cache[stk] = tilbudRetVare(k.navn, stk);
+      return cache[stk];
+    };
     k.brug.forEach(b => {
+      const fund = fundFor(b);
+      if(!fund) return;
       const kr = tilbudRetKroner(fund, b);
       if(kr == null || kr < TILRET_KR) return;
       if(!ud.has(b.retId)) ud.set(b.retId, { retId: b.retId, ret: b.ret, ialt: 0, dele: [] });
@@ -11707,7 +11734,8 @@ function tilbudRetTegn(){
     +   r.dele.map(d => {
           const p = d.fund.vinder;
           const v = tilbudRetPriser[String(p.produkt_id)] || {};
-          const pakker = (d.brug && d.brug.maengde != null)
+          const pakker = d.fund.stk ? Math.max(1, Math.round(Number(d.brug && d.brug.maengde) || 1))
+            : (d.brug && d.brug.maengde != null)
             ? Math.max(1, nemAntal(d.brug.maengde, d.brug.enhed, p.pakke_maengde, p.pakke_enhed, p).antal || 1) : 1;
           /* v3.4.0 — TO besparelser, paa hver sin linje, efter hans oenske:
              1. Nemligs tilbud paa VAREN: pris, overstreget foerpris, procent
