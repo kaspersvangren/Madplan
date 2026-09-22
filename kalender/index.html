@@ -1971,6 +1971,13 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       <button type="button" class="bskrk" data-kt="a_optoening">❄ Op af fryseren<span class="stand">til</span></button>
       <button type="button" class="bskrk" data-kt="a_nyt">Nye opgaver siden sidst<span class="stand">til</span></button>
 
+      <!-- "Alle notifikationer skal vaere et valg" (22/9). De to her kommer
+           ikke paa et fast tidspunkt, men naar noget sker — og de er
+           SLAAET FRA som standard; man vaelger dem selv til. -->
+      <div class="bskgrp">Når noget sker</div>
+      <button type="button" class="bskrk" data-kt="tilbud">Tilbud i Rema og 365<span class="stand">fra</span></button>
+      <button type="button" class="bskrk" data-kt="teknik">Tekniske advarsler — når Nemlig eller tilbudsaviserne holder op med at svare<span class="stand">fra</span></button>
+
       <div class="bsksum" id="besk-sum"></div>
     </div>
     <div class="actions">
@@ -2523,7 +2530,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.4.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.5.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -13386,7 +13393,11 @@ const ENHED_ID = (() => {
 const M_TIDER = ["06:30","07:00","07:30","08:00","08:30"];
 const A_TIDER = ["18:30","19:00","19:30","20:00","20:30"];
 const BESK_KONTAKTER = ["m_aftaler","m_opgaver","m_nyt",
-                        "a_aftaler","a_opgaver","a_optoening","a_nyt"];
+                        "a_aftaler","a_opgaver","a_optoening","a_nyt",
+                        /* v3.5.0: basens standard er FRA for begge, ogsaa
+                           paa enheder der tilmeldes fremover — tilmeldingen
+                           saetter dem ikke, saa standarden gaelder. */
+                        "tilbud","teknik"];
 
 let beskRaekke = null;      /* rækken i push_enheder for DENNE enhed */
 let beskKladde = null;      /* det man er ved at rette, så Luk fortryder */
