@@ -1196,6 +1196,14 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    oven paa. Saa kan den hverken daekke navnet eller "sidst lavet", og
    kortets hoejde passer sig selv.                                       */
 .retkort .tilbudstjerne{flex:none;align-self:center}
+.menustjerne{flex:none;margin-left:6px;vertical-align:-2px}
+.menustjerne path{fill:#F6C453;stroke:#8A5A0B;stroke-width:1.2;stroke-linejoin:round}
+html[data-theme="dark"] .menustjerne path{fill:#D9A63C;stroke:#3A2606}
+/* Afsnitsoverskrift i tilbudsarket. Samme udtryk som .gruppetop. */
+.tilsektion{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.tilsektion:first-of-type{margin-top:6px}
+#tilbudret-andre .tilret-ret h3{margin-bottom:2px}
 .retkort .tilbudstjerne path{fill:#F6C453;stroke:#8A5A0B;stroke-width:1}
 .retkort .tilbudstjerne text{fill:#4A2E02;font-size:11px;font-weight:600}
 .retkort .tilbudstjerne text.kr{font-size:12px}
@@ -1981,7 +1989,10 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
     </button>
     <button class="menu-row" id="menu-tilbudret">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4L12 22l-9-9V4a1 1 0 0 1 1-1h9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
-      Tilbud på retter
+      Tilbud
+      <!-- Samme gule stjerne som paa retkortene, saa den betyder det
+           samme begge steder. Skal traekke oejet lidt — han bad om det. -->
+      <svg class="menustjerne" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.5.9-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.1 1.1-6.5L2.6 9.5l6.5-.9z"/></svg>
     </button>
     <!-- Købshistorikken er sit EGET site, ikke et ark i appen: den er til
          at sidde og grave i, ikke til at bruge midt i et indkøb. Derfor et
@@ -2280,10 +2291,17 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 <!-- Tilbud på retter -->
 <div class="backdrop" id="tilbudret-back">
   <div class="sheet" role="dialog" aria-modal="true">
-    <h2>Tilbud på retter</h2>
+    <h2>Tilbud</h2>
+    <!-- To slags tilbud i samme ark, hver med sin overskrift: retter hvor
+         hovedingrediensen er nede hos Nemlig, og jeres overvaagede varer i
+         Remas og 365's aviser. Nemlig-delen hentes live og tager et par
+         sekunder; Rema/365 ligger klar i basen og staar med det samme. -->
+    <div class="tilsektion">Retter hos Nemlig</div>
     <div class="meta" id="tilbudret-meta">Retter hvor hovedingrediensen er nede i pris.</div>
     <div class="tilret-top" id="tilbudret-top"></div>
     <div id="tilbudret-krop"></div>
+    <div class="tilsektion">Jeres varer hos Rema og 365</div>
+    <div id="tilbudret-andre"></div>
     <div class="actions">
       <button class="btn" id="tilbudret-luk">Luk</button>
     </div>
@@ -2473,7 +2491,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.0.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.1.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -11580,10 +11598,42 @@ function tilbudRetTegn(){
     + '</div>').join("");
 }
 
+/* Rema og 365 i samme ark. Grupperet pr. vare, med de samme maerker som i
+   indkoebsarket — og samme tryk: annoncebilledet. */
+function tilbudAndreTegn(){
+  const el = document.getElementById("tilbudret-andre");
+  if(!el) return;
+  const overvaaget = (nemligVarer || []).filter(v =>
+    v.tilbud_graense != null && Array.isArray(v.tilbud_ord) && v.tilbud_ord.length);
+  if(!overvaaget.length){
+    el.innerHTML = '<div class="tilret-intet">Ingen varer overvåges endnu. Sæt en grænse på'
+      + ' varekortet under Nemlig-varer.</div>';
+    return;
+  }
+  const medFund = overvaaget.filter(v => tilbudForVare(v.id).length)
+    .sort((a, b) => String(a.navn).localeCompare(String(b.navn), "da"));
+  if(!medFund.length){
+    el.innerHTML = '<div class="tilret-intet">Ingen af de ' + overvaaget.length
+      + ' overvågede varer er under grænsen i Remas eller 365\'s aviser lige nu.</div>';
+    return;
+  }
+  el.innerHTML = medFund.map(v =>
+      '<div class="tilret-ret"><h3>' + esc(storNavn(v.navn)) + '</h3>'
+    + '<div class="tilret-linje">under ' + esc(tilbudKr(v.tilbud_graense)) + '</div>'
+    + tilbudMaerker({ kort: { id: v.id } })
+    + '</div>').join("");
+}
+document.getElementById("tilbudret-andre").addEventListener("click", ev => {
+  const m = ev.target.closest("[data-tilbud]");
+  if(m) tilbudVis(m.dataset.tilbud);
+});
+
 document.getElementById("menu-tilbudret").onclick = async () => {
   hide("menu-back");
   tilbudRetHenter = true;
   tilbudRetTegn();
+  tilbudAndreTegn();                                  // det der allerede ligger i hukommelsen
+  tilbudHent().then(tilbudAndreTegn);                 // og friskt fra basen, uden at vente
   show("tilbudret-back");
   try{
     await tilbudRetHent();
