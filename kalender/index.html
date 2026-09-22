@@ -1173,6 +1173,11 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 /* Vælg vare kan åbnes oven på Nemlig-varer og oven på indkøbsarket.
    Uden det her lander den bagved, fordi alle ark deler samme lag. */
 #nemvalg-back{z-index:60}
+/* Tilbudsarket aabnes OVENPAA varekortet (60), og annoncebilledet oven paa
+   indkoebsarket. Uden egne lag ville de ligge paa standardens 40 — under
+   varekortet, usynlige. */
+#tilbudop-back{z-index:64}
+#tilbudvis-back{z-index:62}
 #nemerstat-back{z-index:66}
 #nembyt-back{z-index:65}
 #nemdelt-back{z-index:58}      /* over selve indkøbsarket, under de andre */
@@ -1291,6 +1296,33 @@ html[data-theme="dark"] .retkort .tilbudstjerne path{fill:#D9A63C;stroke:#3A2606
    afsnit som de almindelige gratis varer, og uden et mærke kan de to slags
    ikke skelnes. Ferie-guld er valgt fordi den findes i begge temaer og
    hverken er tilbudsgrøn eller advarselsrød. */
+/* Tilbud i Rema og 365. Kaedens egen farve bruges ikke — et maerke skal
+   kunne ses i begge temaer, og Remas blaa og 365's roede ville kaempe med
+   appens egne farver. Samme ramme som VIP-maerket, men mad-groen. */
+.tilbudmaerke{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;
+  font-weight:700;color:var(--mad);border:1px solid var(--mad);border-radius:999px;
+  padding:1px 7px;margin:4px 6px 0 0;background:color-mix(in srgb, var(--mad) 10%, transparent)}
+.tilbudmaerke.kommer{border-style:dashed}
+.tilbudmaerker{display:flex;flex-wrap:wrap}
+.tilbudlinje{display:flex;align-items:center;gap:10px;width:100%;font:inherit;text-align:left;
+  background:none;border:0;border-top:1px solid var(--line);padding:12px 2px;margin-top:6px;color:var(--ink)}
+.tilbudlinje .etiket{font-weight:700}
+.tilbudlinje .tekst{flex:1;color:var(--muted);font-size:14px;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tilbudlinje .pil{color:var(--muted);font-size:20px;line-height:1}
+.tilbudfelt{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap}
+.tilbudfelt.blok{display:block}
+.tilbudfelt .etiket{font-weight:700;min-width:64px}
+.tilbudfelt input[type=number]{width:90px}
+.tilbudord{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tilbudord button{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:999px;
+  padding:4px 10px;background:var(--chip);color:var(--ink)}
+.tilbudnyt{display:flex;gap:8px}
+.tilbudnyt input{flex:1;min-width:0}
+.tilbudnyt .btn{flex:none;padding:0 14px}
+#tilbudvis-krop img{display:block;width:100%;height:auto;border-radius:10px;background:#fff;
+  border:1px solid var(--line);margin:8px 0}
+#tilbudvis-krop .linje{font-size:14px;color:var(--muted);margin:4px 0}
 .nemvip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;
   color:var(--ferie);border:1px solid var(--ferie);border-radius:999px;
   padding:0 5px;margin-left:6px;vertical-align:1px;
@@ -2072,6 +2104,13 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
         <span><b>Fast valg</b><small>altid denne vare — ingen forslag</small></span></label>
       <label class="nemvalgrad"><input type="radio" name="nemfast" value="0">
         <span><b>Åben</b><small>sig til hvis noget lignende er på tilbud</small></span></label>
+      <!-- Tilbud i Rema og 365. EN linje, uanset hvor mange soegeord der er:
+           han bad udtrykkeligt om at opsaetningen ikke maa goere varekortet
+           langt, saa man skal scrolle forbi den for at naa Gem. Et tryk
+           aabner et lille ark ovenpaa med resten. -->
+      <button type="button" class="tilbudlinje" id="nemvalg-tilbud">
+        <span class="etiket">Tilbud</span><span class="tekst" id="nemvalg-tilbudtekst">Fra</span>
+        <span class="pil" aria-hidden="true">›</span></button>
       <label class="nemvalgrad" id="nemvalg-fastvare" hidden><input type="checkbox" id="nemvalg-erfast">
         <span><b>Fast vare</b><small>hører ikke til en opskrift — vises altid i arket</small></span></label>
     </div>
@@ -2081,6 +2120,44 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       <button class="btn" id="nemvalg-slet" hidden>Slet</button>
       <button class="btn primary" id="nemvalg-gem">Gem</button>
     </div>
+  </div>
+</div>
+
+<!-- Tilbud: opsaetning for EN vare. Ligger ovenpaa varekortet. Gemmes
+     SAMMEN med varekortet, naar man trykker Gem dernede — saa er der kun
+     et Gem at huske. -->
+<div class="backdrop" id="tilbudop-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>Hold øje med tilbud</h2>
+    <div class="meta">Rema og 365, via deres ugeaviser. Et tilbud under grænsen
+      står på varen i indkøbsarket, og I får besked når avisen udkommer.</div>
+    <label class="tilbudfelt"><span class="etiket">Under</span>
+      <input type="number" id="tilbudop-graense" min="0" step="any" inputmode="decimal" placeholder="fx 21">
+      <span>kr</span></label>
+    <div class="tilbudfelt blok"><span class="etiket">Søgeord</span>
+      <div id="tilbudop-ord" class="tilbudord"></div>
+      <div class="tilbudnyt"><input type="text" id="tilbudop-nyt" placeholder="fx pågen" autocomplete="off">
+        <button type="button" class="btn" id="tilbudop-tilfoej">Tilføj</button></div>
+      <span class="nemstykhint">Aviserne skriver sjældent den præcise vare — "Pågen brød,
+        flere varianter". Ét ord der matcher er nok.</span></div>
+    <div class="tilbudfelt"><span class="etiket">Kæder</span>
+      <label><input type="checkbox" id="tilbudop-rema"> Rema</label>
+      <label><input type="checkbox" id="tilbudop-365"> 365</label></div>
+    <div class="actions">
+      <button class="btn" id="tilbudop-fra">Slå fra</button>
+      <button class="btn" id="tilbudop-fortryd">Fortryd</button>
+      <button class="btn primary" id="tilbudop-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tilbud: annoncebilledet, udsnittet fra avissiden. -->
+<div class="backdrop" id="tilbudvis-back">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="tilbudvis-titel">Tilbud</h2>
+    <div class="meta" id="tilbudvis-meta"></div>
+    <div id="tilbudvis-krop"></div>
+    <div class="actions"><button class="btn primary" id="tilbudvis-luk">Luk</button></div>
   </div>
 </div>
 
@@ -2396,7 +2473,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "2.99.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.0.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -8220,6 +8297,210 @@ async function nemHentGratis(){
   }
 }
 
+/* =======================================================================
+   Tilbud i Rema og 365 (v2.100.0)
+
+   En kort liste varer med hver sin prisgraense. Morgenfunktionen
+   tilbud-agent finder tilbud under graensen i Remas og 365's ugeaviser
+   (via eTilbudsavis) og gemmer dem i tilbud_fund. Her vises de som et
+   lille maerke paa varens linje, og et tryk viser annoncebilledet.
+
+   APPEN PAASTAAR ALDRIG AT JERES VARE ER PAA TILBUD. Aviserne skriver
+   "Paagen broed, flere varianter", ikke "Paagen Limpan". Maerket siger
+   hvad avisen siger, og billedet lader jer afgoere resten. Soegeordet
+   "paagen" rammer ogsaa kanelbullar — det er med vilje ikke skjult.
+
+   Fundene vises FRA AVISEN UDKOMMER, ikke foerst naar tilbuddet gaelder.
+   Hans egen begrundelse: "Vi vil ikke koebe 3 poser kaffe til 90 om
+   torsdagen, hvis vi kan faa dem til 75 dagen efter." Derfor kan baade
+   det der gaelder nu og det der kommer staa paa samme vare.
+   ======================================================================= */
+const TILBUD_KAEDENAVN = { rema: "Rema", "365": "365" };
+let tilbudFund = [];
+let tilbudOpKladde = null;      // det der redigeres i det lille ark
+
+async function tilbudHent(){
+  try{
+    const { data, error } = await sb.from("tilbud_fund").select("*")
+      .gte("til", new Date().toISOString());
+    if(error) throw error;
+    tilbudFund = data || [];
+  }catch(e){
+    /* Tavst: saa staar der bare ingen maerker, som foer. */
+    tilbudFund = [];
+  }
+}
+
+function tilbudForVare(vareId){
+  return tilbudFund.filter(f => f.vare_id === vareId)
+    .sort((a, b) => String(a.fra || "").localeCompare(String(b.fra || "")) || a.pris - b.pris);
+}
+
+const tilbudKr = n => (Math.round(Number(n) * 100) / 100).toString().replace(".", ",") + " kr";
+/* "20.–26. sep" i samme maaned, "30. sep–3. okt" hen over et skift. */
+function tilbudPeriode(f){
+  if(!f.fra || !f.til) return "";
+  const a = new Date(f.fra), b = new Date(f.til);
+  const m = d => MAANEDER[d.getMonth()].slice(0, 3);
+  return a.getMonth() === b.getMonth()
+    ? a.getDate() + ".\u2013" + b.getDate() + ". " + m(b)
+    : a.getDate() + ". " + m(a) + "\u2013" + b.getDate() + ". " + m(b);
+}
+
+function tilbudMaerker(l){
+  const id = l && l.kort && l.kort.id;
+  if(!id) return "";
+  const liste = tilbudForVare(id);
+  if(!liste.length) return "";
+  const nu = Date.now();
+  return '<span class="tilbudmaerker">' + liste.slice(0, 3).map(f => {
+    const kommer = f.fra && new Date(f.fra).getTime() > nu;
+    return '<button type="button" class="tilbudmaerke' + (kommer ? " kommer" : "") + '"'
+      + ' data-tilbud="' + esc(f.id + "|" + f.vare_id) + '"'
+      + ' aria-label="' + esc((kommer ? "Kommende tilbud: " : "Tilbud: ") + (TILBUD_KAEDENAVN[f.kaede] || f.kaede)) + '">'
+      + esc((TILBUD_KAEDENAVN[f.kaede] || f.kaede) + " " + tilbudKr(f.pris) + " \u00b7 " + tilbudPeriode(f))
+      + '</button>';
+  }).join("") + '</span>';
+}
+
+function tilbudVis(noegle){
+  const [id, vare] = String(noegle).split("|");
+  const f = tilbudFund.find(x => x.id === id && x.vare_id === vare);
+  if(!f) return;
+  const kommer = f.fra && new Date(f.fra).getTime() > Date.now();
+  document.getElementById("tilbudvis-titel").textContent =
+    (f.kaede === "rema" ? "Rema 1000" : "365discount") + " \u00b7 " + tilbudKr(f.pris);
+  document.getElementById("tilbudvis-meta").textContent =
+    (kommer ? "Kommer: " : "Gælder: ") + tilbudPeriode(f);
+  const bil = f.billede_stor || f.billede;
+  document.getElementById("tilbudvis-krop").innerHTML =
+      (bil ? '<img src="' + esc(bil) + '" alt="Udsnit af avisen">' : "")
+    + '<div class="linje"><b>' + esc(f.overskrift || "") + '</b></div>'
+    + (f.beskrivelse ? '<div class="linje">' + esc(f.beskrivelse) + '</div>' : "")
+    + '<div class="linje">Det er avisens egen tekst. Om jeres vare er med, må billedet afgøre.</div>';
+  show("tilbudvis-back");
+}
+
+/* ---------- opsaetningen paa varekortet ---------- */
+function tilbudFraRaekke(r){
+  return {
+    graense: r && r.tilbud_graense != null ? Number(r.tilbud_graense) : null,
+    ord: r && Array.isArray(r.tilbud_ord) ? r.tilbud_ord.slice() : [],
+    kaeder: r && Array.isArray(r.tilbud_kaeder) && r.tilbud_kaeder.length
+      ? r.tilbud_kaeder.slice() : ["rema", "365"]
+  };
+}
+
+/* EN linje paa varekortet, uanset hvor mange soegeord der er. */
+function tilbudLinjeTegn(){
+  const t = nemValg && nemValg.tilbud;
+  const el = document.getElementById("nemvalg-tilbudtekst");
+  if(!el) return;
+  if(!t || t.graense == null || !t.ord.length){ el.textContent = "Fra"; return; }
+  const k = t.kaeder.map(x => TILBUD_KAEDENAVN[x] || x).join(", ");
+  el.textContent = k + " under " + tilbudKr(t.graense) + " \u00b7 "
+    + t.ord.length + (t.ord.length === 1 ? " søgeord" : " søgeord");
+}
+
+/* Forslag til soegeord ud fra varens navn hos Nemlig: det foerste ord,
+   smaa bogstaver. "Paagenlimpan" -> "paagenlimpan", "Smoerbar original"
+   -> "smoerbar". Han retter og tilfoejer selv. */
+function tilbudForslag(){
+  const navn = (nemValg && nemValg.valgt && nemValg.valgt.navn) || (nemValg && nemValg.raekke && nemValg.raekke.navn) || "";
+  const f = String(navn).trim().split(/\s+/)[0] || "";
+  return f ? [f.toLocaleLowerCase("da")] : [];
+}
+
+function tilbudOpTegn(){
+  const k = tilbudOpKladde;
+  document.getElementById("tilbudop-ord").innerHTML = k.ord.length
+    ? k.ord.map((o, i) => '<button type="button" data-tilbudord="' + i + '">' + esc(o) + ' \u00d7</button>').join("")
+    : '<span class="nemstykhint">Ingen søgeord endnu.</span>';
+}
+
+function tilbudOpAabn(){
+  const t = (nemValg && nemValg.tilbud) || tilbudFraRaekke(null);
+  tilbudOpKladde = { graense: t.graense, ord: t.ord.length ? t.ord.slice() : tilbudForslag(), kaeder: t.kaeder.slice() };
+  document.getElementById("tilbudop-graense").value = tilbudOpKladde.graense ?? "";
+  document.getElementById("tilbudop-nyt").value = "";
+  document.getElementById("tilbudop-rema").checked = tilbudOpKladde.kaeder.includes("rema");
+  document.getElementById("tilbudop-365").checked  = tilbudOpKladde.kaeder.includes("365");
+  tilbudOpTegn();
+  show("tilbudop-back");
+}
+
+function tilbudOpTilfoej(){
+  const felt = document.getElementById("tilbudop-nyt");
+  const o = felt.value.trim().toLocaleLowerCase("da");
+  if(o && !tilbudOpKladde.ord.includes(o)) tilbudOpKladde.ord.push(o);
+  felt.value = "";
+  tilbudOpTegn();
+}
+
+function tilbudOpOk(){
+  /* Et ord der staar i feltet uden at vaere tilfoejet, tages med — ellers
+     taber man det man lige har skrevet ved at trykke OK. */
+  if(document.getElementById("tilbudop-nyt").value.trim()) tilbudOpTilfoej();
+  const g = Number(String(document.getElementById("tilbudop-graense").value).replace(",", "."));
+  const kaeder = [];
+  if(document.getElementById("tilbudop-rema").checked) kaeder.push("rema");
+  if(document.getElementById("tilbudop-365").checked)  kaeder.push("365");
+  nemValg.tilbud = {
+    graense: Number.isFinite(g) && g > 0 ? g : null,
+    ord: tilbudOpKladde.ord.slice(),
+    kaeder: kaeder.length ? kaeder : ["rema", "365"]
+  };
+  hide("tilbudop-back");
+  tilbudLinjeTegn();
+}
+
+function tilbudOpFra(){
+  nemValg.tilbud = { graense: null, ord: [], kaeder: ["rema", "365"] };
+  hide("tilbudop-back");
+  tilbudLinjeTegn();
+}
+
+/* Efter Gem: laeg soegningerne i databasens koe, vent til svarene er
+   kommet, og lad tilbud-agent behandle dem. DATABASEN henter, fordi
+   eTilbudsavis afviser edge-funktionernes servere (401, maalt 22/9).
+   Sender ingen besked — man har jo netop selv kigget. */
+async function tilbudOpdaterNu(vareId){
+  try{
+    const { error } = await sb.rpc("tilbud_bestil", { p_vare: vareId });
+    if(error) throw error;
+    await new Promise(r => setTimeout(r, 6000));
+    await sb.functions.invoke("tilbud-agent", { body: {} });
+    await tilbudHent();
+    if(nemArk) nemTegn();
+  }catch(e){ console.warn("Tilbud kunne ikke hentes nu:", e); }
+}
+
+document.getElementById("nemvalg-tilbud").onclick = tilbudOpAabn;
+document.getElementById("tilbudop-tilfoej").onclick = tilbudOpTilfoej;
+document.getElementById("tilbudop-nyt").addEventListener("keydown", ev => {
+  if(ev.key === "Enter"){ ev.preventDefault(); tilbudOpTilfoej(); }
+});
+document.getElementById("tilbudop-ord").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-tilbudord]");
+  if(!b) return;
+  tilbudOpKladde.ord.splice(Number(b.dataset.tilbudord), 1);
+  tilbudOpTegn();
+});
+document.getElementById("tilbudop-ok").onclick = tilbudOpOk;
+document.getElementById("tilbudop-fra").onclick = tilbudOpFra;
+document.getElementById("tilbudop-fortryd").onclick = () => hide("tilbudop-back");
+document.getElementById("tilbudvis-luk").onclick = () => hide("tilbudvis-back");
+/* Fanges i CAPTURE-fasen, foer arkets egne behandlere: maerket sidder
+   inde i linjen, og et tryk paa det maa ikke ogsaa tolkes som et tryk
+   paa linjen. */
+document.getElementById("nem-krop").addEventListener("click", ev => {
+  const m = ev.target.closest("[data-tilbud]");
+  if(!m) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  tilbudVis(m.dataset.tilbud);
+}, true);
+
 /* ---------- VIP-gaverne ----------
    Hans egne gaver fra nemlig.com/mit-nemlig/nemlig-vip. De står i SAMME
    afsnit som de almindelige gratis varer, men med et VIP-mærke, så de to
@@ -8494,6 +8775,7 @@ function nemTegn(){
         +   '<span class="v"><span class="navn">' + esc(storNavn(l.navn)) + '</span>'
         +     '<span class="under kraevertekst">' + tekst + '</span>'
         +     (l.kilder ? '<span class="under">' + esc(l.kilder) + '</span>' : "")
+        +     tilbudMaerker(l)
         +   '</span>'
         + '</span>'
         /* KUN Udskift her. Man tilføjer ikke smagsvarianter til noget der
@@ -8630,6 +8912,10 @@ function nemTegn(){
         })()
       + (alt ? '<span class="nemikurv">✓ ' + alt + ' i kurven</span>' : "")
       + (tilbud ? '<span class="tilbud">' + esc(tilbud) + '</span>' : "")
+      /* Tilbud i Rema og 365 — et maerke pr. fund, med kaede, pris og
+         periode. Et kommende tilbud har stiplet kant: det er dem der
+         afgoer om kaffen skal koebes torsdag eller fredag. */
+      + tilbudMaerker(l)
       /* Findes der en billigere vej til samme behov, siges det HER — som
          en oplysning, ikke som noget der skal handles på. Man går selv
          ind i Varianter, hvis man vil skifte. */
@@ -9293,6 +9579,7 @@ async function nemAabn(){
   nemFoldet.add("gratis");
   nemHentGratis();     // uden await: arket skal ikke vente på den
   nemHentVip();        // samme grund — gaverne må ikke forsinke arket
+  tilbudHent().then(() => { if(nemArk) nemTegn(); });   // Rema og 365
   /* Tiderne hentes uden await af samme grund. Kommer de, tegnes arket om
      og priserne hentes forfra med det RIGTIGE tidsrum — først da er
      udsolgt-visningen til at stole på. Kommer de ikke, virker arket
@@ -9822,12 +10109,16 @@ function nemValgAaben(opsaet){
     document.getElementById("nemvalg-altid").checked = !!r.koeb_altid;
     document.querySelector('input[name="nemfast"][value="' + (r.fast_valg ? "1" : "0") + '"]').checked = true;
     document.getElementById("nemvalg-erfast").checked = r.slags === "fast";
+    nemValg.tilbud = tilbudFraRaekke(r);
+    tilbudLinjeTegn();
     document.getElementById("nemvalg-detalje").hidden = false;
     nemNavneVarsel();
   } else {
     document.getElementById("nemvalg-maengde").value = "";
     document.getElementById("nemvalg-detalje").hidden = true;
     document.getElementById("nemvalg-erfast").checked = nemValg.fastVare;
+    nemValg.tilbud = tilbudFraRaekke(null);
+    tilbudLinjeTegn();
     nemValg.styk = [];
     nemValg.alt  = [];
     document.getElementById("nemvalg-altid").checked = false;
@@ -10195,6 +10486,10 @@ async function nemValgGem(){
     hovedgruppe: nemValg.valgt.hovedgruppe || null,
     billede: nemValg.valgt.billede || null,
     fast_valg: document.querySelector('input[name="nemfast"]:checked').value === "1",
+    /* Tilbud i Rema og 365. Gemmes med varen, saa der kun er eet Gem. */
+    tilbud_graense: nemValg.tilbud && nemValg.tilbud.graense != null ? nemValg.tilbud.graense : null,
+    tilbud_ord: nemValg.tilbud ? nemValg.tilbud.ord : [],
+    tilbud_kaeder: nemValg.tilbud ? nemValg.tilbud.kaeder : ["rema", "365"],
     aendret: new Date().toISOString()
   };
 
@@ -10216,6 +10511,9 @@ async function nemValgGem(){
   const gemt = svar.data[0];
   const i = nemligVarer.findIndex(v => v.id === gemt.id);
   if(i >= 0) nemligVarer[i] = gemt; else nemligVarer.push(gemt);
+  /* Er der sat en tilbudsgraense, hentes der med det samme — man skal
+     ikke vente til i morgen for at se om det virker. Uden await. */
+  if(gemt.tilbud_graense != null && (gemt.tilbud_ord || []).length) tilbudOpdaterNu(gemt.id);
 
   hide("nemvalg-back");
   if(nemValg.sti){
