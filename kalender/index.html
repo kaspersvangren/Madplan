@@ -1307,10 +1307,19 @@ html[data-theme="dark"] .retkort .tilbudstjerne path{fill:#D9A63C;stroke:#3A2606
 /* Tilbud i Rema og 365. Kaedens egen farve bruges ikke — et maerke skal
    kunne ses i begge temaer, og Remas blaa og 365's roede ville kaempe med
    appens egne farver. Samme ramme som VIP-maerket, men mad-groen. */
-.tilbudmaerke{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;
-  font-weight:700;color:var(--mad);border:1px solid var(--mad);border-radius:999px;
-  padding:1px 7px;margin:4px 6px 0 0;background:color-mix(in srgb, var(--mad) 10%, transparent)}
+.tilbudmaerke{--kaede:var(--mad);display:inline-flex;align-items:stretch;font:inherit;font-size:11.5px;
+  border:1px solid var(--kaede);border-radius:999px;overflow:hidden;padding:0;
+  margin:4px 6px 0 0;background:var(--surface);color:var(--ink);line-height:1.5}
+/* Kaedernes egne farver (eTilbudsavis 22/9). */
+.tilbudmaerke.kaede-rema{--kaede:#014693}
+.tilbudmaerke.kaede-365{--kaede:#01AA46}
+.tilbudmaerke .k{background:var(--kaede);color:#fff;font-weight:800;letter-spacing:.04em;padding:1px 7px}
+.tilbudmaerke .p{font-weight:700;padding:1px 6px 1px 7px}
+.tilbudmaerke .d{color:var(--muted);padding:1px 8px 1px 0}
+/* Kommende tilbud: stiplet kant, saa man kan se at det IKKE gaelder endnu. */
 .tilbudmaerke.kommer{border-style:dashed}
+/* Remas blaa forsvinder mod en moerk baggrund — kanten lysnes lidt. */
+html[data-theme="dark"] .tilbudmaerke.kaede-rema{border-color:#4F7FC4}
 .tilbudmaerker{display:flex;flex-wrap:wrap}
 .tilbudlinje{display:flex;align-items:center;gap:10px;width:100%;font:inherit;text-align:left;
   background:none;border:0;border-top:1px solid var(--line);padding:12px 2px;margin-top:6px;color:var(--ink)}
@@ -2491,7 +2500,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.1.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.2.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -8334,6 +8343,9 @@ async function nemHentGratis(){
    det der gaelder nu og det der kommer staa paa samme vare.
    ======================================================================= */
 const TILBUD_KAEDENAVN = { rema: "Rema", "365": "365" };
+/* Kort navn til det farvede felt i maerket. Farverne er kaedernes egne,
+   maalt fra eTilbudsavis 22/9: Rema #014693, 365 #01AA46 (se CSS). */
+const TILBUD_KAEDEKORT = { rema: "REMA", "365": "365" };
 let tilbudFund = [];
 let tilbudOpKladde = null;      // det der redigeres i det lille ark
 
@@ -8373,10 +8385,16 @@ function tilbudMaerker(l){
   const nu = Date.now();
   return '<span class="tilbudmaerker">' + liste.slice(0, 3).map(f => {
     const kommer = f.fra && new Date(f.fra).getTime() > nu;
-    return '<button type="button" class="tilbudmaerke' + (kommer ? " kommer" : "") + '"'
+    /* TRE TYDELIGE DELE, som han bad om: kaedens navn i et felt med
+       kaedens farve, prisen med fed, datoerne daempet til sidst. Foer var
+       det "365 15 kr · 17.–23. sep" i samme skrift — "bare en masse tal". */
+    return '<button type="button" class="tilbudmaerke kaede-' + esc(f.kaede) + (kommer ? " kommer" : "") + '"'
       + ' data-tilbud="' + esc(f.id + "|" + f.vare_id) + '"'
-      + ' aria-label="' + esc((kommer ? "Kommende tilbud: " : "Tilbud: ") + (TILBUD_KAEDENAVN[f.kaede] || f.kaede)) + '">'
-      + esc((TILBUD_KAEDENAVN[f.kaede] || f.kaede) + " " + tilbudKr(f.pris) + " \u00b7 " + tilbudPeriode(f))
+      + ' aria-label="' + esc((kommer ? "Kommende tilbud: " : "Tilbud: ")
+          + (TILBUD_KAEDENAVN[f.kaede] || f.kaede) + ", " + tilbudKr(f.pris) + ", " + tilbudPeriode(f)) + '">'
+      +   '<span class="k">' + esc(TILBUD_KAEDEKORT[f.kaede] || f.kaede) + '</span>'
+      +   '<span class="p">' + esc(tilbudKr(f.pris)) + '</span>'
+      +   '<span class="d">' + esc(tilbudPeriode(f)) + '</span>'
       + '</button>';
   }).join("") + '</span>';
 }
