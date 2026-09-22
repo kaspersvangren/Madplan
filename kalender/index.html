@@ -1200,6 +1200,21 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .menustjerne path{fill:#F6C453;stroke:#8A5A0B;stroke-width:1.2;stroke-linejoin:round}
 html[data-theme="dark"] .menustjerne path{fill:#D9A63C;stroke:#3A2606}
 /* Afsnitsoverskrift i tilbudsarket. Samme udtryk som .gruppetop. */
+/* Tilbudskortet for en ret (v3.3.0). */
+.madfelt[data-madtil]{cursor:pointer}
+.dagrad.fremhaev{outline:2px solid var(--mad);outline-offset:2px;transition:outline-color .6s}
+.tilret-retnavn{display:flex;align-items:center;gap:8px;width:100%;font:inherit;background:none;
+  border:0;padding:0;text-align:left;color:var(--ink)}
+.tilret-retnavn h3{flex:1;margin:0}
+.tilret-retnavn .pil{color:var(--muted);font-size:20px;line-height:1}
+.tilret-vare{display:flex;align-items:center;gap:10px;width:100%;font:inherit;text-align:left;
+  background:none;border:0;border-top:1px solid var(--line);padding:8px 0 2px;margin-top:6px;color:var(--ink)}
+.tilret-vare img,.tilret-vare .tom{flex:none;width:44px;height:44px;border-radius:8px;object-fit:contain;
+  background:#fff;border:1px solid var(--line)}
+.tilret-vare .v{flex:1;min-width:0;display:block}
+.tilret-vare b{display:block}
+.tilret-vare .linje{display:block;font-size:13.5px;color:var(--muted);margin-top:1px}
+.tilret-vare .spar{color:var(--mad);font-weight:700}
 .tilsektion{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   color:var(--muted);margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
 .tilsektion:first-of-type{margin-top:6px}
@@ -2500,7 +2515,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.2.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.3.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4032,6 +4047,21 @@ async function rydDag(ds){
   if(error){ vis("Kunne ikke rydde dagen: " + error.message); return; }
   madplanDage = madplanDage.filter(m => m.dato !== ds);
   render();
+}
+
+/* Fra forsiden: aftensmaden er et link til madplanen paa den dag. Ugen
+   saettes FOER fanen skiftes, for saetFane tegner selv. Dagen fremhaeves
+   kort, saa oejet kan finde den. */
+function hopTilMadplan(ds){
+  madplanUge = fredagFor(fromIso(ds));
+  saetFane("madplan");
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.dagrad[data-dag="' + ds + '"]');
+    if(!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("fremhaev");
+    setTimeout(() => el.classList.remove("fremhaev"), 1800);
+  });
 }
 
 function renderMadplan(){
@@ -6433,7 +6463,9 @@ function renderDay(){
      Optøningen hører til maden, ikke til aftalerne, så den bor her.   */
   const optoen = optoeningTil(iso(addDays(d,1)));
   h += '<div class="duo' + (optoen.length ? "" : " alene") + '">'
-     +   '<div class="madfelt">'
+     /* Tryk paa aftensmaden: hop til madplanen paa netop den dag. Egen
+        attribut — data-dag bruges allerede af kalenderens maanedsvisning. */
+     +   '<div class="madfelt" data-madtil="' + ds + '" role="button" tabindex="0">'
      +     '<div class="mini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v8a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 13v8"/><path d="M16 3c-1.7 1.2-2 3.4-2 5s.3 3.8 2 5v8"/></svg>Aftensmad</div>'
      +     madIndhold
      +   '</div>';
@@ -11231,6 +11263,9 @@ document.getElementById("stage").addEventListener("click", async ev => {
     render();
     return;
   }
+  /* Aftensmaden paa forsiden -> madplanen paa den dag. */
+  const madtil = ev.target.closest("[data-madtil]");
+  if(madtil){ hopTilMadplan(madtil.dataset.madtil); return; }
   const kryds = ev.target.closest("[data-kryds]");
   if(kryds){ await krydsAf(kryds.dataset.kryds); return; }
   const opgk = ev.target.closest("[data-opg]");
@@ -11529,7 +11564,7 @@ function tilbudRetSamle(){
       if(!ud.has(b.retId)) ud.set(b.retId, { retId: b.retId, ret: b.ret, ialt: 0, dele: [] });
       const r = ud.get(b.retId);
       r.ialt += kr;
-      r.dele.push({ vare: k.navn, kr, fund });
+      r.dele.push({ vare: k.navn, kr, fund, brug: b });
     });
   });
   return [...ud.values()].sort((a, b) => b.ialt - a.ialt);
@@ -11604,15 +11639,35 @@ function tilbudRetTegn(){
       + ' varerne leveres.</div>';
     return;
   }
+  /* v3.3.0 — hans forslag: PRISEN foerst, saa besparelsen, og PRODUKTETS
+     eget navn. Foer stod der "culottesteg · Okseculotte oeko. · 12 % ·
+     40,93 kr": ingrediensens kortlagte navn, som i en ret ved navn
+     Culottesteg gav navnet tre gange, og ingen pris. Nu:
+       CULOTTESTEG                      (retten — tryk aabner opskriften)
+       [billede] Okseculotte oeko.      (tryk aabner varekortet)
+                 250 kr · spar 40,93 kr (12 %)
+     Prisen er pr. PAKKE, besparelsen gaelder den maengde RETTEN bruger.
+     Bruger retten to pakker, staar der "2 x 250 kr", saa tallene passer. */
   krop.innerHTML = raekker.map(r =>
       '<div class="tilret-ret">'
-    +   '<h3>' + esc(r.ret) + '</h3>'
-    +   '<div class="tilret-spar">spar ' + nemKr(r.ialt) + ' kr</div>'
-    +   r.dele.map(d =>
-          '<div class="tilret-linje">' + esc(d.vare) + ' · '
-          + esc(d.fund.vinder.produkt_navn || "") + ' · '
-          + Math.round(d.fund.pct) + ' % · ' + nemKr(d.kr) + ' kr'
-          + '</div>').join("")
+    +   '<button type="button" class="tilret-retnavn" data-tilretret="' + esc(r.retId) + '">'
+    +     '<h3>' + esc(r.ret) + '</h3><span class="pil" aria-hidden="true">›</span></button>'
+    +   (r.dele.length > 1 ? '<div class="tilret-spar">spar i alt ' + nemKr(r.ialt) + ' kr</div>' : "")
+    +   r.dele.map(d => {
+          const p = d.fund.vinder;
+          const v = tilbudRetPriser[String(p.produkt_id)] || {};
+          const pakker = (d.brug && d.brug.maengde != null)
+            ? Math.max(1, nemAntal(d.brug.maengde, d.brug.enhed, p.pakke_maengde, p.pakke_enhed, p).antal || 1) : 1;
+          const pris = v.pris != null ? (pakker > 1 ? pakker + " \u00d7 " : "") + nemKr(v.pris) + " kr" : "";
+          const bil = v.billede || p.billede || null;
+          return '<button type="button" class="tilret-vare" data-tilretvare="' + esc(p.produkt_id) + '"'
+            +     ' data-tilretretnavn="' + esc(r.ret) + '">'
+            +   (bil ? '<img src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">' : '<span class="tom"></span>')
+            +   '<span class="v"><b>' + esc(p.produkt_navn || d.vare) + '</b>'
+            +     '<span class="linje">' + (pris ? esc(pris) + ' · ' : '')
+            +       '<span class="spar">spar ' + nemKr(d.kr) + ' kr</span> (' + Math.round(d.fund.pct) + ' %)</span>'
+            +   '</span></button>';
+        }).join("")
     + '</div>').join("");
 }
 
@@ -11665,6 +11720,19 @@ document.getElementById("menu-tilbudret").onclick = async () => {
   tilbudRetTegn();
 };
 document.getElementById("tilbudret-luk").onclick = () => hide("tilbudret-back");
+document.getElementById("tilbudret-krop").addEventListener("click", ev => {
+  /* Retten -> opskriften. Tilbudsarket lukkes foerst: opskriftens ark
+     ligger paa samme lag og tidligere i siden, saa det ville ellers
+     havne BAG tilbudsarket. */
+  const ret = ev.target.closest("[data-tilretret]");
+  if(ret){ hide("tilbudret-back"); aabnRet(ret.dataset.tilretret); return; }
+  /* Varen -> varekortet. Det ligger paa lag 70, over tilbudsarket. */
+  const vare = ev.target.closest("[data-tilretvare]");
+  if(vare){
+    const v = tilbudRetPriser[vare.dataset.tilretvare];
+    if(v) nemKortVis(v, "Bruges i " + vare.dataset.tilretretnavn);
+  }
+});
 
 const show = id => {
   const back = document.getElementById(id);
