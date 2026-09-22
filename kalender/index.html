@@ -1177,6 +1177,10 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
    indkoebsarket. Uden egne lag ville de ligge paa standardens 40 — under
    varekortet, usynlige. */
 #tilbudop-back{z-index:64}
+/* Opskriften aabnet fra Tilbud ligger OVER tilbudsarket (40). Slet-
+   bekraeftelsen aabnes fra opskriften og skal ligge over den igen. */
+#ret-back.overtilbud{z-index:45}
+#retslet-back{z-index:46}
 #tilbudvis-back{z-index:62}
 #nemerstat-back{z-index:66}
 #nembyt-back{z-index:65}
@@ -1215,6 +1219,10 @@ html[data-theme="dark"] .menustjerne path{fill:#D9A63C;stroke:#3A2606}
 .tilret-vare b{display:block}
 .tilret-vare .linje{display:block;font-size:13.5px;color:var(--muted);margin-top:1px}
 .tilret-vare .spar{color:var(--mad);font-weight:700}
+.tilret-vare .linje.pris{color:var(--ink)}
+.tilret-vare .nu{font-weight:700}
+.tilret-vare s{color:var(--muted);margin-left:4px}
+.tilret-vare .pct{color:var(--holiday);font-weight:700;margin-left:4px}
 .tilsektion{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   color:var(--muted);margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
 .tilsektion:first-of-type{margin-top:6px}
@@ -2515,7 +2523,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.3.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.4.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -3703,6 +3711,7 @@ document.getElementById("retslet-ja").onclick = async () => {
   if(gammeltBillede) await sletBillede(gammeltBillede);
   retter = retter.filter(r => r.id !== aabenRetId);
   ingredienser = ingredienser.filter(i => i.ret_id !== aabenRetId);
+  if(document.getElementById("ret-back").classList.contains("overtilbud")) hide("tilbudret-back");
   hide("retslet-back"); hide("ret-back"); render();
 };
 
@@ -3897,7 +3906,12 @@ async function sletBillede(sti){
   img.addEventListener("pointerup", slut);
   img.addEventListener("pointercancel", slut);
 })();
-document.getElementById("ret-rediger").onclick = () => { hide("ret-back"); aabnRetRed(aabenRetId); };
+document.getElementById("ret-rediger").onclick = () => {
+  /* Kom opskriften fra Tilbud, lukkes Tilbud ogsaa — redigeringen skal
+     ikke ende bag det. Samme som foer v3.4.0. */
+  if(document.getElementById("ret-back").classList.contains("overtilbud")) hide("tilbudret-back");
+  hide("ret-back"); aabnRetRed(aabenRetId);
+};
 document.getElementById("retred-fortryd").onclick = async () => {
   /* Blev der lagt et billede op og derefter fortrudt, ville filen blive
      liggende uden at nogen ret peger på den. */
@@ -11385,8 +11399,17 @@ window.addEventListener("popstate", () => {
 
   vagter = Math.max(0, vagter - 1);
 
+  /* 0. Opskriften aabnet fra Tilbud: luk KUN den, saa Tilbud staar
+        tilbage (v3.4.0). Der laegges intet nyt historik-skridt — der er
+        allerede to, et for hvert ark, og nu er der et ark tilbage. Et
+        skridt lagt HER ville Chrome springe over (maalt 21/8, se ovenfor). */
+  const opsk = document.getElementById("ret-back");
+  if(opsk && opsk.classList.contains("open") && opsk.classList.contains("overtilbud")
+     && document.getElementById("tilbudret-back").classList.contains("open")){
+    opsk.classList.remove("open");
+  }
   /* 1. Et åbent ark lukkes først. */
-  if(arkAabne()){
+  else if(arkAabne()){
     arkLukAlle();
   }
   /* 2. Ellers går vi hjem til i dag — samme sted som husikonet. */
@@ -11518,7 +11541,7 @@ function tilbudRetVare(vareNavn){
     const no = tilbudRetEnhed(p, tilbudRetNormal(pris));
     if(nu && (!bedstNu || nu.pris < bedstNu.pris))
       bedstNu = { ...nu, p, kampagne: pris.kampagne || null };
-    if(no && (!bedstNormal || no.pris < bedstNormal.pris)) bedstNormal = no;
+    if(no && (!bedstNormal || no.pris < bedstNormal.pris)) bedstNormal = { ...no, p };
   });
   if(!bedstNu || !bedstNormal) return null;
   /* Pakker og kilopriser må ikke blandes: 40 kr sparet pr. kilo betyder
@@ -11530,8 +11553,11 @@ function tilbudRetVare(vareNavn){
   const pct = (sparPrEnhed / bedstNormal.pris) * 100;
   if(pct < TILRET_PCT) return null;
 
+  /* normalVare: den variant besparelsen er MAALT IMOD — den billigste til
+     normalpris. Er det en anden vare end vinderen, er besparelsen mindre
+     end vinderens egen rabat, og det skal kortet kunne forklare (v3.4.0). */
   return { sparPrEnhed, pct, basis: bedstNu.basis, vinder: bedstNu.p,
-           kampagne: bedstNu.kampagne };
+           kampagne: bedstNu.kampagne, normalVare: bedstNormal.p };
 }
 
 /* Hvad sparer man så på DENNE ret? Behovet lægges om til samme grundlag
@@ -11658,14 +11684,32 @@ function tilbudRetTegn(){
           const v = tilbudRetPriser[String(p.produkt_id)] || {};
           const pakker = (d.brug && d.brug.maengde != null)
             ? Math.max(1, nemAntal(d.brug.maengde, d.brug.enhed, p.pakke_maengde, p.pakke_enhed, p).antal || 1) : 1;
-          const pris = v.pris != null ? (pakker > 1 ? pakker + " \u00d7 " : "") + nemKr(v.pris) + " kr" : "";
+          /* v3.4.0 — TO besparelser, paa hver sin linje, efter hans oenske:
+             1. Nemligs tilbud paa VAREN: pris, overstreget foerpris, procent
+                — det samme som varekortet siger.
+             2. JERES besparelse: kroner for rettens maengde, maalt mod den
+                billigste variant til normalpris. Er den variant en ANDEN vare,
+                navngives den, saa man kan se hvorfor tallet er mindre.
+             Foer stod kun "spar 40,93 kr (12 %)", og varekortet sagde 15 % —
+             det lignede en fejl. */
+          const normal = tilbudRetNormal(v);
+          const egenPct = (normal != null && v.pris != null && normal > v.pris)
+            ? Math.round((normal - v.pris) / normal * 100) : null;
+          const gange = pakker > 1 ? pakker + " \u00d7 " : "";
+          const linje1 = v.pris == null ? ""
+            : '<span class="nu">' + esc(gange + nemKr(v.pris) + " kr") + '</span>'
+            + (egenPct ? ' <s>' + esc(nemKr(normal)) + '</s> <span class="pct">\u2212' + egenPct + ' %</span>' : "");
+          const mod = d.fund.normalVare && String(d.fund.normalVare.produkt_id) !== String(p.produkt_id)
+            ? d.fund.normalVare : null;
+          const linje2 = '<span class="spar">Spar ' + nemKr(d.kr) + ' kr på retten</span>'
+            + (mod ? ' \u00b7 ' + Math.round(d.fund.pct) + ' % under ' + esc(mod.produkt_navn || "") : "");
           const bil = v.billede || p.billede || null;
           return '<button type="button" class="tilret-vare" data-tilretvare="' + esc(p.produkt_id) + '"'
             +     ' data-tilretretnavn="' + esc(r.ret) + '">'
             +   (bil ? '<img src="' + esc(nemBillede(bil, 120)) + '" alt="" loading="lazy">' : '<span class="tom"></span>')
             +   '<span class="v"><b>' + esc(p.produkt_navn || d.vare) + '</b>'
-            +     '<span class="linje">' + (pris ? esc(pris) + ' · ' : '')
-            +       '<span class="spar">spar ' + nemKr(d.kr) + ' kr</span> (' + Math.round(d.fund.pct) + ' %)</span>'
+            +     (linje1 ? '<span class="linje pris">' + linje1 + '</span>' : "")
+            +     '<span class="linje">' + linje2 + '</span>'
             +   '</span></button>';
         }).join("")
     + '</div>').join("");
@@ -11720,12 +11764,30 @@ document.getElementById("menu-tilbudret").onclick = async () => {
   tilbudRetTegn();
 };
 document.getElementById("tilbudret-luk").onclick = () => hide("tilbudret-back");
+/* Opskriften lukkes ad mange veje (Luk, kryds, baggrund, tilbage, Escape,
+   slet, rediger). I stedet for at huske "overtilbud" alle steder, fjernes
+   maerket naar arket mister "open" — uanset hvordan. */
+/* KUN naar klassen faktisk er der: classList.remove saetter attributten
+   igen selv naar klassen mangler, og det er i sig selv en aendring, som
+   udloeser observatoeren igen — en uendelig loekke der fryser siden.
+   Fanget af test-340, foer den naaede telefonen. */
+new MutationObserver(() => {
+  const b = document.getElementById("ret-back");
+  if(!b.classList.contains("open") && b.classList.contains("overtilbud")) b.classList.remove("overtilbud");
+}).observe(document.getElementById("ret-back"), { attributes: true, attributeFilter: ["class"] });
 document.getElementById("tilbudret-krop").addEventListener("click", ev => {
   /* Retten -> opskriften. Tilbudsarket lukkes foerst: opskriftens ark
      ligger paa samme lag og tidligere i siden, saa det ville ellers
      havne BAG tilbudsarket. */
+  /* Retten -> opskriften, lagt OVENPAA tilbudsarket (v3.4.0). Saa lukker
+     tilbage-knappen kun opskriften, og man staar i Tilbud igen. Foer blev
+     tilbudsarket lukket foerst, og tilbage landede paa forsiden. */
   const ret = ev.target.closest("[data-tilretret]");
-  if(ret){ hide("tilbudret-back"); aabnRet(ret.dataset.tilretret); return; }
+  if(ret){
+    document.getElementById("ret-back").classList.add("overtilbud");
+    aabnRet(ret.dataset.tilretret);
+    return;
+  }
   /* Varen -> varekortet. Det ligger paa lag 70, over tilbudsarket. */
   const vare = ev.target.closest("[data-tilretvare]");
   if(vare){
