@@ -2150,8 +2150,8 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
       </div>
       <label class="nemvalgrad" id="nemvalg-altidrad">
         <input type="checkbox" id="nemvalg-altid">
-        <span><b>Køb altid</b><small>står under Faste indkøb — sat til med
-          det retterne kræver, når ugen bruger den</small></span></label>
+        <span><b>Køb altid</b><small>står under Faste indkøb hver uge — og
+          sættes op, hvis en ret kræver mere</small></span></label>
       <div class="nemstyk" id="nemvalg-altfelt">
         <span class="etiket">Varianter</span>
         <div id="nemvalg-altliste"></div>
@@ -2320,6 +2320,13 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
     <div class="nemsoegfelt">
       <input type="text" id="nemvarer-filter" placeholder="Find i listen" autocomplete="off">
       <button id="nemvarer-ny">Ny fast vare</button>
+    </div>
+    <!-- EEN liste over varer, som man kan skaere til (v3.8.0). -->
+    <div class="nemsort">
+      <button data-nemvis="alle" class="valgt">Alle</button>
+      <button data-nemvis="fast">Købes fast</button>
+      <button data-nemvis="retter">I retter</button>
+      <button data-nemvis="mangler">Ikke kortlagt</button>
     </div>
     <div class="nemsort">
       <button data-nemsort="mangler" class="valgt">Ikke kortlagt først</button>
@@ -2537,7 +2544,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.7.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.8.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -10228,11 +10235,14 @@ function nemValgAaben(opsaet){
     tilbudLinjeTegn();
     nemValg.styk = [];
     nemValg.alt  = [];
-    document.getElementById("nemvalg-altid").checked = false;
+    /* En ny FAST vare oprettes netop for at blive koebt hver uge. */
+    document.getElementById("nemvalg-altid").checked = !!nemValg.fastVare;
   }
   /* Markeringen giver kun mening på en INGREDIENS. En fast vare er jo
      allerede et fast køb — der ville fluebenet ikke betyde noget. */
-  document.getElementById("nemvalg-altidrad").hidden = nemValg.fastVare;
+  /* Fluebenet vises paa ALLE varer (v3.8.0) — ogsaa dem der oprettes med
+     "Ny fast vare", hvor det bare er sat til fra start. */
+  document.getElementById("nemvalg-altidrad").hidden = false;
 
   document.getElementById("nemvalg-fund").innerHTML = "";
   nemStykTegn();
@@ -10574,7 +10584,11 @@ async function nemValgGem(){
     /* Tomme og halvfaerdige linjer smides vaek foer der gemmes, og er der
        intet tilbage, skrives NULL — saa ser en aeldre udgave af filen
        praecis det den plejer. */
-    koeb_altid: !nemValg.fastVare && document.getElementById("nemvalg-altid").checked,
+    /* v3.8.0: EEN maade at sige "koebes hver uge". Foer stod det for de
+       rene faste varer i TYPEN og for ingredienser i FLUEBENET, og her
+       blev fluebenet tvunget til falsk for faste varer. Nu gaelder
+       fluebenet alle varer; typen siger kun hvor varen kom fra. */
+    koeb_altid: document.getElementById("nemvalg-altid").checked,
     /* Standardvaren må ALDRIG også ligge som variant: så står den to gange
        i Varianter-arket, med hver sit antal. Fire varer havde den dublet
        inden 2.57.0. Filtreret her, hvor alle veje ind mødes. */
@@ -10677,6 +10691,29 @@ function nemIngredienser(){
 }
 
 let nemVarerSort = "mangler";
+/* v3.8.0: kartoteket er EEN liste over varer, ikke to kasser.
+   [stated] Hans egen model, og den rigtige: "Der er varer vi køber, fordi
+   de er faste. Der er varer vi køber fordi de bruges i madretter. Men de
+   er allesammen bare varer." Foer stod en vare under Faste indkøb ELLER
+   under Ingredienser alt efter hvordan den blev OPRETTET — saa oliven
+   (ingrediens med flueben) og letmaelk (fast vare brugt i en ret) stod
+   hver sit sted, selv om de opfoerer sig ens. Nu staar hver vare EEN
+   gang, med maerker der viser hvad den er. */
+let nemVarerVis = "alle";     // alle | fast | retter | mangler
+
+/* Alle varer OG alle ingrediensnavne, samlet til een liste. En vare der
+   ogsaa er ingrediens staar EEN gang, med sine retter. */
+function nemVarerAlle(){
+  const kort = new Map();
+  for(const x of nemIngredienser()) kort.set(nemNoegle(x.navn), x);
+  for(const v of nemligVarer){
+    const n = nemNoegle(v.navn);
+    if(!n) continue;
+    if(kort.has(n)){ if(!kort.get(n).kort) kort.get(n).kort = v; }
+    else kort.set(n, { navn: v.navn, retter: [], kort: v });
+  }
+  return [...kort.values()];
+}
 
 function nemVarerTegn(){
   const krop = document.getElementById("nemvarer-krop");
@@ -10684,12 +10721,12 @@ function nemVarerTegn(){
   const passer = (navn, produkt) => !f || nemNoegle(navn).includes(f)
     || String(produkt || "").toLowerCase().includes(f);
 
-  const faste = nemligVarer
-    .filter(v => v.slags === "fast" && passer(v.navn, v.produkt_navn))
-    .sort((a, b) => a.navn.localeCompare(b.navn, "da"));
-
-  let ing = nemIngredienser()
-    .filter(x => passer(x.navn, x.kort && x.kort.produkt_navn));
+  let ing = nemVarerAlle()
+    .filter(x => passer(x.navn, x.kort && x.kort.produkt_navn))
+    .filter(x => nemVarerVis === "alle"
+      || (nemVarerVis === "fast"    && x.kort && x.kort.koeb_altid)
+      || (nemVarerVis === "retter"  && x.retter.length)
+      || (nemVarerVis === "mangler" && !x.kort));
 
   if(nemVarerSort === "antal"){
     ing.sort((a, b) => b.retter.length - a.retter.length
@@ -10698,10 +10735,10 @@ function nemVarerTegn(){
     ing.sort((a, b) => a.navn.localeCompare(b.navn, "da"));
   }
 
-  if(!faste.length && !ing.length){
+  if(!ing.length){
     krop.innerHTML = '<div class="nemtom">'
-      + (f ? "Ingen varer passer på det."
-           : "Der er hverken faste indkøb eller ingredienser endnu.") + '</div>';
+      + (f || nemVarerVis !== "alle" ? "Ingen varer passer på det."
+           : "Der er ingen varer endnu.") + '</div>';
     document.getElementById("nemvarer-taeller").textContent = "";
     return;
   }
@@ -10710,6 +10747,8 @@ function nemVarerTegn(){
   const raekkeKort = (navn, v, ekstra) => {
     const pakke = v.pakke_maengde ? tal(Number(v.pakke_maengde)) + " " + (v.pakke_enhed || "") : "—";
     const maerker = [
+      /* v3.8.0: EN maade at se at varen koebes hver uge. */
+      v.koeb_altid ? "købes fast" : null,
       v.fast_valg ? "fast valg" : "åben",
       v.koeb_aldrig ? "købes aldrig" : null
     ].filter(Boolean).join(" · ");
@@ -10739,58 +10778,28 @@ function nemVarerTegn(){
     return '<span class="nemretter">' + esc(vis) + '</span>';
   };
 
-  /* Faste indkøb: inddelt efter hovedgruppe, som i arket. */
-  const blokFaste = varer => {
-    if(!varer.length) return "";
-    const kasser = new Map();
-    varer.forEach(v => {
-      const g = v.hovedgruppe || "Øvrigt";
-      if(!kasser.has(g)) kasser.set(g, []);
-      kasser.get(g).push(v);
-    });
-    const orden = [...kasser.keys()].sort((a, b) =>
-      (a === "Øvrigt") - (b === "Øvrigt") || a.localeCompare(b, "da"));
+  /* EEN liste. Ved "Ikke kortlagt først" deles den i to afsnit, ellers
+     staar varerne i ubrudt raekkefoelge. */
+  const raekke = x => x.kort
+    ? raekkeKort(x.navn, x.kort, retterTekst(x.retter))
+    : raekkeTom(x.navn, retterTekst(x.retter));
 
-    let ud = '<div class="nemvarergruppe">Faste indkøb'
-      + '<span class="antal">' + varer.length + '</span></div>';
-    for(const g of orden){
-      if(kasser.size > 1) ud += '<div class="nemundergruppe">' + esc(g) + '</div>';
-      ud += kasser.get(g).map(v => raekkeKort(v.navn, v)).join("");
-    }
-    return ud;
-  };
-
-  /* Ingredienser: alle fra kogebogen, kortlagte som ukortlagte. */
-  const blokIngred = ing => {
-    if(!ing.length) return "";
-    const kortlagt = ing.filter(x => x.kort).length;
-    let ud = '<div class="nemvarergruppe">Ingredienser'
-      + '<span class="antal">' + kortlagt + ' af ' + ing.length + '</span></div>';
-
-    if(nemVarerSort === "mangler"){
-      const mangler = ing.filter(x => !x.kort);
-      const har = ing.filter(x => x.kort);
-      if(mangler.length){
-        ud += '<div class="nemundergruppe">Mangler kortlægning</div>';
-        ud += mangler.map(x => raekkeTom(x.navn, retterTekst(x.retter))).join("");
-      }
-      if(har.length){
-        ud += '<div class="nemundergruppe">Kortlagt</div>';
-        ud += har.map(x => raekkeKort(x.navn, x.kort, retterTekst(x.retter))).join("");
-      }
-      return ud;
-    }
-    return ud + ing.map(x => x.kort
-      ? raekkeKort(x.navn, x.kort, retterTekst(x.retter))
-      : raekkeTom(x.navn, retterTekst(x.retter))).join("");
-  };
-
-  krop.innerHTML = blokFaste(faste) + blokIngred(ing);
+  if(nemVarerSort === "mangler"){
+    const mangler = ing.filter(x => !x.kort), har = ing.filter(x => x.kort);
+    krop.innerHTML =
+        (mangler.length ? '<div class="nemundergruppe">Mangler kortlægning</div>'
+                          + mangler.map(raekke).join("") : "")
+      + (har.length ? '<div class="nemundergruppe">Kortlagt</div>'
+                      + har.map(raekke).join("") : "");
+  } else {
+    krop.innerHTML = ing.map(raekke).join("");
+  }
 
   const kortlagt = ing.filter(x => x.kort).length;
+  const fast = ing.filter(x => x.kort && x.kort.koeb_altid).length;
   document.getElementById("nemvarer-taeller").textContent = ing.length
-    ? kortlagt + " af " + ing.length + " ingredienser er kortlagt"
-    : "Der er ingen ingredienser i kogebogen endnu.";
+    ? kortlagt + " af " + ing.length + " varer er kortlagt · " + fast + " købes fast"
+    : "Der er ingen varer endnu.";
 }
 
 function nemStandOpdater(){
@@ -11234,14 +11243,25 @@ document.getElementById("nemvarer-krop").addEventListener("click", ev => {
   if(v) nemValgAaben({ navn: v.navn, sti: null, raekke: v, fastVare: v.slags === "fast" });
 });
 
-document.querySelector(".nemsort").addEventListener("click", ev => {
+/* BEGGE raekker: filtrene og sorteringen. Hang behandleren kun paa den
+   FOERSTE .nemsort, holdt sorteringsknapperne op med at virke i samme
+   oejeblik filterraekken blev lagt ovenover (v3.8.0). */
+document.querySelectorAll(".nemsort").forEach(raekke => raekke.addEventListener("click", ev => {
+  const vb = ev.target.closest("[data-nemvis]");
+  if(vb){
+    nemVarerVis = vb.dataset.nemvis;
+    document.querySelectorAll("[data-nemvis]").forEach(x =>
+      x.classList.toggle("valgt", x === vb));
+    nemVarerTegn();
+    return;
+  }
   const b = ev.target.closest("[data-nemsort]");
   if(!b) return;
   nemVarerSort = b.dataset.nemsort;
   document.querySelectorAll("[data-nemsort]").forEach(x =>
     x.classList.toggle("valgt", x === b));
   nemVarerTegn();
-});
+}));
 
 document.getElementById("husk-nej").onclick = () => {
   venterHusk = null;
