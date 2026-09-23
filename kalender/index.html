@@ -2557,7 +2557,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.10.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.11.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -9236,10 +9236,15 @@ function nemTegn(){
      som man venter: hos Nemlig kommer GRØNT før frugt, og mælk til sidst
      i Mejeri.
 
-     DELES KUN når hvert segment får mindst TO linjer — ellers bytter man
-     én liste ud med en stak overskrifter med én vare under hver (Tørvarer
-     ville give ni). Resten samles i "Øvrigt", som altid står sidst. */
-  const NEM_SEG_MINDST = 2;
+     HVER mellemgruppe får sit eget segment, OGSÅ med kun én vare i
+     (v3.11.0). Først krævede jeg mindst to, og så faldt rugbrød i
+     "Øvrigt", fordi det er den eneste mørke brød — [stated] "det føles
+     bare mærkeligt for et menneske". Nu hedder det Mørkt brød, som det
+     skal. Prisen er Tørvarer: elleve faste varer på ni mellemgrupper
+     giver ni overskrifter, de syv med én vare. Til gengæld står det der
+     hører sammen, sammen — og i Nemligs rækkefølge, så listen følger
+     butikken.
+     "Øvrigt" bruges nu KUN til varer helt uden mellemgruppe. */
 
   const nemSegmenter = (raekker, gruppe) => {
     const tegn = ([l, i]) => linje(l, gruppe, i);
@@ -9254,8 +9259,12 @@ function nemTegn(){
       kasser.get(n).push(r);
     });
 
-    const store = [...kasser.entries()].filter(([, r]) => r.length >= NEM_SEG_MINDST);
-    if(store.length < 2) return raekker.map(tegn).join("");   // ikke værd at dele
+    const store = [...kasser.entries()];
+    /* Én mellemgruppe og ikke andet: så siger overskriften intet, som
+       gruppen ikke allerede siger. */
+    const rest0 = raekker.filter(r => !navnAf(r));
+    if(store.length < 2 && !(store.length === 1 && rest0.length))
+      return raekker.map(tegn).join("");
 
     const iSegment = new Set();
     store.forEach(([, r]) => r.forEach(x => iSegment.add(x)));
