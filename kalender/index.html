@@ -1153,6 +1153,13 @@ html[data-theme="dark"] .gate::before{filter:invert(1);opacity:.30}
 .nemnavn input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
   background:var(--bg);color:var(--ink);font:inherit}
 .nemnavn .noegle{display:block;font-size:12px;color:var(--holiday);margin-top:5px}
+/* Segmenter inde i en gruppe. Baggrunden skifter en anelse, så øjet kan
+   se hvor det ene hører op — ikke en kasse med kant, bare et skær. */
+.nemsegment{background:color-mix(in srgb, var(--chip) 45%, transparent);
+  border-radius:10px;padding:2px 8px 6px;margin:6px 0}
+.nemsegment.lige{background:none}
+.nemsegtitel{font-size:11.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--muted);padding:8px 2px 2px}
 .nemvarergruppe{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
   font-weight:700;margin:20px 0 4px}
 .nemvarergruppe:first-child{margin-top:4px}
@@ -2550,7 +2557,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.9.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.10.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -9216,6 +9223,66 @@ function nemTegn(){
 
   /* De faste indkøb inddeles efter Nemligs egen hovedgruppe — Brød, Drikke,
      Frugt og grønt. Vi sorterer ikke selv; grupperingen følger med varen. */
+  /* Segmenter INDE i en gruppe (v3.10.0). "Frugt og grønt" er stadig ÉN
+     foldeknap, men indeni står frugt for sig og grønt for sig, hver med en
+     lille overskrift og en anelse anden baggrund. [stated] Hans forslag —
+     ikke en foldeknap pr. mellemgruppe, "det kan stadig være Frugt og
+     grønt man folder ud".
+
+     RÆKKEFØLGEN er NEMLIGS EGEN, taget fra undergruppe-nummeret: de fem
+     første cifre er hovedgruppe + mellemgruppe, så en almindelig
+     sortering giver deres orden. [stated] Hans valg, da alternativerne
+     var alfabetisk eller en håndholdt liste. Bemærk at den ikke altid er
+     som man venter: hos Nemlig kommer GRØNT før frugt, og mælk til sidst
+     i Mejeri.
+
+     DELES KUN når hvert segment får mindst TO linjer — ellers bytter man
+     én liste ud med en stak overskrifter med én vare under hver (Tørvarer
+     ville give ni). Resten samles i "Øvrigt", som altid står sidst. */
+  const NEM_SEG_MINDST = 2;
+
+  const nemSegmenter = (raekker, gruppe) => {
+    const tegn = ([l, i]) => linje(l, gruppe, i);
+    const segOrden = ([l]) => String((l.kort && l.kort.undergruppe) || "999999999");
+    const navnAf = ([l]) => (l.kort && l.kort.mellemgruppe) || "";
+
+    const kasser = new Map();
+    raekker.forEach(r => {
+      const n = navnAf(r);
+      if(!n) return;
+      if(!kasser.has(n)) kasser.set(n, []);
+      kasser.get(n).push(r);
+    });
+
+    const store = [...kasser.entries()].filter(([, r]) => r.length >= NEM_SEG_MINDST);
+    if(store.length < 2) return raekker.map(tegn).join("");   // ikke værd at dele
+
+    const iSegment = new Set();
+    store.forEach(([, r]) => r.forEach(x => iSegment.add(x)));
+    const rest = raekker.filter(r => !iSegment.has(r));
+
+    /* Nemligs orden: laveste undergruppe-nummer i segmentet. */
+    store.sort((a, b) => {
+      const na = a[1].map(segOrden).sort()[0], nb = b[1].map(segOrden).sort()[0];
+      return na.localeCompare(nb);
+    });
+
+    let ud = "";
+    store.forEach(([navn, r], nr) => {
+      ud += '<div class="nemsegment' + (nr % 2 ? " lige" : "") + '">'
+         +    '<div class="nemsegtitel">' + esc(navn) + '</div>'
+         +    r.slice().sort((x, y) => x[0].navn.localeCompare(y[0].navn, "da")).map(tegn).join("")
+         + '</div>';
+    });
+    if(rest.length){
+      ud += '<div class="nemsegment' + (store.length % 2 ? " lige" : "") + '">'
+         +    '<div class="nemsegtitel">Øvrigt</div>'
+         +    rest.slice().sort((x, y) => x[0].navn.localeCompare(y[0].navn, "da")).map(tegn).join("")
+         + '</div>';
+    }
+    return ud;
+  };
+
   const afsnitDelt = (titel, liste, gruppe) => {
     if(!liste.length) return '';
     const kasser = new Map();
@@ -9255,7 +9322,7 @@ function nemTegn(){
            +  '</button>';
         if(lukket) continue;
       }
-      ud += raekker.map(([l, i]) => linje(l, gruppe, i)).join("");
+      ud += nemSegmenter(raekker, gruppe);
     }
     return ud;
   };
@@ -10314,7 +10381,7 @@ function nemValgAaben(opsaet){
     const r = nemValg.raekke;
     nemValg.valgt = {
       id: r.produkt_id, navn: r.produkt_navn || "", beskrivelse: "",
-      undergruppe: r.undergruppe, pris: null,
+      undergruppe: r.undergruppe, mellemgruppe: r.mellemgruppe || null, pris: null,
       /* FEJL rettet 20. august: billede og hovedgruppe manglede her, mens
          de BLEV skrevet ved gem. Åbnede man en gemt vare for at rette en
          enhed og trykkede Gem, blev de derfor nulstillet — billedet
@@ -10712,6 +10779,9 @@ async function nemValgGem(){
     })(),
     undergruppe: nemValg.valgt.undergruppe || null,
     hovedgruppe: nemValg.valgt.hovedgruppe || null,
+    /* v3.10.0: Nemligs mellemgruppe gemmes med, så nye varer selv falder
+       i det rigtige segment. Uden den ville de lande i "Øvrigt". */
+    mellemgruppe: nemValg.valgt.mellemgruppe || null,
     billede: nemValg.valgt.billede || null,
     fast_valg: document.querySelector('input[name="nemfast"]:checked').value === "1",
     /* Tilbud i Rema og 365. Gemmes med varen, saa der kun er eet Gem. */
