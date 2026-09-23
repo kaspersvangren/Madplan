@@ -1370,6 +1370,12 @@ html[data-theme="dark"] .tilbudmaerke.kaede-rema{border-color:#4F7FC4}
 #tilbudvis-krop img{display:block;width:100%;height:auto;border-radius:10px;background:#fff;
   border:1px solid var(--line);margin:8px 0}
 #tilbudvis-krop .linje{font-size:14px;color:var(--muted);margin:4px 0}
+/* Retterne under en samlet linje, og advarslen om at det måske ikke
+   rækker. Advarslen bruger den GULE tone — den er et spørgsmål, ikke en
+   fejl: de kan sagtens have hvidløg nok i skuffen. */
+.nemdele b{font-weight:700;color:var(--ink)}
+.nemdele i{font-style:italic}
+.nemraekker{color:var(--ferie);font-weight:600}
 .nemvip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;
   color:var(--ferie);border:1px solid var(--ferie);border-radius:999px;
   padding:0 5px;margin-left:6px;vertical-align:1px;
@@ -2544,7 +2550,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.8.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.9.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)
@@ -4683,9 +4689,24 @@ function beregnIndkoeb(fredag){
         const mk = ingMarkFor(ds, kilde.id, ing.navn);
         if(mk && mk.har) return;
         const kort = ing.kategori === "tjek" ? tjek : koeb;
-        const noegle = ing.navn.toLowerCase() + "|" + (ing.enhed || "");
-        const post = kort.get(noegle) || { navn: ing.navn, enhed: ing.enhed || "", maengde: null, retter: new Set() };
-        if(ing.maengde != null) post.maengde = (post.maengde || 0) + ing.maengde * (m.portioner || 1);
+        /* v3.9.0: nøglen er NAVNET ALENE. Før stod enheden med i nøglen,
+           så hvidløg i "fed" og hvidløg i "stk" blev to linjer med samme
+           navn — og det samme skete for en ret MED mængde ved siden af en
+           UDEN. [stated] "Hvidløg / Hvidløg" i indkøbslisten. Målt på 13
+           uger: sker ca. én gang om ugen, oftest netop med/uden mængde.
+           Hver rets bidrag gemmes nu for sig i `dele`, så linjen kan vise
+           hvem der vil have hvad — og så mængderne kan lægges sammen
+           gennem varekortets omregning i stedet for at blive skilt ad. */
+        const noegle = ing.navn.toLowerCase();
+        const post = kort.get(noegle) || { navn: ing.navn, enhed: ing.enhed || "", maengde: null, retter: new Set(), dele: [] };
+        const m1 = ing.maengde != null ? ing.maengde * (m.portioner || 1) : null;
+        post.dele.push({ ret: kilde.kilde, maengde: m1, enhed: ing.enhed || "" });
+        if(m1 != null){
+          /* Bagudkompatibelt: behov + enhed står stadig, når alle de
+             kendte mængder deler enhed. Ellers regnes der på `dele`. */
+          if(post.maengde == null){ post.maengde = m1; post.enhed = ing.enhed || ""; }
+          else if((post.enhed || "") === (ing.enhed || "")) post.maengde += m1;
+        }
         post.retter.add(kilde.kilde);
         kort.set(noegle, post);
       });
@@ -6992,6 +7013,37 @@ function nemStykliste(kort){
    hinanden, så "1 pakke" mod "4 stk" blev regnet til 1 UDEN gættemærke.
    To pakker wraps mod en pose på 8 stk ville have købt én pose og set
    selvsikker ud imens. Nu skal ordet være det samme.                  */
+/* Hvor stor en DEL af en pakke et behov fylder — samme regnestykke som
+   nemAntal, men UDEN oprunding. Bruges til at lægge flere retters mængder
+   sammen på tværs af enheder (4 fed + 1 stk), og til at se hvor meget der
+   er tilovers til de retter der ikke har nogen mængde. null = kan ikke
+   omregnes. (v3.9.0) */
+function nemPakkeAndel(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
+  if(behov == null) return null;
+  const e1 = (enhed || "").toLowerCase().trim();
+  const stykliste = nemStykliste(kort);
+  const traef = stykliste.find(x => x.enhed === e1);
+  if(traef && traef.antal) return behov / traef.antal;
+
+  const fBehov = nemFamilie(e1);
+  if(fBehov){
+    for(const x of stykliste){
+      if(nemFamilie(x.enhed) !== fBehov) continue;
+      const a = nemTilGrund(behov, e1), b = nemTilGrund(x.antal, x.enhed);
+      if(a && b) return a / b;
+    }
+  }
+  if(!pakkeMaengde) return null;
+  const f1 = nemFamilie(enhed), f2 = nemFamilie(pakkeEnhed);
+  const e2 = (pakkeEnhed || "").toLowerCase().trim();
+  if(f1 && f2 && f1 === f2){
+    const a = nemTilGrund(behov, e1), b = nemTilGrund(pakkeMaengde, e2);
+    if(a && b) return a / b;
+  }
+  if(!f1 && !f2 && e1 && e1 === e2) return behov / pakkeMaengde;
+  return null;
+}
+
 function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
   if(behov == null) return { antal:1, gaet:true };
   const e1 = (enhed || "").toLowerCase().trim();
@@ -7031,6 +7083,23 @@ function nemAntal(behov, enhed, pakkeMaengde, pakkeEnhed, kort){
 /* Hvilke afsnit i indkøbsarket der er foldet sammen. Ligger på enheden,
    ikke i basen: det er en visningsting, og den skal ikke følge med over
    på tabletten midt i en indkøbstur. */
+/* Hvor lidt der må være tilovers, før appen siger til om de retter der
+   ikke har nogen mængde. En KVART pakke — [stated] hans tal. Ét sted at
+   skrue på. */
+const NEM_REST_GRAENSE = 0.25;
+
+/* Rækker det valgte antal til de retter der IKKE har nogen mængde?
+   Kendt behov trækkes fra antallet af pakker; er der under en kvart pakke
+   tilbage, siges der til. Siger INTET når: ingen ret mangler mængde (så er
+   alt regnet med), varen ikke er valgt til (så er der intet at række til),
+   eller behovet slet ikke kunne regnes om (så ved vi for lidt).
+   Det SPÆRRER ikke knappen — det er et spørgsmål, ikke en fejl. */
+function nemRaekkerIkke(l){
+  if(!l || !l.udenMaengde || !l.udenMaengde.length) return false;
+  if(!(l.antal > 0) || l.andel == null) return false;
+  return (l.antal - l.andel) < NEM_REST_GRAENSE;
+}
+
 const NEMFOLD_NOEGLE = "kalender-nemlig-foldet";
 let nemFoldet = new Set();
 try{
@@ -8137,10 +8206,31 @@ function nemByg(){
       gaet: false,
       spring: false
     };
+    /* Retter der IKKE har sat en mængde. De skal stadig have varen, men
+       appen kan ikke vide hvor meget — derfor regnes de ikke med i tallet,
+       de nævnes. [stated] "Man bruger en slat, eller så mange hvidløg man
+       lige synes." */
+    r.dele = (p.dele || []).slice();
+    r.udenMaengde = r.dele.filter(d => d.maengde == null).map(d => d.ret);
+
     if(kort && kort.produkt_id){
-      const a = nemAntal(p.maengde, p.enhed, Number(kort.pakke_maengde), kort.pakke_enhed, kort);
-      r.antal = a.antal;
-      r.gaet  = a.gaet;
+      const pm = Number(kort.pakke_maengde);
+      /* Læg retternes mængder sammen som DELE AF EN PAKKE, så 4 fed og
+         1 stk hvidløg kan mødes. Kan bare én af dem ikke omregnes, falder
+         vi tilbage på den gamle vej med den samlede mængde. */
+      const kendte = r.dele.filter(d => d.maengde != null);
+      let andele = kendte.map(d => nemPakkeAndel(d.maengde, d.enhed, pm, kort.pakke_enhed, kort));
+      if(kendte.length && andele.every(x => x != null)){
+        const sum = andele.reduce((a, b) => a + b, 0);
+        r.andel = sum;
+        r.antal = Math.max(1, Math.ceil(sum));
+        r.gaet  = false;
+      } else {
+        const a = nemAntal(p.maengde, p.enhed, pm, kort.pakke_enhed, kort);
+        r.antal = a.antal;
+        r.gaet  = a.gaet;
+        r.andel = kendte.length ? nemPakkeAndel(p.maengde, p.enhed, pm, kort.pakke_enhed, kort) : null;
+      }
     }
     return r;
   };
@@ -8926,6 +9016,17 @@ function nemTegn(){
     } else if(l.kilder){
       under = l.kilder;      // hvilke retter varen kommer fra — ikke en advarsel
     }
+    /* v3.9.0: EN linje pr. vare, med retterne under — hver med sin egen
+       mængde, og "uden mængde" hvor opskriften ikke siger noget.
+       [stated] Hans egen model. Erstatter den rene liste af retter, som
+       ikke kunne vise hvem der ville have hvad. */
+    const deleTekst = (l.dele && l.dele.length > 1)
+      ? l.dele.map(d => esc(d.ret) + " " + (d.maengde != null
+          ? '<b>' + esc(tal(d.maengde) + (d.enhed ? " " + boejEnhed(d.enhed, d.maengde) : "")) + '</b>'
+          : '<i>uden mængde</i>')).join(" · ")
+      : "";
+    const raekkerIkke = nemRaekkerIkke(l);
+
     const pakke = l.kort.pakke_maengde
       ? tal(Number(l.kort.pakke_maengde)) + " " + (l.kort.pakke_enhed || "") : "";
     const alt = nemIKurv(l.kort.produkt_id);
@@ -8989,6 +9090,12 @@ function nemTegn(){
           : (under
               ? '<span class="under' + (underGaet ? " gaet" : "") + '">' + esc(under) + '</span>'
               : !l.medtaget ? '<span class="under">tages ikke med</span>' : ""))
+      /* Retterne, hver med sin mængde (v3.9.0). Kun når varen kommer fra
+         mere end én ret — ellers siger linjen ovenfor det hele. */
+      + (deleTekst ? '<span class="under nemdele">' + deleTekst + '</span>' : "")
+      + (raekkerIkke
+          ? '<span class="under nemraekker">\u26a0 Rækker måske ikke til '
+            + esc(l.udenMaengde.join(" og ")) + '</span>' : "")
       /* "Ikke købt i N dage" — kun på faste varer, kun når rytmen er
          brudt, og kun med antallet af dage. Rytmen selv afgør OM linjen
          vises, men skrives ikke ud: den fylder uden at hjælpe, når man
