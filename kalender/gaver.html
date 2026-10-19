@@ -95,11 +95,10 @@ section.cat h2 small { font-family: var(--font-body); font-size: 13px; color: va
 .who { font-size: 12px; font-weight: 700; }
 .who.kasper { color: var(--kasper); }
 .who.fie { color: var(--fie); }
-.opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .vote button { font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 6px 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; min-width: 0; }
 .vote button:hover { border-color: var(--muted); }
 .vote button[data-v="ja"][aria-pressed="true"] { background: var(--ja-soft); border-color: var(--ja); color: var(--ja); }
-.vote button[data-v="maaske"][aria-pressed="true"] { background: var(--maaske-soft); border-color: var(--maaske); color: var(--maaske); }
 .vote button[data-v="nej"][aria-pressed="true"] { background: var(--nej-soft); border-color: var(--nej); color: var(--nej); }
 .card.dim .pic img { opacity: .45; }
 .empty { margin-top: 40px; color: var(--muted); text-align: center; }
@@ -116,6 +115,10 @@ section.cat h2 small { font-family: var(--font-body); font-size: 13px; color: va
 #login input { font: inherit; font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 #login button { font: inherit; font-weight: 700; padding: 10px; border: 0; border-radius: 6px; background: var(--spruce); color: var(--bg); cursor: pointer; }
 #login-fejl { color: var(--nej); font-size: 13px; min-height: 1em; }
+.skjulknap { position: absolute; right: 8px; top: 8px; font: inherit; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; border: 0; background: var(--surface); color: var(--fg); opacity: .9; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.skjulknap:hover { opacity: 1; }
+.statusrad { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.nulstil { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--nej); background: none; border: 0; padding: 6px 0 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
 </style>
 
 <div class="wrap">
@@ -123,7 +126,7 @@ section.cat h2 small { font-family: var(--font-body); font-size: 13px; color: va
   <header class="top">
     <div>
       <h1>Julegavevalget 2026</h1>
-      <p class="sub">Børne- og Kulturforvaltningen Gladsaxe · 49 gaver fra Gavefabrikken. Kasper og Fie stemmer hver for sig – tryk igen på en knap for at fjerne svaret.</p>
+      <p class="sub">Børne- og Kulturforvaltningen Gladsaxe · 49 gaver fra Gavefabrikken. Kasper og Fie stemmer hver for sig – tryk igen på en knap for at fjerne svaret. Skjul gemmes kun på din egen telefon.</p>
     </div>
     <span class="deadline">Vælg senest 21. oktober</span>
   </header>
@@ -138,7 +141,10 @@ section.cat h2 small { font-family: var(--font-body); font-size: 13px; color: va
 
   <div class="bar">
     <div class="chips" id="chips" role="group" aria-label="Filtrér gaver"></div>
-    <div class="status" id="status">Henter stemmer …</div>
+    <div class="statusrad">
+      <div class="status" id="status">Henter stemmer …</div>
+      <button type="button" class="nulstil" id="nulstil">Nulstil alt</button>
+    </div>
   </div>
 
   <main id="list"></main>
@@ -152,24 +158,32 @@ const CATS = [
   ["tekstil", "Tekstiler"], ["rejse", "Tasker og gadgets"], ["andet", "Oplevelser og spiseligt"]
 ];
 const PEOPLE = [["kasper", "Kasper"], ["fie", "Fie"]];
-const OPTS = [["ja", "Ja"], ["maaske", "Måske"], ["nej", "Nej"]];
+const OPTS = [["ja", "Ja"], ["nej", "Nej"]];
 const DEFAULT_GIFT = "339467";
 const SHOP = "https://gaveshop.gavefabrikken.dk/shop/4wpg6j/catalog/";
 
 const state = { kasper: {}, fie: {} };
 let filter = "alle";
 try { filter = localStorage.getItem("gavefilter") || "alle"; } catch (e) {}
+/* Skjulte gaver gemmes kun på den enkelte telefon — Fie og Kasper
+   rydder hver deres egen skærm op uden at fjerne noget for den anden. */
+let skjult = new Set();
+try { skjult = new Set(JSON.parse(localStorage.getItem("gaveskjult") || "[]")); } catch (e) {}
+function gemSkjult() { try { localStorage.setItem("gaveskjult", JSON.stringify([...skjult])); } catch (e) {} }
 
 const FILTERS = [
   ["alle", "Alle", () => true],
   ["beggeja", "Begge ja", g => vk(g) === "ja" && vf(g) === "ja"],
   ["enja", "Mindst én ja", g => vk(g) === "ja" || vf(g) === "ja"],
-  ["maaske", "Måske-bunken", g => (vk(g) === "maaske" || vf(g) === "maaske") && vk(g) !== "nej" && vf(g) !== "nej"],
   ["uenige", "Uenige", g => vk(g) && vf(g) && vk(g) !== vf(g)],
   ["manglerk", "Kasper mangler", g => !vk(g)],
   ["manglerf", "Fie mangler", g => !vf(g)],
   ["skjulnej", "Skjul nej", g => vk(g) !== "nej" && vf(g) !== "nej"],
+  ["skjulte", "Skjulte", g => skjult.has(g.id)],
 ];
+/* Alle filtre undtagen "Skjulte" springer de skjulte gaver over */
+if (!FILTERS.some(f => f[0] === filter)) filter = "alle";   // fx et gemt "Måske-bunken"
+function passer(key, f, g) { return key === "skjulte" ? f(g) : !skjult.has(g.id) && f(g); }
 function vk(g) { return state.kasper[g.id] || ""; }
 function vf(g) { return state.fie[g.id] || ""; }
 
@@ -224,15 +238,21 @@ function build() {
         });
         votes.appendChild(el("div", { class: "vote" }, [el("span", { class: "who " + pk, text: pl }), opts]));
       });
+      const skjulBtn = el("button", { type: "button", class: "skjulknap", id: "s-" + g.id, text: "Skjul" });
+      skjulBtn.addEventListener("click", () => {
+        if (skjult.has(g.id)) skjult.delete(g.id); else skjult.add(g.id);
+        gemSkjult();
+        render();
+      });
       const card = el("article", { class: "card" }, [
-        el("div", { class: "pic" }, [el("img", { src: "gaver/" + g.id + ".webp", alt: g.b + " – " + g.n, loading: "lazy", decoding: "async" }), tag]),
+        el("div", { class: "pic" }, [el("img", { src: "gaver/" + g.id + ".webp", alt: g.b + " – " + g.n, loading: "lazy", decoding: "async" }), tag, skjulBtn]),
         el("div", { class: "body" }, [
           el("div", {}, [el("div", { class: "brand", text: g.b }), el("p", { class: "name", text: g.n })]),
           extra, votes
         ])
       ]);
       grid.appendChild(card);
-      cardEls[g.id] = { card, tag, sec };
+      cardEls[g.id] = { card, tag, sec, skjulBtn };
     });
     listEl.appendChild(sec);
   });
@@ -243,12 +263,13 @@ function render() {
   FILTERS.forEach(([key, , f]) => {
     const b = document.getElementById("f-" + key);
     b.setAttribute("aria-pressed", String(key === filter));
-    b.querySelector(".n").textContent = GIFTS.filter(f).length;
+    b.querySelector(".n").textContent = GIFTS.filter(g => passer(key, f, g)).length;
   });
   const visibleCats = {};
   let shown = 0;
   GIFTS.forEach(g => {
-    const { card, tag, sec } = cardEls[g.id];
+    const { card, tag, sec, skjulBtn } = cardEls[g.id];
+    skjulBtn.textContent = skjult.has(g.id) ? "Vis igen" : "Skjul";
     const k = vk(g), f = vf(g);
     const match = k === "ja" && f === "ja";
     card.classList.toggle("both-ja", match);
@@ -258,7 +279,7 @@ function render() {
     card.querySelectorAll(".vote button").forEach(btn => {
       btn.setAttribute("aria-pressed", String(state[btn.dataset.p][g.id] === btn.dataset.v));
     });
-    const vis = fn(g);
+    const vis = passer(filter, fn, g);
     card.hidden = !vis;
     if (vis) { shown++; visibleCats[g.c] = (visibleCats[g.c] || 0) + 1; }
   });
@@ -273,7 +294,7 @@ function render() {
    (gave_id, person, valg). Hele siden + tabellen kan slettes efter jul. */
 const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
-const GYLDIG = { ja: 1, maaske: 1, nej: 1 };
+const GYLDIG = { ja: 1, nej: 1 };   // gamle "maaske"-rækker ignoreres
 let sb = null;
 let klar = false;
 const igang = {};               // "gave|person" -> antal skrivninger undervejs
@@ -336,9 +357,24 @@ async function blivKlar() {
   lytLive();
 }
 
+/* Nulstil: sletter BEGGES stemmer i basen og viser de skjulte igen på
+   denne telefon. confirm() virker her — siden er ikke et Claude-artefakt. */
+async function nulstil() {
+  if (!klar) { setStatus("Log ind først.", true); return; }
+  if (!confirm("Slet alle stemmer for både Kasper og Fie og vis skjulte gaver igen?")) return;
+  skjult.clear(); gemSkjult();
+  state.kasper = {}; state.fie = {};
+  render();
+  const { error } = await sb.from("gaver_stemmer").delete().neq("gave_id", "");
+  if (error) { setStatus("Kunne ikke nulstille: " + error.message, true); return; }
+  setStatus("Nulstillet · alle stemmer er slettet");
+  hent();
+}
+
 async function start() {
   build();
   render();
+  document.getElementById("nulstil").addEventListener("click", nulstil);
   if (!window.supabase) { setStatus("Kunne ikke hente databasens værktøj. Tjek nettet og genindlæs.", true); return; }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const { data } = await sb.auth.getSession();
