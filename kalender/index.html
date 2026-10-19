@@ -468,7 +468,10 @@ html[data-theme="dark"] .mark.frost{background:rgba(120,180,240,.18);color:#8fc2
 .dagrad.idag .dag .n{text-decoration:underline;text-underline-offset:3px}
 .dagrad .dag .u{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
 .dagrad .mad{flex:1;min-width:0}
-.dagrad .mad .r{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* .r er et <span> og derfor inline — saa virkede overflow/ellipsis ikke, og
+   lange retter loeb ud over pilen (3.12.0). Nu blok, op til to linjer. */
+.dagrad .mad .r{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;
+  overflow:hidden;overflow-wrap:anywhere;font-weight:600;font-size:16px;line-height:1.25}
 .dagrad .mad .t{font-size:13px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
 .dagrad .tom{color:var(--muted);font-size:15px}
 .dagrad .pil{color:var(--muted);flex:none}
@@ -2059,6 +2062,13 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
          bogmærkes som alt andet.
          Stien er relativ, fordi historik.html ligger i samme mappe som
          beta.html og index.html. Flyttes filen, skal den her rettes med. -->
+    <!-- MIDLERTIDIG (3.12.0, oktober 2026): julegavevalget. Samme mappe og
+         samme fane, så siden deler appens login. Fjernes sammen med
+         gaver.html og mappen gaver/, når gaven er valgt. -->
+    <a class="menu-row" id="menu-gaver" href="gaver.html">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Julegaven 2026
+    </a>
     <a class="menu-row" id="menu-historik" href="historik.html" target="_blank" rel="noopener">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
       Købshistorik
@@ -2557,7 +2567,7 @@ html[data-theme="dark"] .nemsum .linje span.naaet{background:#6DBE86}
 /* =======================================================================
    Indstillinger du kan skrue på
    ======================================================================= */
-const VERSION      = "3.11.0";  // tælles op ved hver ny udgave af filen
+const VERSION      = "3.12.0";  // tælles op ved hver ny udgave af filen
 const IDLE_MS      = 60000;   // millisekunder uden berøring før visningen går hjem til i dag
 const IDLE_ANDET_MS= 900000;  // det samme, men når man står i en anden fane end kalenderen (15 min)
 const IDLE_ARBEJDE_MS = 3600000; // og når der står en halvfærdig oprettelse åben (1 time)

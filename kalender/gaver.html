@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Julegavevalget 2026</title>
+<!-- Midlertidig side (oktober 2026): Kasper og Fie stemmer om julegaven fra
+     Gladsaxes gaveshop. Åbnes fra menuen i Vores Hverdag. Slet gaver.html,
+     mappen gaver/ og menupunktet #menu-gaver, når gaven er valgt — og evt.
+     tabellen gaver_stemmer i Supabase. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+html, body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: smal topbjælke med frist + filtre, derefter et tæt gitter af gavekort i kategorier; hvert kort har to stemmerækker (Kasper, Fie). */
+:root {
+  --bg: #f3f5f2;
+  --surface: #ffffff;
+  --fg: #1d2a24;
+  --muted: #5d6b64;
+  --line: #d9e0db;
+  --spruce: #1f4d3a;
+  --spruce-soft: #e3ece6;
+  --ja: #2f7d4f;
+  --ja-soft: #dcefe2;
+  --maaske: #a86a00;
+  --maaske-soft: #f7ead0;
+  --nej: #b0413e;
+  --nej-soft: #f6dedc;
+  --kasper: #2b5d8a;
+  --fie: #8a3d6e;
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121915; --surface: #1a231e; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3832;
+    --spruce: #8fc9aa; --spruce-soft: #22332a;
+    --ja: #6fca93; --ja-soft: #1f3a29; --maaske: #e2ad4f; --maaske-soft: #3a2f18;
+    --nej: #e98480; --nej-soft: #3d2221; --kasper: #8cb8e3; --fie: #d895c1;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121915; --surface: #1a231e; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3832;
+  --spruce: #8fc9aa; --spruce-soft: #22332a;
+  --ja: #6fca93; --ja-soft: #1f3a29; --maaske: #e2ad4f; --maaske-soft: #3a2f18;
+  --nej: #e98480; --nej-soft: #3d2221; --kasper: #8cb8e3; --fie: #d895c1;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.4; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 36px); line-height: 1.1; margin: 0; text-wrap: balance; color: var(--spruce); }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 60ch; }
+.deadline { display: inline-flex; align-items: center; gap: 8px; background: var(--spruce); color: var(--bg); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); margin-top: 16px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 6px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip .n { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--spruce); border-color: var(--spruce); color: var(--bg); }
+.chip[aria-pressed="true"] .n { color: inherit; opacity: .8; }
+.chip:focus-visible, .vote button:focus-visible, a:focus-visible { outline: 2px solid var(--spruce); outline-offset: 2px; }
+.status { font-size: 12.5px; color: var(--muted); margin-top: 6px; min-height: 1.2em; }
+.status.warn { color: var(--nej); }
+section.cat { margin-top: 28px; }
+section.cat h2 { font-family: var(--font-display); font-weight: 400; font-size: 21px; margin: 0 0 12px; color: var(--fg); display: flex; align-items: baseline; gap: 8px; }
+section.cat h2 small { font-family: var(--font-body); font-size: 13px; color: var(--muted); font-weight: 500; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+@media (max-width: 520px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.card.both-ja { border-color: var(--ja); box-shadow: 0 0 0 1px var(--ja); }
+.pic { position: relative; aspect-ratio: 4 / 5; max-width: 100%; background: var(--spruce-soft); }
+.pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tag { position: absolute; left: 8px; top: 8px; background: var(--surface); color: var(--fg); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+.tag.match { background: var(--ja); color: var(--surface); }
+.body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.brand { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.name { font-size: 15px; font-weight: 600; line-height: 1.25; margin: 2px 0 0; overflow-wrap: anywhere; }
+.extra { font-size: 12px; color: var(--muted); }
+.extra a { color: var(--muted); }
+.votes { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.vote { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 6px; }
+.who { font-size: 12px; font-weight: 700; }
+.who.kasper { color: var(--kasper); }
+.who.fie { color: var(--fie); }
+.opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.vote button { font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 6px 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; min-width: 0; }
+.vote button:hover { border-color: var(--muted); }
+.vote button[data-v="ja"][aria-pressed="true"] { background: var(--ja-soft); border-color: var(--ja); color: var(--ja); }
+.vote button[data-v="maaske"][aria-pressed="true"] { background: var(--maaske-soft); border-color: var(--maaske); color: var(--maaske); }
+.vote button[data-v="nej"][aria-pressed="true"] { background: var(--nej-soft); border-color: var(--nej); color: var(--nej); }
+.card.dim .pic img { opacity: .45; }
+.empty { margin-top: 40px; color: var(--muted); text-align: center; }
+@media (max-width: 520px) {
+  .vote { grid-template-columns: 1fr; gap: 3px; }
+  .body { padding: 8px 8px 10px; }
+  .name { font-size: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) { .vote button, .chip { transition: background-color .12s, border-color .12s, color .12s; } }
+.tilbage { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 10px; }
+.tilbage:hover { color: var(--fg); }
+#login { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; max-width: 360px; }
+#login label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+#login input { font: inherit; font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+#login button { font: inherit; font-weight: 700; padding: 10px; border: 0; border-radius: 6px; background: var(--spruce); color: var(--bg); cursor: pointer; }
+#login-fejl { color: var(--nej); font-size: 13px; min-height: 1em; }
+</style>
+
+<div class="wrap">
+  <a class="tilbage" href="index.html">‹ Vores Hverdag</a>
+  <header class="top">
+    <div>
+      <h1>Julegavevalget 2026</h1>
+      <p class="sub">Børne- og Kulturforvaltningen Gladsaxe · 49 gaver fra Gavefabrikken. Kasper og Fie stemmer hver for sig – tryk igen på en knap for at fjerne svaret.</p>
+    </div>
+    <span class="deadline">Vælg senest 21. oktober</span>
+  </header>
+
+  <form id="login" hidden>
+    <strong>Log ind med familiekontoen</strong>
+    <label for="login-mail">E-mail<input id="login-mail" type="email" autocomplete="username" required></label>
+    <label for="login-kode">Kodeord<input id="login-kode" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Log ind</button>
+    <div id="login-fejl" role="alert"></div>
+  </form>
+
+  <div class="bar">
+    <div class="chips" id="chips" role="group" aria-label="Filtrér gaver"></div>
+    <div class="status" id="status">Henter stemmer …</div>
+  </div>
+
+  <main id="list"></main>
+  <p class="empty" id="empty" hidden>Ingen gaver passer til filteret.</p>
+</div>
+
+<script>
+const GIFTS=[{"id": "339449", "b": "Aida Raw", "n": "Funktionel reol og farverige krus", "c": "bolig", "v": false}, {"id": "339602", "b": "Knabstrup Keramik", "n": "Farverige kopper med riflet design - 6 stk", "c": "bord", "v": false}, {"id": "339454", "b": "Aida Raw", "n": "Stilren og rå serveringsskål i stentøj + Skålesæt i nordisk design - 3 stk", "c": "bord", "v": false}, {"id": "339460", "b": "Masterchef", "n": "Moderne knivsæt med non-stick belægning - 5 stk", "c": "kok", "v": false}, {"id": "339611", "b": "Olav Eriksen", "n": "Eksklusive knive i tysk stål – 3 stk", "c": "kok", "v": false}, {"id": "339606", "b": "Laguiole by House of Chefs", "n": "Skærebrætter i akacietræ med holder", "c": "kok", "v": false}, {"id": "339583", "b": "Hâws", "n": "Alsidig stavblender med komplet tilbehør", "c": "kok", "v": false}, {"id": "339587", "b": "House of Chefs", "n": "Multifunktionel 3i1 crepepande", "c": "kok", "v": true}, {"id": "339598", "b": "ByKoch", "n": "Trådløs håndmikser i stilrent design", "c": "kok", "v": false}, {"id": "339588", "b": "House of Chefs", "n": "Rummelig wok i genanvendt aluminium", "c": "kok", "v": true}, {"id": "339590", "b": "House of Chefs", "n": "Sauterpande med låg i genanvendt aluminium", "c": "kok", "v": true}, {"id": "391132", "b": "ByKoch", "n": "Robuste Hexagon pander i rustfrit stål - 2 stk", "c": "kok", "v": false}, {"id": "339597", "b": "ByKoch", "n": "Hårdfør Hexagon pande - 28 cm", "c": "kok", "v": false}, {"id": "339607", "b": "Mauviel 1830", "n": "Kobberkasserolle til servering og madlavning - 10 cm", "c": "kok", "v": false}, {"id": "339636", "b": "Smeg", "n": "Ildfaste fade i ikonisk retrodesign", "c": "kok", "v": false}, {"id": "339638", "b": "Smeg", "n": "Ildfast fad i klassisk retrodesign", "c": "kok", "v": false}, {"id": "339615", "b": "Pillivuyt", "n": "Ovnfast og elegant serveringsfad", "c": "bord", "v": false}, {"id": "339641", "b": "Stelton", "n": "Skulpturel serveringsbakke i stål", "c": "bord", "v": true}, {"id": "341048", "b": "Georg Jensen", "n": "Elegant Bernadotte-kagesæt i rustfrit stål", "c": "bord", "v": false}, {"id": "391134", "b": "Georg Jensen", "n": "Dekorative skåle med omtanke - 2 stk", "c": "bord", "v": true}, {"id": "339472", "b": "Georg Jensen", "n": "Guldbelagt skål i ikonisk design", "c": "bord", "v": false}, {"id": "339633", "b": "Sofie Linde Kähler", "n": "Farverig designvase med karakter", "c": "bolig", "v": false}, {"id": "354717", "b": "Kay Bojesen", "n": "Liliput Fanebærer med tekstilflag", "c": "bolig", "v": false}, {"id": "354719", "b": "Kay Bojesen", "n": "Miniaturefugle i klassisk dansk design", "c": "bolig", "v": false}, {"id": "391267", "b": "SKAGEN COMFORT", "n": "Komfortabel dyne med bambusfibre – 140×200 eller 140×220 cm", "c": "tekstil", "v": false}, {"id": "339496", "b": "Georg Jensen Damask", "n": "Klassisk badelagen med matchende strandtaske", "c": "tekstil", "v": false}, {"id": "339467", "b": "CottonLover", "n": "Bløde OEKO-TEX-håndklæder - 4 dele", "c": "tekstil", "v": false}, {"id": "339466", "b": "CottonLover", "n": "Vendbart sengesæt i bomuldspercale - 2 sæt", "c": "tekstil", "v": false}, {"id": "339031", "b": "Omhu", "n": "Klassisk dug med julehjerter", "c": "tekstil", "v": false}, {"id": "339465", "b": "Cerruti 1881", "n": "Sporty og stilren weekendtaske", "c": "rejse", "v": false}, {"id": "339600", "b": "HUGO BOSS", "n": "Stilren toilettaske til rejse og hverdag", "c": "rejse", "v": true}, {"id": "339462", "b": "Dyberg Larsen", "n": "Stilren Skagerrak Mini bordlampe", "c": "bolig", "v": false}, {"id": "339630", "b": "Tisvilde", "n": "Stabil solcellelampe til udendørs brug - 2 stk", "c": "bolig", "v": false}, {"id": "339041", "b": "Royal Copenhagen", "n": "Termokop i ikonisk riflet design", "c": "bord", "v": false}, {"id": "339719", "b": "Royal Copenhagen", "n": "Elegant Blå Mega Riflet frokosttallerken - 22 cm", "c": "bord", "v": true}, {"id": "339720", "b": "Royal Copenhagen", "n": "Elegant Blå Mega Riflet tallerken - 27 cm", "c": "bord", "v": true}, {"id": "339650", "b": "Royal Copenhagen", "n": "Smuk Blå Mega Riflet kande - 0,9 L", "c": "bord", "v": true}, {"id": "340631", "b": "Royal Copenhagen", "n": "Smuk Blå Mega skål - 47 cl", "c": "bord", "v": false}, {"id": "340632", "b": "Royal Copenhagen", "n": "Elegant serveringsskål i porcelæn", "c": "bord", "v": false}, {"id": "339643", "b": "Royal Copenhagen", "n": "Elegant trekantet serveringsfad", "c": "bord", "v": false}, {"id": "339042", "b": "Royal Copenhagen", "n": "Smuk Hvid Riflet skål - 110 cl", "c": "bord", "v": true}, {"id": "339044", "b": "Royal Copenhagen", "n": "Elegante Hvid Riflede termokrus - 2 stk", "c": "bord", "v": false}, {"id": "339469", "b": "Explorer", "n": "Nødradio med solceller og powerbank", "c": "rejse", "v": false}, {"id": "339464", "b": "Body Care", "n": "Smart app-baseret kropsscanner", "c": "rejse", "v": false}, {"id": "339601", "b": "iiFUN", "n": "Smart 3-i-1-ladestation med trådløs opladning", "c": "rejse", "v": false}, {"id": "339461", "b": "Makita", "n": "Komplet bor- og bitsæt i kuffert", "c": "rejse", "v": false}, {"id": "357044", "b": "ByKoch", "n": "Professionel stegeoplevelse hjemme", "c": "kok", "v": false}, {"id": "390487", "b": "Gavefabrikken", "n": "Fabrikkens juleæske med chokolade og specialiteter", "c": "andet", "v": false}, {"id": "396495", "b": "Go Nordic Cruiseline", "n": "MiniCruise til Oslo for 4 pers", "c": "andet", "v": false}];
+const CATS = [
+  ["kok", "Køkken"], ["bord", "Bord og servering"], ["bolig", "Bolig og design"],
+  ["tekstil", "Tekstiler"], ["rejse", "Tasker og gadgets"], ["andet", "Oplevelser og spiseligt"]
+];
+const PEOPLE = [["kasper", "Kasper"], ["fie", "Fie"]];
+const OPTS = [["ja", "Ja"], ["maaske", "Måske"], ["nej", "Nej"]];
+const DEFAULT_GIFT = "339467";
+const SHOP = "https://gaveshop.gavefabrikken.dk/shop/4wpg6j/catalog/";
+
+const state = { kasper: {}, fie: {} };
+let filter = "alle";
+try { filter = localStorage.getItem("gavefilter") || "alle"; } catch (e) {}
+
+const FILTERS = [
+  ["alle", "Alle", () => true],
+  ["beggeja", "Begge ja", g => vk(g) === "ja" && vf(g) === "ja"],
+  ["enja", "Mindst én ja", g => vk(g) === "ja" || vf(g) === "ja"],
+  ["maaske", "Måske-bunken", g => (vk(g) === "maaske" || vf(g) === "maaske") && vk(g) !== "nej" && vf(g) !== "nej"],
+  ["uenige", "Uenige", g => vk(g) && vf(g) && vk(g) !== vf(g)],
+  ["manglerk", "Kasper mangler", g => !vk(g)],
+  ["manglerf", "Fie mangler", g => !vf(g)],
+  ["skjulnej", "Skjul nej", g => vk(g) !== "nej" && vf(g) !== "nej"],
+];
+function vk(g) { return state.kasper[g.id] || ""; }
+function vf(g) { return state.fie[g.id] || ""; }
+
+const listEl = document.getElementById("list");
+const chipsEl = document.getElementById("chips");
+const statusEl = document.getElementById("status");
+const cardEls = {};
+
+function el(tag, attrs, kids) {
+  const n = document.createElement(tag);
+  for (const k in attrs || {}) {
+    if (k === "text") n.textContent = attrs[k];
+    else if (k === "class") n.className = attrs[k];
+    else n.setAttribute(k, attrs[k]);
+  }
+  (kids || []).forEach(c => c && n.appendChild(c));
+  return n;
+}
+
+function build() {
+  FILTERS.forEach(([key, label]) => {
+    const b = el("button", { class: "chip", type: "button", "data-f": key, id: "f-" + key }, [
+      el("span", { text: label }), el("span", { class: "n" })
+    ]);
+    b.addEventListener("click", () => {
+      filter = key;
+      try { localStorage.setItem("gavefilter", key); } catch (e) {}
+      render();
+    });
+    chipsEl.appendChild(b);
+  });
+  CATS.forEach(([ck, cl]) => {
+    const gifts = GIFTS.filter(g => g.c === ck);
+    const grid = el("div", { class: "grid" });
+    const sec = el("section", { class: "cat", "data-cat": ck }, [
+      el("h2", {}, [document.createTextNode(cl + " "), el("small", { text: gifts.length + " gaver" })]), grid
+    ]);
+    gifts.forEach(g => {
+      const tag = el("span", { class: "tag", hidden: "" });
+      const extra = el("div", { class: "extra" });
+      const link = el("a", { href: SHOP + g.id, target: "_blank", rel: "noopener", text: "Se i shoppen" });
+      extra.appendChild(link);
+      if (g.v) extra.appendChild(document.createTextNode(" · har produktvideo"));
+      if (g.id === DEFAULT_GIFT) extra.appendChild(document.createTextNode(" · standardgave hvis intet vælges"));
+      const votes = el("div", { class: "votes" });
+      PEOPLE.forEach(([pk, pl]) => {
+        const opts = el("div", { class: "opts", role: "group", "aria-label": pl + " om " + g.n });
+        OPTS.forEach(([ov, ol]) => {
+          const btn = el("button", { type: "button", "data-p": pk, "data-v": ov, "aria-pressed": "false", id: "b-" + g.id + "-" + pk + "-" + ov, text: ol });
+          btn.addEventListener("click", () => vote(pk, g.id, ov));
+          opts.appendChild(btn);
+        });
+        votes.appendChild(el("div", { class: "vote" }, [el("span", { class: "who " + pk, text: pl }), opts]));
+      });
+      const card = el("article", { class: "card" }, [
+        el("div", { class: "pic" }, [el("img", { src: "gaver/" + g.id + ".webp", alt: g.b + " – " + g.n, loading: "lazy", decoding: "async" }), tag]),
+        el("div", { class: "body" }, [
+          el("div", {}, [el("div", { class: "brand", text: g.b }), el("p", { class: "name", text: g.n })]),
+          extra, votes
+        ])
+      ]);
+      grid.appendChild(card);
+      cardEls[g.id] = { card, tag, sec };
+    });
+    listEl.appendChild(sec);
+  });
+}
+
+function render() {
+  const fn = (FILTERS.find(f => f[0] === filter) || FILTERS[0])[2];
+  FILTERS.forEach(([key, , f]) => {
+    const b = document.getElementById("f-" + key);
+    b.setAttribute("aria-pressed", String(key === filter));
+    b.querySelector(".n").textContent = GIFTS.filter(f).length;
+  });
+  const visibleCats = {};
+  let shown = 0;
+  GIFTS.forEach(g => {
+    const { card, tag, sec } = cardEls[g.id];
+    const k = vk(g), f = vf(g);
+    const match = k === "ja" && f === "ja";
+    card.classList.toggle("both-ja", match);
+    card.classList.toggle("dim", k === "nej" && f === "nej");
+    if (match) { tag.hidden = false; tag.className = "tag match"; tag.textContent = "Begge ja"; }
+    else { tag.hidden = true; }
+    card.querySelectorAll(".vote button").forEach(btn => {
+      btn.setAttribute("aria-pressed", String(state[btn.dataset.p][g.id] === btn.dataset.v));
+    });
+    const vis = fn(g);
+    card.hidden = !vis;
+    if (vis) { shown++; visibleCats[g.c] = (visibleCats[g.c] || 0) + 1; }
+  });
+  listEl.querySelectorAll("section.cat").forEach(s => { s.hidden = !visibleCats[s.dataset.cat]; });
+  document.getElementById("empty").hidden = shown > 0;
+}
+
+/* ---------- lagring: Vores Hverdags egen Supabase ----------
+   Siden ligger i samme mappe som appen, så den deler appens login
+   (supabase-js gemmer det i localStorage under samme navn). Fie skal
+   derfor ikke logge ind igen. Stemmerne ligger i tabellen gaver_stemmer
+   (gave_id, person, valg). Hele siden + tabellen kan slettes efter jul. */
+const SUPABASE_URL = "https://kargzxpaaganyfnpyvmb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Z6Hxu-FsXtCk3FTczyFOBQ_bjhW_Xld";
+const GYLDIG = { ja: 1, maaske: 1, nej: 1 };
+let sb = null;
+let klar = false;
+const igang = {};               // "gave|person" -> antal skrivninger undervejs
+
+function setStatus(txt, warn) { statusEl.textContent = txt; statusEl.classList.toggle("warn", !!warn); }
+
+function vote(person, id, v) {
+  if (!klar) { setStatus("Log ind først for at stemme.", true); return; }
+  const cur = state[person][id];
+  const next = Object.assign({}, state[person]);
+  if (cur === v) delete next[id]; else next[id] = v;
+  state[person] = next;
+  render();
+  gem(person, id, next[id] || null);
+}
+
+async function gem(person, id, valg) {
+  const k = id + "|" + person;
+  igang[k] = (igang[k] || 0) + 1;
+  try {
+    const q = valg
+      ? sb.from("gaver_stemmer").upsert({ gave_id: id, person, valg, opdateret: new Date().toISOString() })
+      : sb.from("gaver_stemmer").delete().eq("gave_id", id).eq("person", person);
+    const { error } = await q;
+    if (error) throw error;
+    setStatus("Gemt · I ser de samme stemmer");
+  } catch (e) {
+    setStatus("Kunne ikke gemme: " + (e.message || e) + ". Prøv igen om lidt.", true);
+  } finally {
+    igang[k]--;
+  }
+}
+
+async function hent() {
+  const { data, error } = await sb.from("gaver_stemmer").select("gave_id,person,valg");
+  if (error) { setStatus("Kunne ikke hente stemmerne: " + error.message, true); return; }
+  const ny = { kasper: {}, fie: {} };
+  (data || []).forEach(r => { if (ny[r.person] && GYLDIG[r.valg]) ny[r.person][r.gave_id] = r.valg; });
+  // En stemme der er ved at blive gemt, må ikke blive overskrevet af en ældre læsning
+  PEOPLE.forEach(([pk]) => GIFTS.forEach(g => {
+    if (igang[g.id + "|" + pk]) { if (state[pk][g.id]) ny[pk][g.id] = state[pk][g.id]; else delete ny[pk][g.id]; }
+  }));
+  state.kasper = ny.kasper; state.fie = ny.fie;
+  render();
+}
+
+function lytLive() {
+  sb.channel("gaver_stemmer")
+    .on("postgres_changes", { event: "*", schema: "public", table: "gaver_stemmer" }, () => hent())
+    .subscribe();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) hent(); });
+}
+
+async function blivKlar() {
+  klar = true;
+  document.getElementById("login").hidden = true;
+  setStatus("Henter stemmer …");
+  await hent();
+  if (statusEl.textContent === "Henter stemmer …") setStatus("Forbundet · stemmerne deles mellem Kasper og Fie");
+  lytLive();
+}
+
+async function start() {
+  build();
+  render();
+  if (!window.supabase) { setStatus("Kunne ikke hente databasens værktøj. Tjek nettet og genindlæs.", true); return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { blivKlar(); return; }
+  setStatus("Ikke logget ind.", true);
+  const form = document.getElementById("login");
+  form.hidden = false;
+  form.addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const fejl = document.getElementById("login-fejl");
+    fejl.textContent = "";
+    const { error } = await sb.auth.signInWithPassword({
+      email: document.getElementById("login-mail").value.trim(),
+      password: document.getElementById("login-kode").value
+    });
+    if (error) { fejl.textContent = "Login mislykkedes: " + error.message; return; }
+    blivKlar();
+  });
+}
+start();
+</script>
+</body>
+</html>
